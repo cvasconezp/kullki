@@ -1,0 +1,12 @@
+{
+  "name": "Kullki — Caja de ahorro",
+  "short_name": "Kullki",
+  "description": "Gestión transparente de cajas de ahorro comunitarias",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f2",
+  "theme_color": "#0E7A5C",
+  "icons": [
+    { "src": "/icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

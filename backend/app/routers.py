@@ -21,7 +21,14 @@ def _add_months(d: date, n: int) -> date:
 
 
 def _saldo_capital(credito: models.Credito) -> float:
-    return round(sum(c.capital for c in credito.cuotas if not c.pagada), 2)
+    """Capital pendiente; los abonos parciales se imputan primero al interés de la cuota."""
+    saldo = 0.0
+    for c in credito.cuotas:
+        if c.pagada:
+            continue
+        abono_a_capital = max(0.0, (c.abonado or 0) - c.interes)
+        saldo += max(0.0, c.capital - abono_a_capital)
+    return round(saldo, 2)
 
 
 def _en_mora(credito: models.Credito) -> bool:
@@ -30,14 +37,22 @@ def _en_mora(credito: models.Credito) -> bool:
 
 
 def _socio_out(db: Session, s: models.Socio) -> schemas.SocioOut:
-    total = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
-                      .where(models.Aporte.socio_id == s.id)) or 0
+    """Ahorro neto del socio = aportes (sin multas) - retiros. Las multas van al fondo."""
+    ahorros = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
+                        .where(models.Aporte.socio_id == s.id,
+                               models.Aporte.tipo != "multa")) or 0
+    multas = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
+                       .where(models.Aporte.socio_id == s.id,
+                              models.Aporte.tipo == "multa")) or 0
+    retiros = db.scalar(select(func.coalesce(func.sum(models.Retiro.monto), 0))
+                        .where(models.Retiro.socio_id == s.id)) or 0
     saldo = 0.0
     for cr in s.creditos:
         if cr.estado == "activo":
             saldo += _saldo_capital(cr)
     out = schemas.SocioOut.model_validate(s)
-    out.total_aportes = round(total, 2)
+    out.total_aportes = round(ahorros - retiros, 2)
+    out.total_multas = round(multas, 2)
     out.saldo_credito = round(saldo, 2)
     return out
 
@@ -91,7 +106,8 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
         raise HTTPException(400, "Ya existe un usuario con la cédula del tesorero")
     caja = models.Caja(nombre=data.nombre, slug=data.slug, comunidad=data.comunidad,
                        tasa_interes_mensual=data.tasa_interes_mensual,
-                       aporte_ordinario=data.aporte_ordinario)
+                       aporte_ordinario=data.aporte_ordinario,
+                       multa_mora=data.multa_mora)
     db.add(caja)
     db.flush()
     tesorero = models.Usuario(caja_id=caja.id, nombre=data.tesorero_nombre,
@@ -287,32 +303,120 @@ def crear_credito(data: schemas.CreditoIn, db: Session = Depends(get_db),
     return _credito_out(credito, detalle=True)
 
 
+def _aplicar_abono(db, user, cuota: models.Cuota, monto: float, fecha) -> models.Credito:
+    credito = cuota.credito
+    if cuota.pagada:
+        raise HTTPException(400, "Esta cuota ya está pagada")
+    if any(not q.pagada and q.numero < cuota.numero for q in credito.cuotas):
+        raise HTTPException(400, "Hay cuotas anteriores pendientes; abónalas primero")
+    pendiente = round(cuota.total - (cuota.abonado or 0), 2)
+    if monto > pendiente + 0.005:
+        raise HTTPException(400, f"El abono excede lo pendiente de la cuota (${pendiente:.2f})")
+    fecha = fecha or date.today()
+
+    # Multa de mora automática: una sola vez, en el primer abono tras el vencimiento
+    caja = db.get(models.Caja, credito.caja_id)
+    if (caja.multa_mora > 0 and fecha > cuota.fecha_vencimiento
+            and (cuota.abonado or 0) == 0):
+        db.add(models.Aporte(caja_id=credito.caja_id, socio_id=credito.socio_id,
+                             monto=caja.multa_mora, fecha=fecha, tipo="multa",
+                             nota=f"Mora cuota {cuota.numero} crédito #{credito.id}",
+                             registrado_por=user.id))
+        log_audit(db, user, "crear", "aporte", 0,
+                  f"Multa por mora de ${caja.multa_mora:.2f} a {credito.socio.nombres} "
+                  f"(cuota {cuota.numero} vencida)", caja_id=credito.caja_id)
+
+    cuota.abonado = round((cuota.abonado or 0) + monto, 2)
+    if cuota.abonado >= cuota.total - 0.005:
+        cuota.abonado = cuota.total
+        cuota.pagada = True
+        cuota.fecha_pago = fecha
+        cuota.registrado_por = user.id
+        detalle = (f"Pago cuota {cuota.numero}/{credito.plazo_meses} de ${cuota.total:.2f} "
+                   f"— crédito #{credito.id} de {credito.socio.nombres}")
+    else:
+        detalle = (f"Abono parcial de ${monto:.2f} a cuota {cuota.numero} "
+                   f"(pendiente ${cuota.total - cuota.abonado:.2f}) "
+                   f"— crédito #{credito.id} de {credito.socio.nombres}")
+    if all(q.pagada for q in credito.cuotas):
+        credito.estado = "pagado"
+    log_audit(db, user, "pagar", "cuota", cuota.id, detalle, caja_id=credito.caja_id)
+    db.commit()
+    db.refresh(credito)
+    return credito
+
+
 @creditos_router.post("/cuotas/{cuota_id}/pagar", response_model=schemas.CreditoDetalle)
 def pagar_cuota(cuota_id: int, data: schemas.PagoCuotaIn, db: Session = Depends(get_db),
                 user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Cobra el total pendiente de la cuota."""
     cuota = db.get(models.Cuota, cuota_id)
     if not cuota:
         raise HTTPException(404, "Cuota no encontrada")
-    credito = cuota.credito
-    if user.rol != "superadmin" and credito.caja_id != user.caja_id:
+    if user.rol != "superadmin" and cuota.credito.caja_id != user.caja_id:
         raise HTTPException(404, "Cuota no encontrada")
-    if cuota.pagada:
-        raise HTTPException(400, "Esta cuota ya está pagada")
-    pendientes_previas = [q for q in credito.cuotas if not q.pagada and q.numero < cuota.numero]
-    if pendientes_previas:
-        raise HTTPException(400, "Hay cuotas anteriores pendientes; págalas primero")
-    cuota.pagada = True
-    cuota.fecha_pago = data.fecha_pago or date.today()
-    cuota.registrado_por = user.id
-    if all(q.pagada for q in credito.cuotas):
-        credito.estado = "pagado"
-    log_audit(db, user, "pagar", "cuota", cuota.id,
-              f"Pago cuota {cuota.numero}/{credito.plazo_meses} de ${cuota.total:.2f} "
-              f"— crédito #{credito.id} de {credito.socio.nombres}",
-              caja_id=credito.caja_id)
-    db.commit()
-    db.refresh(credito)
+    pendiente = round(cuota.total - (cuota.abonado or 0), 2)
+    credito = _aplicar_abono(db, user, cuota, pendiente, data.fecha_pago)
     return _credito_out(credito, detalle=True)
+
+
+@creditos_router.post("/cuotas/{cuota_id}/abonar", response_model=schemas.CreditoDetalle)
+def abonar_cuota(cuota_id: int, data: schemas.AbonoIn, db: Session = Depends(get_db),
+                 user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Abono parcial a la cuota en curso."""
+    cuota = db.get(models.Cuota, cuota_id)
+    if not cuota:
+        raise HTTPException(404, "Cuota no encontrada")
+    if user.rol != "superadmin" and cuota.credito.caja_id != user.caja_id:
+        raise HTTPException(404, "Cuota no encontrada")
+    credito = _aplicar_abono(db, user, cuota, data.monto, data.fecha_pago)
+    return _credito_out(credito, detalle=True)
+
+
+# ---------------------------------------------------------------- retiros
+retiros_router = APIRouter(prefix="/retiros", tags=["retiros"])
+
+
+@retiros_router.get("", response_model=list[schemas.RetiroOut])
+def listar_retiros(caja_id: int | None = None, limit: int = 100, db: Session = Depends(get_db),
+                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    cid = caja_scope(user, caja_id)
+    retiros = db.scalars(select(models.Retiro).where(models.Retiro.caja_id == cid)
+                         .order_by(models.Retiro.fecha.desc(), models.Retiro.id.desc())
+                         .limit(limit)).all()
+    out = []
+    for r in retiros:
+        item = schemas.RetiroOut.model_validate(r)
+        item.socio_nombres = r.socio.nombres
+        out.append(item)
+    return out
+
+
+@retiros_router.post("", response_model=schemas.RetiroOut)
+def registrar_retiro(data: schemas.RetiroIn, db: Session = Depends(get_db),
+                     user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    socio = db.get(models.Socio, data.socio_id)
+    if not socio or (user.rol != "superadmin" and socio.caja_id != user.caja_id):
+        raise HTTPException(404, "Socio no encontrado")
+    info = _socio_out(db, socio)
+    if data.monto > info.total_aportes + 0.005:
+        raise HTTPException(400,
+            f"El retiro excede el ahorro disponible del socio (${info.total_aportes:.2f})")
+    if info.saldo_credito > 0 and data.monto > info.total_aportes - info.saldo_credito + 0.005:
+        raise HTTPException(400,
+            "El socio tiene crédito activo: su ahorro respalda la deuda. "
+            f"Puede retirar máximo ${max(0, info.total_aportes - info.saldo_credito):.2f}")
+    retiro = models.Retiro(caja_id=socio.caja_id, socio_id=socio.id, monto=data.monto,
+                           fecha=data.fecha or date.today(), nota=data.nota,
+                           registrado_por=user.id)
+    db.add(retiro)
+    db.flush()
+    log_audit(db, user, "crear", "retiro", retiro.id,
+              f"Retiro de ${data.monto:.2f} de {socio.nombres}", caja_id=socio.caja_id)
+    db.commit()
+    item = schemas.RetiroOut.model_validate(retiro)
+    item.socio_nombres = socio.nombres
+    return item
 
 
 # ---------------------------------------------------------------- reportes
@@ -328,6 +432,8 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
         raise HTTPException(404, "Caja no encontrada")
     total_aportes = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
                               .where(models.Aporte.caja_id == cid)) or 0
+    total_retiros = db.scalar(select(func.coalesce(func.sum(models.Retiro.monto), 0))
+                              .where(models.Retiro.caja_id == cid)) or 0
     desembolsado = db.scalar(select(func.coalesce(func.sum(models.Credito.monto), 0))
                              .where(models.Credito.caja_id == cid)) or 0
     pagado = db.execute(
@@ -336,9 +442,14 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
         .join(models.Credito).where(models.Credito.caja_id == cid, models.Cuota.pagada)
     ).one()
     cap_recuperado, intereses = float(pagado[0]), float(pagado[1])
+    abonos_transito = float(db.scalar(
+        select(func.coalesce(func.sum(models.Cuota.abonado), 0))
+        .join(models.Credito)
+        .where(models.Credito.caja_id == cid, models.Cuota.pagada.is_(False))) or 0)
     hoy = date.today()
     mora = db.execute(
-        select(func.count(models.Cuota.id), func.coalesce(func.sum(models.Cuota.total), 0))
+        select(func.count(models.Cuota.id),
+               func.coalesce(func.sum(models.Cuota.total - models.Cuota.abonado), 0))
         .join(models.Credito)
         .where(models.Credito.caja_id == cid, models.Cuota.pagada.is_(False),
                models.Cuota.fecha_vencimiento < hoy)
@@ -351,11 +462,14 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
     return schemas.DashboardOut(
         caja=schemas.CajaOut.model_validate(caja),
         socios_activos=socios_activos,
-        fondo_disponible=round(total_aportes + cap_recuperado + intereses - desembolsado, 2),
+        fondo_disponible=round(total_aportes + cap_recuperado + intereses
+                               + abonos_transito - desembolsado - total_retiros, 2),
         total_aportes=round(total_aportes, 2),
         capital_prestado=round(desembolsado - cap_recuperado, 2),
         capital_recuperado=round(cap_recuperado, 2),
         intereses_cobrados=round(intereses, 2),
+        total_retiros=round(total_retiros, 2),
+        abonos_en_transito=round(abonos_transito, 2),
         creditos_activos=creditos_activos,
         cuotas_en_mora=int(mora[0]),
         monto_en_mora=round(float(mora[1]), 2),
@@ -379,10 +493,13 @@ def mi_libreta(socio_id: int | None = None, db: Session = Depends(get_db),
         raise HTTPException(404, "Socio no encontrado")
     caja = db.get(models.Caja, socio.caja_id)
     aportes = sorted(socio.aportes, key=lambda a: (a.fecha, a.id), reverse=True)
+    retiros = db.scalars(select(models.Retiro).where(models.Retiro.socio_id == sid)
+                         .order_by(models.Retiro.fecha.desc())).all()
     return schemas.LibretaOut(
         socio=_socio_out(db, socio),
         caja_nombre=caja.nombre,
         aportes=[schemas.AporteOut.model_validate(a) for a in aportes],
+        retiros=[schemas.RetiroOut.model_validate(x) for x in retiros],
         creditos=[_credito_out(c, detalle=True) for c in
                   sorted(socio.creditos, key=lambda c: c.creado_en, reverse=True)],
     )
@@ -395,3 +512,44 @@ def auditoria(caja_id: int | None = None, limit: int = 200, db: Session = Depend
     cid = caja_scope(user, caja_id)
     return db.scalars(select(models.Auditoria).where(models.Auditoria.caja_id == cid)
                       .order_by(models.Auditoria.fecha.desc()).limit(limit)).all()
+
+
+@reportes_router.get("/informe-asamblea", response_model=schemas.InformeAsamblea)
+def informe_asamblea(caja_id: int | None = None, db: Session = Depends(get_db),
+                     user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Informe imprimible para la asamblea: estado de la caja y fila por socio."""
+    cid = caja_scope(user, caja_id)
+    dash = dashboard(caja_id=cid, db=db, user=user)
+    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid)
+                        .order_by(models.Socio.nombres)).all()
+    filas = []
+    for s in socios:
+        info = _socio_out(db, s)
+        en_mora = any(c.estado == "activo" and _en_mora(c) for c in s.creditos)
+        filas.append(schemas.FilaInforme(
+            socio=s.nombres, cedula=s.cedula, ahorro_neto=info.total_aportes,
+            multas=info.total_multas, saldo_credito=info.saldo_credito, en_mora=en_mora))
+    log_audit(db, user, "crear", "informe", 0, "Informe de asamblea generado", caja_id=cid)
+    db.commit()
+    return schemas.InformeAsamblea(caja=dash.caja, fecha=date.today(),
+                                   dashboard=dash, filas=filas)
+
+
+@reportes_router.get("/cierre/simulacion", response_model=schemas.CierreSimulacion)
+def cierre_simulacion(caja_id: int | None = None, db: Session = Depends(get_db),
+                      user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Simula el reparto de intereses cobrados, proporcional al ahorro neto de cada socio."""
+    cid = caja_scope(user, caja_id)
+    dash = dashboard(caja_id=cid, db=db, user=user)
+    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
+                                                   models.Socio.activo)).all()
+    infos = [(s, _socio_out(db, s)) for s in socios]
+    total_ahorro = sum(i.total_aportes for _, i in infos)
+    filas = []
+    for s, i in sorted(infos, key=lambda x: -x[1].total_aportes):
+        pct = (i.total_aportes / total_ahorro * 100) if total_ahorro > 0 else 0
+        filas.append(schemas.FilaCierre(
+            socio=s.nombres, ahorro_neto=i.total_aportes, porcentaje=round(pct, 2),
+            utilidad=round(dash.intereses_cobrados * pct / 100, 2)))
+    return schemas.CierreSimulacion(intereses_a_repartir=dash.intereses_cobrados,
+                                    total_ahorro=round(total_ahorro, 2), filas=filas)

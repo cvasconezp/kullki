@@ -202,6 +202,7 @@ def test_dashboard_fondo_consistente(setup):
     d = client.get("/dashboard", headers=setup["ta"]).json()
     assert d["fondo_disponible"] == round(
         d["total_aportes"] + d["capital_recuperado"] + d["intereses_cobrados"]
+        + d["abonos_en_transito"] - d["total_retiros"]
         - (d["capital_prestado"] + d["capital_recuperado"]), 2)
 
 
@@ -212,3 +213,133 @@ def test_auditoria_visible_para_socio_y_aislada(setup):
     detalles = " ".join(i["detalle"] for i in items)
     assert "Ana A" in detalles
     assert "Beto B" not in detalles  # nada de la otra caja
+
+
+# ---------------- retiros, abonos parciales, multas, informes ----------------
+
+def test_multa_no_suma_al_ahorro_pero_si_al_fondo(setup):
+    antes = client.get("/dashboard", headers=setup["ta"]).json()
+    lib_antes = client.get(f"/mi-libreta?socio_id={setup['socio_a']['id']}",
+                           headers=setup["ta"]).json()
+    r = client.post("/aportes", headers=setup["ta"], json={
+        "socio_id": setup["socio_a"]["id"], "monto": 2, "tipo": "multa"})
+    assert r.status_code == 200
+    despues = client.get("/dashboard", headers=setup["ta"]).json()
+    lib = client.get(f"/mi-libreta?socio_id={setup['socio_a']['id']}",
+                     headers=setup["ta"]).json()
+    assert lib["socio"]["total_aportes"] == lib_antes["socio"]["total_aportes"]  # ahorro intacto
+    assert lib["socio"]["total_multas"] >= 2
+    assert despues["fondo_disponible"] == round(antes["fondo_disponible"] + 2, 2)
+
+
+def test_retiro_valido_descuenta_ahorro_y_fondo(setup):
+    # socio nuevo sin créditos, para no chocar con la regla de respaldo de deuda
+    s = client.post("/socios", headers=setup["ta"],
+                    json={"nombres": "Diego D", "cedula": "2000000099"}).json()
+    client.post("/aportes", headers=setup["ta"], json={"socio_id": s["id"], "monto": 20})
+    antes = client.get("/dashboard", headers=setup["ta"]).json()
+    r = client.post("/retiros", headers=setup["ta"], json={
+        "socio_id": s["id"], "monto": 5, "nota": "test"})
+    assert r.status_code == 200, r.text
+    despues = client.get("/dashboard", headers=setup["ta"]).json()
+    lib = client.get(f"/mi-libreta?socio_id={s['id']}", headers=setup["ta"]).json()
+    assert lib["socio"]["total_aportes"] == 15.0
+    assert despues["fondo_disponible"] == round(antes["fondo_disponible"] - 5, 2)
+    assert len(lib["retiros"]) == 1
+
+
+def test_retiro_excesivo_rechazado(setup):
+    r = client.post("/retiros", headers=setup["ta"], json={
+        "socio_id": setup["socio_a"]["id"], "monto": 99999})
+    assert r.status_code == 400
+
+
+def test_retiro_bloqueado_por_credito_activo(setup):
+    """Caja B: socio con crédito activo no puede vaciar su ahorro."""
+    tb = setup["tb"]
+    sb = setup["socio_b"]["id"]
+    for _ in range(3):
+        client.post("/aportes", headers=tb, json={"socio_id": sb, "monto": 10})
+    r = client.post("/creditos", headers=tb, json={
+        "socio_id": sb, "monto": 25, "plazo_meses": 2})
+    assert r.status_code == 200
+    r = client.post("/retiros", headers=tb, json={"socio_id": sb, "monto": 30})
+    assert r.status_code == 400
+    assert "respalda" in r.json()["detail"]
+    r = client.post("/retiros", headers=tb, json={"socio_id": sb, "monto": 5})
+    assert r.status_code == 200
+
+
+def test_abono_parcial_y_completar(setup):
+    ta = setup["ta"]
+    r = client.post("/creditos", headers=ta, json={
+        "socio_id": setup["socio_a"]["id"], "monto": 200, "plazo_meses": 2})
+    assert r.status_code == 200
+    c = r.json()
+    cuota1 = c["cuotas"][0]
+    # abono parcial
+    r = client.post(f"/creditos/cuotas/{cuota1['id']}/abonar", headers=ta,
+                    json={"monto": 50})
+    assert r.status_code == 200
+    d = r.json()
+    q1 = d["cuotas"][0]
+    assert q1["abonado"] == 50 and q1["pagada"] is False
+    assert d["cuotas_pagadas"] == 0
+    # abono que excede lo pendiente -> rechazado
+    r = client.post(f"/creditos/cuotas/{cuota1['id']}/abonar", headers=ta,
+                    json={"monto": 9999})
+    assert r.status_code == 400
+    # completar con /pagar (cobra el restante)
+    r = client.post(f"/creditos/cuotas/{cuota1['id']}/pagar", headers=ta, json={})
+    assert r.status_code == 200
+    q1 = r.json()["cuotas"][0]
+    assert q1["pagada"] is True and q1["abonado"] == q1["total"]
+
+
+def test_multa_mora_automatica():
+    """Caja con multa_mora: primer abono a cuota vencida genera la multa una sola vez."""
+    sa = login("admin", "test-admin-123")
+    r = client.post("/cajas", headers=sa, json={
+        "nombre": "Caja Mora", "slug": "caja-mora", "comunidad": "Test",
+        "tasa_interes_mensual": 1.0, "aporte_ordinario": 10, "multa_mora": 1.5,
+        "tesorero_nombre": "Tes Mora", "tesorero_cedula": "1000000003",
+        "tesorero_password": "secreta123"})
+    assert r.status_code == 200, r.text
+    tm = login("1000000003", "secreta123")
+    s = client.post("/socios", headers=tm,
+                    json={"nombres": "Carla C", "cedula": "2000000003"}).json()
+    client.post("/aportes", headers=tm, json={"socio_id": s["id"], "monto": 50})
+    c = client.post("/creditos", headers=tm, json={
+        "socio_id": s["id"], "monto": 60, "plazo_meses": 2,
+        "fecha_desembolso": (date.today() - timedelta(days=70)).isoformat()}).json()
+    cuota1 = c["cuotas"][0]  # ya vencida
+    r = client.post(f"/creditos/cuotas/{cuota1['id']}/abonar", headers=tm,
+                    json={"monto": 10})
+    assert r.status_code == 200
+    lib = client.get(f"/mi-libreta?socio_id={s['id']}", headers=tm).json()
+    assert lib["socio"]["total_multas"] == 1.5
+    # segundo abono a la misma cuota: NO duplica la multa
+    client.post(f"/creditos/cuotas/{cuota1['id']}/abonar", headers=tm, json={"monto": 5})
+    lib = client.get(f"/mi-libreta?socio_id={s['id']}", headers=tm).json()
+    assert lib["socio"]["total_multas"] == 1.5
+
+
+def test_informe_asamblea(setup):
+    r = client.get("/informe-asamblea", headers=setup["ta"])
+    assert r.status_code == 200
+    d = r.json()
+    assert d["caja"]["slug"] == "caja-a"
+    assert len(d["filas"]) >= 1
+    fila = next(f for f in d["filas"] if f["socio"] == "Ana A")
+    lib = client.get(f"/mi-libreta?socio_id={setup['socio_a']['id']}",
+                     headers=setup["ta"]).json()
+    assert fila["ahorro_neto"] == lib["socio"]["total_aportes"]
+
+
+def test_cierre_simulacion_proporcional(setup):
+    r = client.get("/cierre/simulacion", headers=setup["ta"])
+    assert r.status_code == 200
+    d = r.json()
+    if d["total_ahorro"] > 0:
+        assert abs(sum(f["porcentaje"] for f in d["filas"]) - 100) < 0.5
+        assert abs(sum(f["utilidad"] for f in d["filas"]) - d["intereses_a_repartir"]) < 0.1

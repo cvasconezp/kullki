@@ -30,6 +30,7 @@ class CajaIn(BaseModel):
     comunidad: str = ""
     tasa_interes_mensual: float = 1.5
     aporte_ordinario: float = 10.0
+    multa_mora: float = 0.0
     tesorero_nombre: str
     tesorero_cedula: str
     tesorero_password: str = Field(min_length=6)
@@ -42,6 +43,7 @@ class CajaOut(BaseModel):
     comunidad: str
     tasa_interes_mensual: float
     aporte_ordinario: float
+    multa_mora: float
     activa: bool
 
     class Config:
@@ -65,7 +67,8 @@ class SocioOut(BaseModel):
     telefono: str
     fecha_ingreso: date
     activo: bool
-    total_aportes: float = 0
+    total_aportes: float = 0      # ahorro neto: aportes (sin multas) - retiros
+    total_multas: float = 0
     saldo_credito: float = 0
 
     class Config:
@@ -111,6 +114,7 @@ class CuotaOut(BaseModel):
     capital: float
     interes: float
     total: float
+    abonado: float
     pagada: bool
     fecha_pago: date | None
 
@@ -153,6 +157,8 @@ class DashboardOut(BaseModel):
     capital_prestado: float
     capital_recuperado: float
     intereses_cobrados: float
+    total_retiros: float = 0
+    abonos_en_transito: float = 0
     creditos_activos: int
     cuotas_en_mora: int
     monto_en_mora: float
@@ -162,6 +168,7 @@ class LibretaOut(BaseModel):
     socio: SocioOut
     caja_nombre: str
     aportes: list[AporteOut]
+    retiros: list["RetiroOut"] = []
     creditos: list[CreditoDetalle]
 
 
@@ -176,3 +183,58 @@ class AuditoriaOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- Retiros ----------
+class RetiroIn(BaseModel):
+    socio_id: int
+    monto: float = Field(gt=0)
+    fecha: date | None = None
+    nota: str = ""
+
+
+class RetiroOut(BaseModel):
+    id: int
+    socio_id: int
+    socio_nombres: str | None = None
+    monto: float
+    fecha: date
+    nota: str
+
+    class Config:
+        from_attributes = True
+
+
+class AbonoIn(BaseModel):
+    monto: float = Field(gt=0)
+    fecha_pago: date | None = None
+
+
+# ---------- Informe de asamblea ----------
+class FilaInforme(BaseModel):
+    socio: str
+    cedula: str
+    ahorro_neto: float
+    multas: float
+    saldo_credito: float
+    en_mora: bool
+
+
+class InformeAsamblea(BaseModel):
+    caja: CajaOut
+    fecha: date
+    dashboard: DashboardOut
+    filas: list[FilaInforme]
+
+
+class FilaCierre(BaseModel):
+    socio: str
+    ahorro_neto: float
+    porcentaje: float
+    utilidad: float
+
+
+class CierreSimulacion(BaseModel):
+    intereses_a_repartir: float
+    total_ahorro: float
+    filas: list[FilaCierre]

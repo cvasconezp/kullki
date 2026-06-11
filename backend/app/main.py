@@ -6,8 +6,8 @@ from sqlalchemy import select
 from .database import Base, engine, SessionLocal
 from . import models
 from .auth import hash_password
-from .routers import (auth_router, cajas_router, socios_router,
-                      aportes_router, creditos_router, reportes_router)
+from .routers import (auth_router, cajas_router, socios_router, aportes_router,
+                      creditos_router, retiros_router, reportes_router)
 
 app = FastAPI(title="Kullki API", version="0.1.0",
               description="Gestión transparente de cajas de ahorro comunitarias — Yachay Deep Labs")
@@ -21,7 +21,7 @@ app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True
                    allow_methods=["*"], allow_headers=["*"])
 
 for r in (auth_router, cajas_router, socios_router, aportes_router,
-          creditos_router, reportes_router):
+          creditos_router, retiros_router, reportes_router):
     app.include_router(r)
 
 

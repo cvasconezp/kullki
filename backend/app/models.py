@@ -14,6 +14,7 @@ class Caja(Base):
     comunidad: Mapped[str] = mapped_column(String(120), default="")
     tasa_interes_mensual: Mapped[float] = mapped_column(Float, default=1.5)  # % mensual por defecto
     aporte_ordinario: Mapped[float] = mapped_column(Float, default=10.0)
+    multa_mora: Mapped[float] = mapped_column(Float, default=0.0)  # USD por cuota vencida
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -93,6 +94,7 @@ class Cuota(Base):
     capital: Mapped[float] = mapped_column(Float)
     interes: Mapped[float] = mapped_column(Float)
     total: Mapped[float] = mapped_column(Float)
+    abonado: Mapped[float] = mapped_column(Float, default=0.0)
     pagada: Mapped[bool] = mapped_column(Boolean, default=False)
     fecha_pago: Mapped[date | None] = mapped_column(Date, nullable=True)
     registrado_por: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
@@ -111,3 +113,17 @@ class Auditoria(Base):
     entidad_id: Mapped[int] = mapped_column(Integer)
     detalle: Mapped[str] = mapped_column(Text, default="")
     fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Retiro(Base):
+    __tablename__ = "retiros"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
+    socio_id: Mapped[int] = mapped_column(ForeignKey("socios.id"), index=True)
+    monto: Mapped[float] = mapped_column(Float)
+    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    nota: Mapped[str] = mapped_column(String(200), default="")
+    registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    socio: Mapped["Socio"] = relationship()

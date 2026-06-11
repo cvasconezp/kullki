@@ -100,9 +100,21 @@ kullki/
     └── vercel.json
 ```
 
-## Hoja de ruta sugerida
+## Implementado en v0.2
 
-- Exportar libreta y reportes a PDF para asambleas
-- Notificación de cuota próxima por WhatsApp (Twilio/Meta API)
-- Modo offline-first (PWA) para zonas con conectividad limitada
-- Cierre de ejercicio: reparto de utilidades proporcional a aportes
+- **Retiros de ahorro** con doble validación: no más que el ahorro del socio,
+  y si tiene crédito activo su ahorro respalda la deuda.
+- **Abonos parciales** a cuotas (imputados primero al interés) con cobro del restante.
+- **Multa por mora automática** y configurable por caja (se aplica una sola vez
+  por cuota, en el primer abono tras el vencimiento). Las multas van al fondo
+  común, no al ahorro del socio.
+- **Informe de asamblea imprimible** (botón Imprimir/PDF): estado de la caja +
+  detalle por socio + simulación de cierre de ejercicio (reparto de intereses
+  proporcional al ahorro).
+- **PWA instalable** (manifest + ícono): "Agregar a pantalla de inicio" en el celular.
+
+## Hoja de ruta
+
+- Notificación de cuota próxima por WhatsApp (requiere credenciales Meta/Twilio)
+- Service worker offline-first para asambleas sin señal
+- Registro formal del cierre de ejercicio (capitalizar o pagar utilidades)

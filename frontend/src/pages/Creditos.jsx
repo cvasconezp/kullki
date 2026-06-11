@@ -1,30 +1,56 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta } from "../lib/api.js";
 
-function TablaCuotas({ credito, onPagar, pagando }) {
+function TablaCuotas({ credito, onPagar, onAbonar, pagando }) {
+  const [abonos, setAbonos] = useState({});
+  const primeraPendiente = credito.cuotas.find((q) => !q.pagada)?.id;
   return (
     <div>
-      {credito.cuotas.map((c) => (
-        <div className="cuota-pagar" key={c.id}>
-          <div>
-            <div className="principal" style={{ fontSize: 14 }}>
-              Cuota {c.numero} · <span className="cifra">{usd(c.total)}</span>
+      {credito.cuotas.map((c) => {
+        const vencida = !c.pagada && new Date(c.fecha_vencimiento) < new Date();
+        const pendiente = +(c.total - (c.abonado || 0)).toFixed(2);
+        return (
+          <div key={c.id} style={{ borderBottom: "1px dashed var(--regla)", padding: "9px 0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+              <div>
+                <div className="principal" style={{ fontSize: 14 }}>
+                  Cuota {c.numero} · <span className="cifra">{usd(c.total)}</span>
+                  {!c.pagada && c.abonado > 0 &&
+                    <span className="detalle"> (abonado {usd(c.abonado)})</span>}
+                </div>
+                <div className="detalle">
+                  capital {usd(c.capital)} + interés {usd(c.interes)} · vence {fechaCorta(c.fecha_vencimiento)}
+                </div>
+              </div>
+              {c.pagada ? (
+                <span className="pill ok">pagada {fechaCorta(c.fecha_pago)}</span>
+              ) : c.id === primeraPendiente ? (
+                <button className="boton mini" disabled={pagando}
+                  style={vencida ? { background: "var(--cochinilla)" } : {}}
+                  onClick={() => onPagar(c.id)}>
+                  {vencida ? "Cobrar (vencida)" : "Cobrar " + usd(pendiente)}
+                </button>
+              ) : (
+                <span className="pill neutro">pendiente</span>
+              )}
             </div>
-            <div className="detalle">
-              capital {usd(c.capital)} + interés {usd(c.interes)} · vence {fechaCorta(c.fecha_vencimiento)}
-            </div>
+            {!c.pagada && c.id === primeraPendiente && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <input inputMode="decimal" placeholder="Abono parcial"
+                  value={abonos[c.id] || ""}
+                  style={{ flex: 1, padding: "8px 10px", border: "1px solid var(--regla)",
+                           borderRadius: 9, fontSize: 14, fontFamily: "var(--cuerpo)" }}
+                  onChange={(e) => setAbonos({ ...abonos, [c.id]: e.target.value })} />
+                <button className="boton mini secundario"
+                  disabled={pagando || !(+abonos[c.id] > 0)}
+                  onClick={() => { onAbonar(c.id, +abonos[c.id]); setAbonos({ ...abonos, [c.id]: "" }); }}>
+                  Abonar
+                </button>
+              </div>
+            )}
           </div>
-          {c.pagada ? (
-            <span className="pill ok">pagada {fechaCorta(c.fecha_pago)}</span>
-          ) : new Date(c.fecha_vencimiento) < new Date() ? (
-            <button className="boton mini" style={{ background: "var(--cochinilla)" }}
-              disabled={pagando} onClick={() => onPagar(c.id)}>Cobrar (vencida)</button>
-          ) : (
-            <button className="boton mini secundario" disabled={pagando}
-              onClick={() => onPagar(c.id)}>Cobrar</button>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -71,6 +97,17 @@ export default function Creditos() {
     setError(""); setTrabajando(true);
     try {
       const d = await api(`/creditos/cuotas/${cuotaId}/pagar`, { method: "POST", body: {} });
+      setDetalle((prev) => ({ ...prev, [creditoId]: d }));
+      api("/creditos").then(setCreditos);
+    } catch (e) { setError(e.message); }
+    finally { setTrabajando(false); }
+  };
+
+  const abonar = async (cuotaId, monto, creditoId) => {
+    setError(""); setTrabajando(true);
+    try {
+      const d = await api(`/creditos/cuotas/${cuotaId}/abonar`,
+        { method: "POST", body: { monto } });
       setDetalle((prev) => ({ ...prev, [creditoId]: d }));
       api("/creditos").then(setCreditos);
     } catch (e) { setError(e.message); }
@@ -151,7 +188,8 @@ export default function Creditos() {
               <summary>Ver tabla de cuotas</summary>
               {detalle[c.id]
                 ? <TablaCuotas credito={detalle[c.id]} pagando={trabajando}
-                    onPagar={(cuotaId) => pagar(cuotaId, c.id)} />
+                    onPagar={(cuotaId) => pagar(cuotaId, c.id)}
+                    onAbonar={(cuotaId, monto) => abonar(cuotaId, monto, c.id)} />
                 : <div className="vacio">Cargando cuotas…</div>}
             </details>
           </div>

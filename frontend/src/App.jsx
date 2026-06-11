@@ -7,13 +7,15 @@ import Aportes from "./pages/Aportes.jsx";
 import Creditos from "./pages/Creditos.jsx";
 import Libreta from "./pages/Libreta.jsx";
 import Bitacora from "./pages/Bitacora.jsx";
+import Informes from "./pages/Informes.jsx";
 import Cajas from "./pages/Cajas.jsx";
 
 const NAV_TESORERO = [
   { id: "inicio", label: "Inicio", ico: "⌂" },
   { id: "socios", label: "Socios", ico: "👥" },
-  { id: "aportes", label: "Aportes", ico: "⊕" },
+  { id: "aportes", label: "Movim.", ico: "⊕" },
   { id: "creditos", label: "Créditos", ico: "⇄" },
+  { id: "informes", label: "Informe", ico: "▦" },
   { id: "bitacora", label: "Bitácora", ico: "≡" },
 ];
 const NAV_SOCIO = [
@@ -63,6 +65,7 @@ export default function App() {
         {esTesorero && activa === "socios" && <Socios />}
         {esTesorero && activa === "aportes" && <Aportes />}
         {esTesorero && activa === "creditos" && <Creditos />}
+        {esTesorero && activa === "informes" && <Informes />}
         {esSocio && activa === "libreta" && <Libreta sesion={sesion} />}
         {activa === "bitacora" && !esSuper && <Bitacora />}
       </main>
