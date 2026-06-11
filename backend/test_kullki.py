@@ -91,6 +91,20 @@ def test_socio_solo_ve_su_libreta(setup):
     assert r.json()["socio"]["id"] == setup["socio_a"]["id"]  # ignora el socio_id ajeno
 
 
+def test_tesorero_ve_expediente_de_su_socio(setup):
+    """El tesorero puede abrir el expediente (libreta) de cualquier socio de SU caja."""
+    r = client.get(f"/mi-libreta?socio_id={setup['socio_a']['id']}", headers=setup["ta"])
+    assert r.status_code == 200
+    d = r.json()
+    assert d["socio"]["id"] == setup["socio_a"]["id"]
+    assert "aportes" in d and "creditos" in d
+
+
+def test_tesorero_no_ve_expediente_de_otra_caja(setup):
+    r = client.get(f"/mi-libreta?socio_id={setup['socio_a']['id']}", headers=setup["tb"])
+    assert r.status_code == 404
+
+
 # ---------------- aportes ----------------
 
 def test_aporte_y_total(setup):

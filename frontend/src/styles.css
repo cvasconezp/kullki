@@ -157,3 +157,12 @@ button { font-family: var(--cuerpo); cursor: pointer; }
 details summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 6px 0; list-style: none; }
 details summary::before { content: "▸ "; color: var(--kullki); }
 details[open] summary::before { content: "▾ "; }
+
+/* ---------- fila tocable (abre expediente del socio) ---------- */
+.fila.tocable { cursor: pointer; border-radius: 8px; margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+.fila.tocable:active { background: var(--kullki-tinte); }
+.fila.tocable .chevron { color: var(--kullki); font-size: 16px; align-self: center; }
+.expediente { background: var(--papel); border-radius: 10px; padding: 10px 12px; margin: 2px 0 10px; border: 1px solid var(--regla); }
+.expediente h4 { font-family: var(--display); font-size: 13.5px; margin: 8px 0 2px; color: var(--tinta-suave); text-transform: uppercase; letter-spacing: 0.05em; }
+.expediente h4:first-child { margin-top: 0; }
+.volver { background: none; border: none; color: var(--kullki-oscuro); font-weight: 600; font-size: 14px; padding: 4px 0; }
