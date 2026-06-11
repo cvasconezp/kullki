@@ -182,3 +182,25 @@ details[open] summary::before { content: "▾ "; }
   .libreta { box-shadow: none; }
   .pill.mora { border: 1px solid var(--cochinilla); }
 }
+
+/* Selector de caja (login multi-caja) */
+.selector-caja {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--carta);
+  border: 1.5px solid var(--borde);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, background .15s;
+}
+.selector-caja:hover:not(:disabled) { border-color: var(--kullki); background: var(--kullki-tinte); }
+.selector-caja:disabled { opacity: .55; cursor: default; }
+.selector-caja .nombre { font-weight: 600; color: var(--kullki-oscuro); }
+.selector-caja .meta { font-size: 13px; color: var(--texto-suave); margin-top: 2px; }
+.selector-caja .chevron { color: var(--kullki); font-size: 22px; line-height: 1; }

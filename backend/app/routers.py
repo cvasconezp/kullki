@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from . import models, schemas
 from .auth import (
-    create_token, verify_password, hash_password,
+    get_identidad,
+    Actor, create_token, verify_password, hash_password, membresias_activas,
     get_current_user, require_roles, caja_scope, log_audit,
 )
 
@@ -61,28 +62,90 @@ def _socio_out(db: Session, s: models.Socio) -> schemas.SocioOut:
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@auth_router.post("/login", response_model=schemas.TokenOut)
+@auth_router.post("/login", response_model=schemas.LoginOut)
 def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
     user = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
     if not user or not user.activo or not verify_password(data.password, user.password_hash):
         raise HTTPException(401, "Cédula o contraseña incorrecta")
-    caja_nombre = None
-    if user.caja_id:
-        caja = db.get(models.Caja, user.caja_id)
-        caja_nombre = caja.nombre if caja else None
-    return schemas.TokenOut(
-        access_token=create_token(user), rol=user.rol, nombre=user.nombre,
-        caja_id=user.caja_id, socio_id=user.socio_id, caja_nombre=caja_nombre,
-    )
+
+    # Superadmin: token directo, sin caja
+    if user.es_superadmin:
+        return schemas.LoginOut(
+            access_token=create_token(user), rol="superadmin", nombre=user.nombre,
+            requiere_seleccion=False, cajas=[])
+
+    mems = membresias_activas(db, user)
+    if not mems:
+        raise HTTPException(403, "Tu cuenta no está vinculada a ninguna caja activa")
+
+    cajas = []
+    for m in mems:
+        caja = db.get(models.Caja, m.caja_id)
+        if caja and caja.activa:
+            cajas.append(schemas.CajaMembresia(
+                caja_id=caja.id, caja_nombre=caja.nombre, comunidad=caja.comunidad,
+                rol=m.rol, socio_id=m.socio_id))
+
+    if not cajas:
+        raise HTTPException(403, "Tu cuenta no está vinculada a ninguna caja activa")
+
+    # Una sola caja: token ya anclado, entra directo
+    if len(cajas) == 1:
+        c = cajas[0]
+        return schemas.LoginOut(
+            access_token=create_token(user, caja_id=c.caja_id, rol=c.rol, socio_id=c.socio_id),
+            rol=c.rol, nombre=user.nombre, caja_id=c.caja_id, caja_nombre=c.caja_nombre,
+            socio_id=c.socio_id, requiere_seleccion=False, cajas=cajas)
+
+    # Varias cajas: token "sin anclar"; el front muestra el selector
+    return schemas.LoginOut(
+        access_token=create_token(user), rol=None, nombre=user.nombre,
+        requiere_seleccion=True, cajas=cajas)
+
+
+@auth_router.post("/seleccionar-caja", response_model=schemas.LoginOut)
+def seleccionar_caja(data: schemas.SeleccionCaja, db: Session = Depends(get_db),
+                     actor: Actor = Depends(get_identidad)):
+    """Cambia/elige la caja activa. Emite un token nuevo anclado a esa caja."""
+    user = actor.usuario
+    if user.es_superadmin:
+        raise HTTPException(400, "El superadmin no opera dentro de una caja")
+    m = db.scalar(select(models.Membresia).where(
+        models.Membresia.usuario_id == user.id,
+        models.Membresia.caja_id == data.caja_id,
+        models.Membresia.activo))
+    if not m:
+        raise HTTPException(403, "No perteneces a esa caja")
+    caja = db.get(models.Caja, m.caja_id)
+    return schemas.LoginOut(
+        access_token=create_token(user, caja_id=m.caja_id, rol=m.rol, socio_id=m.socio_id),
+        rol=m.rol, nombre=user.nombre, caja_id=m.caja_id,
+        caja_nombre=caja.nombre if caja else None, socio_id=m.socio_id,
+        requiere_seleccion=False, cajas=[])
+
+
+@auth_router.get("/mis-cajas", response_model=list[schemas.CajaMembresia])
+def mis_cajas(db: Session = Depends(get_db), actor: Actor = Depends(get_identidad)):
+    """Lista las cajas a las que la persona pertenece (para el selector)."""
+    if actor.usuario.es_superadmin:
+        return []
+    out = []
+    for m in membresias_activas(db, actor.usuario):
+        caja = db.get(models.Caja, m.caja_id)
+        if caja and caja.activa:
+            out.append(schemas.CajaMembresia(
+                caja_id=caja.id, caja_nombre=caja.nombre, comunidad=caja.comunidad,
+                rol=m.rol, socio_id=m.socio_id))
+    return out
 
 
 @auth_router.post("/cambiar-password")
 def cambiar_password(data: schemas.CambioPassword, db: Session = Depends(get_db),
-                     user: models.Usuario = Depends(get_current_user)):
+                     actor: Actor = Depends(get_identidad)):
+    user = actor.usuario
     if not verify_password(data.actual, user.password_hash):
         raise HTTPException(400, "La contraseña actual no coincide")
     user.password_hash = hash_password(data.nueva)
-    log_audit(db, user, "editar", "usuario", user.id, "Cambio de contraseña")
     db.commit()
     return {"ok": True}
 
@@ -99,24 +162,29 @@ def listar_cajas(db: Session = Depends(get_db),
 
 @cajas_router.post("", response_model=schemas.CajaOut)
 def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
-               user: models.Usuario = Depends(require_roles("superadmin"))):
+               actor: Actor = Depends(require_roles("superadmin"))):
     if db.scalar(select(models.Caja).where(models.Caja.slug == data.slug)):
         raise HTTPException(400, "Ya existe una caja con ese identificador (slug)")
-    if db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.tesorero_cedula)):
-        raise HTTPException(400, "Ya existe un usuario con la cédula del tesorero")
     caja = models.Caja(nombre=data.nombre, slug=data.slug, comunidad=data.comunidad,
                        tasa_interes_mensual=data.tasa_interes_mensual,
                        aporte_ordinario=data.aporte_ordinario,
                        multa_mora=data.multa_mora)
     db.add(caja)
     db.flush()
-    tesorero = models.Usuario(caja_id=caja.id, nombre=data.tesorero_nombre,
-                              cedula=data.tesorero_cedula,
-                              password_hash=hash_password(data.tesorero_password),
-                              rol="tesorero")
-    db.add(tesorero)
+
+    # Cuenta del tesorero: reutiliza si la cédula ya existe (persona en varias cajas)
+    tesorero = db.scalar(select(models.Usuario)
+                         .where(models.Usuario.cedula == data.tesorero_cedula))
+    if not tesorero:
+        tesorero = models.Usuario(nombre=data.tesorero_nombre, cedula=data.tesorero_cedula,
+                                  password_hash=hash_password(data.tesorero_password))
+        db.add(tesorero)
+        db.flush()
+    elif tesorero.es_superadmin:
+        raise HTTPException(400, "Esa cédula pertenece al administrador del sistema")
+    db.add(models.Membresia(usuario_id=tesorero.id, caja_id=caja.id, rol="tesorero"))
     db.flush()
-    log_audit(db, user, "crear", "caja", caja.id,
+    log_audit(db, actor, "crear", "caja", caja.id,
               f"Caja '{caja.nombre}' creada con tesorero {tesorero.nombre}", caja_id=caja.id)
     db.commit()
     db.refresh(caja)
@@ -138,8 +206,8 @@ def listar_socios(caja_id: int | None = None, db: Session = Depends(get_db),
 
 @socios_router.post("", response_model=schemas.SocioOut)
 def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
-                user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
-    cid = caja_scope(user, data.caja_id)
+                actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    cid = caja_scope(actor, data.caja_id)
     if db.scalar(select(models.Socio).where(models.Socio.caja_id == cid,
                                             models.Socio.cedula == data.cedula)):
         raise HTTPException(400, "Ya existe un socio con esa cédula en esta caja")
@@ -148,12 +216,19 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
                          fecha_ingreso=data.fecha_ingreso or date.today())
     db.add(socio)
     db.flush()
-    # cuenta de acceso del socio: usuario = cédula, contraseña inicial = cédula
-    if not db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula)):
-        db.add(models.Usuario(caja_id=cid, socio_id=socio.id, nombre=data.nombres,
-                              cedula=data.cedula, password_hash=hash_password(data.cedula),
-                              rol="socio"))
-    log_audit(db, user, "crear", "socio", socio.id,
+
+    # Cuenta de acceso: una sola por persona (cédula). Si ya existe (porque es
+    # socia/tesorera de otra caja), la REUTILIZAMOS y solo añadimos la membresía.
+    usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
+    if not usuario:
+        usuario = models.Usuario(nombre=data.nombres, cedula=data.cedula,
+                                 password_hash=hash_password(data.cedula))
+        db.add(usuario)
+        db.flush()
+    if not usuario.es_superadmin:
+        db.add(models.Membresia(usuario_id=usuario.id, caja_id=cid,
+                                socio_id=socio.id, rol="socio"))
+    log_audit(db, actor, "crear", "socio", socio.id,
               f"Socio {socio.nombres} ({socio.cedula}) registrado", caja_id=cid)
     db.commit()
     return _socio_out(db, socio)

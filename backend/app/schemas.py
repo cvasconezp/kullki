@@ -18,6 +18,30 @@ class TokenOut(BaseModel):
     caja_nombre: str | None = None
 
 
+class CajaMembresia(BaseModel):
+    caja_id: int
+    caja_nombre: str
+    comunidad: str = ""
+    rol: str
+    socio_id: int | None = None
+
+
+class LoginOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    nombre: str
+    rol: str | None = None              # None cuando requiere_seleccion
+    caja_id: int | None = None
+    caja_nombre: str | None = None
+    socio_id: int | None = None
+    requiere_seleccion: bool = False    # True => el front muestra el selector de caja
+    cajas: list[CajaMembresia] = []
+
+
+class SeleccionCaja(BaseModel):
+    caja_id: int
+
+
 class CambioPassword(BaseModel):
     actual: str
     nueva: str = Field(min_length=6)

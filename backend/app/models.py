@@ -22,16 +22,35 @@ class Caja(Base):
 
 
 class Usuario(Base):
+    """Identidad de una persona. Una cédula = una cuenta de login, sin caja propia.
+    El superadmin se distingue por el flag es_superadmin; el resto opera sobre sus
+    membresías (ver Membresia). Una misma persona puede tener varias membresías."""
     __tablename__ = "usuarios"
     __table_args__ = (UniqueConstraint("cedula", name="uq_usuario_cedula"),)
     id: Mapped[int] = mapped_column(primary_key=True)
-    caja_id: Mapped[int | None] = mapped_column(ForeignKey("cajas.id"), nullable=True)  # null = superadmin
-    socio_id: Mapped[int | None] = mapped_column(ForeignKey("socios.id"), nullable=True)
     nombre: Mapped[str] = mapped_column(String(120))
     cedula: Mapped[str] = mapped_column(String(20), index=True)
     password_hash: Mapped[str] = mapped_column(String(256))
-    rol: Mapped[str] = mapped_column(String(20))  # superadmin | tesorero | socio
+    es_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    membresias: Mapped[list["Membresia"]] = relationship(back_populates="usuario")
+
+
+class Membresia(Base):
+    """Vincula una cuenta (Usuario) con una caja y le da un rol ahí.
+    Una persona socia de dos cajas tiene dos membresías sobre la misma cuenta."""
+    __tablename__ = "membresias"
+    __table_args__ = (UniqueConstraint("usuario_id", "caja_id", name="uq_membresia_usuario_caja"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
+    socio_id: Mapped[int | None] = mapped_column(ForeignKey("socios.id"), nullable=True)
+    rol: Mapped[str] = mapped_column(String(20))  # tesorero | socio
+    activo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    usuario: Mapped["Usuario"] = relationship(back_populates="membresias")
+    caja: Mapped["Caja"] = relationship()
 
 
 class Socio(Base):

@@ -20,9 +20,10 @@ def run():
         caja = models.Caja(nombre="Caja de Ahorro Ñukanchik Kullki", slug="nukanchik",
                            comunidad="Cayambe", tasa_interes_mensual=1.5, aporte_ordinario=10)
         db.add(caja); db.flush()
-        tes = models.Usuario(caja_id=caja.id, nombre="Tesorera Demo", cedula="1700000000",
-                             password_hash=hash_password("tesorera123"), rol="tesorero")
+        tes = models.Usuario(nombre="Tesorera Demo", cedula="1700000000",
+                             password_hash=hash_password("tesorera123"))
         db.add(tes); db.flush()
+        db.add(models.Membresia(usuario_id=tes.id, caja_id=caja.id, rol="tesorero"))
         random.seed(7)
         socios = []
         for i, n in enumerate(NOMBRES):
@@ -31,8 +32,9 @@ def run():
                              telefono=f"09{random.randint(10000000, 99999999)}",
                              fecha_ingreso=date(2025, 1, 15))
             db.add(s); db.flush()
-            db.add(models.Usuario(caja_id=caja.id, socio_id=s.id, nombre=n, cedula=ced,
-                                  password_hash=hash_password(ced), rol="socio"))
+            u = models.Usuario(nombre=n, cedula=ced, password_hash=hash_password(ced))
+            db.add(u); db.flush()
+            db.add(models.Membresia(usuario_id=u.id, caja_id=caja.id, socio_id=s.id, rol="socio"))
             socios.append(s)
         # 16 meses de aportes ordinarios
         for k in range(16):

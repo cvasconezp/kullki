@@ -9,13 +9,15 @@ export function setSesion(s) {
   else localStorage.removeItem("kullki_sesion");
 }
 
-export async function api(path, { method = "GET", body } = {}) {
+export async function api(path, { method = "GET", body, token } = {}) {
   const sesion = getSesion();
+  // token explícito (selección de caja) tiene prioridad sobre el de la sesión
+  const bearer = token || sesion?.access_token;
   const res = await fetch(BASE + path, {
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(sesion ? { Authorization: `Bearer ${sesion.access_token}` } : {}),
+      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });

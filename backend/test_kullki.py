@@ -22,9 +22,28 @@ client = TestClient(app)
 
 
 def login(cedula, password):
+    """Login simple: vale para superadmin y para quien tiene UNA sola caja."""
     r = client.post("/auth/login", json={"cedula": cedula, "password": password})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def login_full(cedula, password):
+    r = client.post("/auth/login", json={"cedula": cedula, "password": password})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def login_en_caja(cedula, password, caja_id):
+    """Login + seleccionar caja explícita (para usuarios multi-caja)."""
+    data = login_full(cedula, password)
+    tok = data["access_token"]
+    if data.get("requiere_seleccion"):
+        r = client.post("/auth/seleccionar-caja", json={"caja_id": caja_id},
+                        headers={"Authorization": f"Bearer {tok}"})
+        assert r.status_code == 200, r.text
+        tok = r.json()["access_token"]
+    return {"Authorization": f"Bearer {tok}"}
 
 
 @pytest.fixture(scope="module")
@@ -343,3 +362,71 @@ def test_cierre_simulacion_proporcional(setup):
     if d["total_ahorro"] > 0:
         assert abs(sum(f["porcentaje"] for f in d["filas"]) - 100) < 0.5
         assert abs(sum(f["utilidad"] for f in d["filas"]) - d["intereses_a_repartir"]) < 0.1
+
+
+# ---------------- multi-caja: una persona en dos cajas ----------------
+
+def test_persona_en_dos_cajas_login_con_seleccion(setup):
+    """El caso que motivó la Opción A: la misma cédula socia de A y B."""
+    sa = setup["sa"]
+    # Persona nueva: socia en caja A
+    ta = setup["ta"]
+    ra = client.post("/socios", headers=ta,
+                     json={"nombres": "Multi Persona", "cedula": "2000000777"})
+    assert ra.status_code == 200, ra.text
+    # La misma cédula, ahora socia en caja B
+    tb = setup["tb"]
+    rb = client.post("/socios", headers=tb,
+                     json={"nombres": "Multi Persona", "cedula": "2000000777"})
+    assert rb.status_code == 200, rb.text
+
+    # Login: como tiene 2 cajas, debe pedir selección
+    data = login_full("2000000777", "2000000777")
+    assert data["requiere_seleccion"] is True
+    assert data["rol"] is None
+    assert len(data["cajas"]) == 2
+    slugs = {c["caja_nombre"] for c in data["cajas"]}
+    assert "Caja caja-a" in slugs and "Caja caja-b" in slugs
+
+    # Sin seleccionar caja, un endpoint con rol debe fallar (409)
+    tok = data["access_token"]
+    r = client.get("/mi-libreta", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 409
+
+    # Selecciona caja A -> ve SU libreta de A
+    ca = next(c for c in data["cajas"] if c["caja_nombre"] == "Caja caja-a")
+    h = client.post("/auth/seleccionar-caja", json={"caja_id": ca["caja_id"]},
+                    headers={"Authorization": f"Bearer {tok}"})
+    assert h.status_code == 200
+    tok_a = h.json()["access_token"]
+    lib = client.get("/mi-libreta", headers={"Authorization": f"Bearer {tok_a}"})
+    assert lib.status_code == 200
+    assert lib.json()["socio"]["caja_id"] == ca["caja_id"]
+
+
+def test_mis_cajas_endpoint(setup):
+    cajas = client.get("/auth/mis-cajas", headers=setup["ta"]).json()
+    # La tesorera de A solo pertenece a la caja A
+    assert all(c["rol"] == "tesorero" for c in cajas)
+    assert any(c["caja_nombre"] == "Caja caja-a" for c in cajas)
+
+
+def test_persona_socia_y_tesorera_en_distintas_cajas(setup):
+    """Una persona puede ser tesorera en una caja y socia en otra."""
+    sa = setup["sa"]
+    # Nueva caja C con tesorera cédula 2000000888
+    r = client.post("/cajas", headers=sa, json={
+        "nombre": "Caja caja-c", "slug": "caja-c", "comunidad": "Test",
+        "tasa_interes_mensual": 1.0, "aporte_ordinario": 10,
+        "tesorero_nombre": "Dual Rol", "tesorero_cedula": "2000000888",
+        "tesorero_password": "secreta123"})
+    assert r.status_code == 200, r.text
+    # La misma persona, socia en caja A
+    ra = client.post("/socios", headers=setup["ta"],
+                     json={"nombres": "Dual Rol", "cedula": "2000000888"})
+    assert ra.status_code == 200
+    data = login_full("2000000888", "secreta123")
+    assert data["requiere_seleccion"] is True
+    roles = {c["caja_nombre"]: c["rol"] for c in data["cajas"]}
+    assert roles["Caja caja-c"] == "tesorero"
+    assert roles["Caja caja-a"] == "socio"
