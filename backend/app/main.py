@@ -78,6 +78,26 @@ def init_db():
                         conn.execute(text(f"ALTER TABLE cajas ADD COLUMN {col} {ddl}"))
                         log.warning("Columna '%s' añadida a 'cajas'.", col)
 
+        # Ficha ampliada del socio + bandera de anulación en movimientos
+        def _add_cols(tabla, cols):
+            if tabla not in insp.get_table_names():
+                return
+            existe = {c["name"] for c in insp.get_columns(tabla)}
+            with engine.begin() as conn:
+                for col, ddl in cols.items():
+                    if col not in existe:
+                        conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {col} {ddl}"))
+                        log.warning("Columna '%s' añadida a '%s'.", col, tabla)
+        _add_cols("socios", {
+            "fecha_nacimiento": "DATE", "genero": "VARCHAR(20) DEFAULT ''",
+            "correo": "VARCHAR(120) DEFAULT ''", "whatsapp": "VARCHAR(20) DEFAULT ''",
+            "direccion": "VARCHAR(200) DEFAULT ''", "ocupacion": "VARCHAR(120) DEFAULT ''",
+            "estado_civil": "VARCHAR(20) DEFAULT ''", "nivel_instruccion": "VARCHAR(30) DEFAULT ''",
+            "num_cargas": "INTEGER DEFAULT 0", "contacto_emergencia": "VARCHAR(160) DEFAULT ''",
+        })
+        _add_cols("aportes", {"anulado": "BOOLEAN DEFAULT FALSE"})
+        _add_cols("retiros", {"anulado": "BOOLEAN DEFAULT FALSE"})
+
         # Superadmin inicial desde variables de entorno
         ced = os.getenv("SUPERADMIN_CEDULA", "admin")
         pwd = os.getenv("SUPERADMIN_PASSWORD", "kullki2026")

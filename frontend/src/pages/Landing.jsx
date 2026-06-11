@@ -110,30 +110,34 @@ export default function Landing({ sesion }) {
 
       {/* ROLES */}
       <section className="lp-roles">
-        <span className="lp-eyebrow">Para cada persona de la caja</span>
-        <h2>Todos miran la misma verdad</h2>
-        <div className="lp-grid roles">
-          {ROLES.map((x) => (
-            <div className="lp-rol" key={x.r}>
-              <div className="lp-rol-t">{x.r}</div>
-              <p>{x.d}</p>
-            </div>
-          ))}
+        <div className="lp-roles-in">
+          <span className="lp-eyebrow">Para cada persona de la caja</span>
+          <h2>Todos miran la misma verdad</h2>
+          <div className="lp-grid roles">
+            {ROLES.map((x) => (
+              <div className="lp-rol" key={x.r}>
+                <div className="lp-rol-t">{x.r}</div>
+                <p>{x.d}</p>
+              </div>
+            ))}
+          </div>
+          <button className="lp-cta claro" onClick={() => navigate("/ingresar")}>Comenzar ahora →</button>
         </div>
-        <button className="lp-cta claro" onClick={() => navigate("/ingresar")}>Comenzar ahora →</button>
       </section>
 
       {/* FOOTER */}
       <footer className="lp-footer">
-        <div className="lp-footer-marca">
-          <span className="lp-logo">Kullki</span>
-          <p>El dinero de tu comunidad, claro y a la vista.</p>
-        </div>
-        <div className="lp-footer-yd">
-          <a href="https://www.yachaydeep.com/labs" target="_blank" rel="noreferrer">
-            <img src="/logo-hero-dark.svg" alt="Yachay Deep" height="34" />
-          </a>
-          <span className="lp-foot-meta">Transformamos datos en conocimiento · © {new Date().getFullYear()}</span>
+        <div className="lp-footer-in">
+          <div className="lp-footer-marca">
+            <span className="lp-logo">Kullki</span>
+            <p>El dinero de tu comunidad, claro y a la vista.</p>
+          </div>
+          <div className="lp-footer-yd">
+            <a href="https://www.yachaydeep.com/labs" target="_blank" rel="noreferrer">
+              <img src="/logo-hero-dark.svg" alt="Yachay Deep" height="34" />
+            </a>
+            <span className="lp-foot-meta">Transformamos datos en conocimiento · © {new Date().getFullYear()}</span>
+          </div>
         </div>
       </footer>
     </div>

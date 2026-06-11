@@ -496,3 +496,73 @@ def test_balances_series_y_composicion(setup):
     assert set(["ahorros_disponibles", "capital_en_calle", "intereses"]) <= set(d["composicion_fondo"])
     for p in d["serie"]:
         assert "periodo" in p and "fondo_acumulado" in p
+
+
+# ---------------- ficha ampliada, anulación, ventana, export ----------------
+
+def test_socio_ficha_ampliada_y_edicion(setup):
+    ta = setup["ta"]
+    s = client.post("/socios", headers=ta, json={
+        "nombres": "Elena Demográfica", "cedula": "2000000444",
+        "correo": "elena@example.com", "genero": "F", "ocupacion": "Agricultora",
+        "fecha_nacimiento": "1990-05-20", "num_cargas": 2}).json()
+    assert s["correo"] == "elena@example.com" and s["genero"] == "F" and s["num_cargas"] == 2
+    r = client.patch(f"/socios/{s['id']}", headers=ta, json={"ocupacion": "Comerciante", "whatsapp": "0991234567"})
+    assert r.status_code == 200
+    assert r.json()["ocupacion"] == "Comerciante" and r.json()["whatsapp"] == "0991234567"
+
+
+def test_anular_aporte_excluye_del_saldo(setup):
+    ta = setup["ta"]
+    s = client.post("/socios", headers=ta, json={"nombres": "Anula Aporte", "cedula": "2000000555"}).json()
+    a = client.post("/aportes", headers=ta, json={"socio_id": s["id"], "monto": 30}).json()
+    lib = client.get(f"/mi-libreta?socio_id={s['id']}", headers=ta).json()
+    assert lib["socio"]["total_aportes"] == 30
+    r = client.post(f"/aportes/{a['id']}/anular", headers=ta)
+    assert r.status_code == 200 and r.json()["anulado"] is True
+    lib = client.get(f"/mi-libreta?socio_id={s['id']}", headers=ta).json()
+    assert lib["socio"]["total_aportes"] == 0          # el anulado no cuenta
+    assert all(x["id"] != a["id"] for x in lib["aportes"])  # ni aparece en la libreta
+
+
+def test_editar_aporte_dentro_de_ventana(setup):
+    ta = setup["ta"]
+    s = client.post("/socios", headers=ta, json={"nombres": "Edita Aporte", "cedula": "2000000556"}).json()
+    a = client.post("/aportes", headers=ta, json={"socio_id": s["id"], "monto": 10}).json()
+    r = client.patch(f"/aportes/{a['id']}", headers=ta, json={"monto": 12})
+    assert r.status_code == 200 and r.json()["monto"] == 12
+
+
+def test_tesorero_no_edita_pasada_la_ventana(setup):
+    """Si el movimiento se creó hace >5 min, el tesorero recibe 403; el superadmin sí puede."""
+    ta = setup["ta"]; sa = setup["sa"]
+    s = client.post("/socios", headers=ta, json={"nombres": "Tardío", "cedula": "2000000557"}).json()
+    a = client.post("/aportes", headers=ta, json={"socio_id": s["id"], "monto": 10}).json()
+    # forzar creado_en al pasado
+    db = SessionLocal()
+    try:
+        ap = db.get(models.Aporte, a["id"])
+        from datetime import datetime, timedelta
+        ap.creado_en = datetime.utcnow() - timedelta(minutes=10)
+        db.commit()
+    finally:
+        db.close()
+    r = client.post(f"/aportes/{a['id']}/anular", headers=ta)
+    assert r.status_code == 403
+    # superadmin autoriza (anula) sin límite
+    ca = next(c for c in client.get("/cajas", headers=sa).json() if c["slug"] == "caja-a")
+    imp = client.post("/auth/asumir-caja", headers=sa, json={"caja_id": ca["id"], "rol": "tesorero"}).json()
+    # el superadmin actúa directamente con su propio token
+    r2 = client.post(f"/aportes/{a['id']}/anular", headers=sa)
+    # superadmin necesita caja_id para scope en algunos endpoints, pero anular usa el del aporte
+    assert r2.status_code in (200,)  # superadmin puede anular pasado el tiempo
+
+
+def test_export_solo_superadmin(setup):
+    assert client.get("/export", headers=setup["ta"]).status_code == 403
+    r = client.get("/export", headers=setup["sa"])
+    assert r.status_code == 200
+    d = r.json()
+    assert "cajas" in d and "aportes" in d and "auditoria" in d
+    # nunca exporta contraseñas
+    assert all("password_hash" not in u for u in d["usuarios"])

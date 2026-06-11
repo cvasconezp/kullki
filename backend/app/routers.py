@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -38,16 +38,33 @@ def _en_mora(credito: models.Credito) -> bool:
     return any((not c.pagada) and c.fecha_vencimiento < hoy for c in credito.cuotas)
 
 
+VENTANA_EDICION = timedelta(minutes=5)
+
+def _verificar_ventana(actor, mov):
+    """Tesorero: solo puede corregir dentro de 5 min de creado el movimiento.
+    Superadmin: sin límite (es la 'autorización del superior')."""
+    if actor.rol == "superadmin":
+        return
+    creado = mov.creado_en or datetime.utcnow()
+    if datetime.utcnow() - creado > VENTANA_EDICION:
+        raise HTTPException(403,
+            "Pasaron más de 5 minutos desde el registro. Pide al administrador "
+            "que autorice la corrección de este movimiento.")
+
+
 def _socio_out(db: Session, s: models.Socio) -> schemas.SocioOut:
     """Ahorro neto del socio = aportes (sin multas) - retiros. Las multas van al fondo."""
     ahorros = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
                         .where(models.Aporte.socio_id == s.id,
-                               models.Aporte.tipo != "multa")) or 0
+                               models.Aporte.tipo != "multa",
+                               models.Aporte.anulado.is_(False))) or 0
     multas = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
                        .where(models.Aporte.socio_id == s.id,
-                              models.Aporte.tipo == "multa")) or 0
+                              models.Aporte.tipo == "multa",
+                              models.Aporte.anulado.is_(False))) or 0
     retiros = db.scalar(select(func.coalesce(func.sum(models.Retiro.monto), 0))
-                        .where(models.Retiro.socio_id == s.id)) or 0
+                        .where(models.Retiro.socio_id == s.id,
+                               models.Retiro.anulado.is_(False))) or 0
     saldo = 0.0
     for cr in s.creditos:
         if cr.estado == "activo":
@@ -278,7 +295,14 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
         raise HTTPException(400, "Ya existe un socio con esa cédula en esta caja")
     socio = models.Socio(caja_id=cid, nombres=data.nombres, cedula=data.cedula,
                          telefono=data.telefono,
-                         fecha_ingreso=data.fecha_ingreso or date.today())
+                         fecha_ingreso=data.fecha_ingreso or date.today(),
+                         fecha_nacimiento=data.fecha_nacimiento, genero=data.genero,
+                         correo=data.correo, whatsapp=data.whatsapp,
+                         direccion=data.direccion, ocupacion=data.ocupacion,
+                         estado_civil=data.estado_civil,
+                         nivel_instruccion=data.nivel_instruccion,
+                         num_cargas=data.num_cargas,
+                         contacto_emergencia=data.contacto_emergencia)
     db.add(socio)
     db.flush()
 
@@ -295,6 +319,22 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
                                 socio_id=socio.id, rol="socio"))
     log_audit(db, actor, "crear", "socio", socio.id,
               f"Socio {socio.nombres} ({socio.cedula}) registrado", caja_id=cid)
+    db.commit()
+    return _socio_out(db, socio)
+
+
+@socios_router.patch("/{socio_id}", response_model=schemas.SocioOut)
+def editar_socio(socio_id: int, data: schemas.SocioUpdate, db: Session = Depends(get_db),
+                 actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    socio = db.get(models.Socio, socio_id)
+    if not socio or (actor.rol != "superadmin" and socio.caja_id != actor.caja_id):
+        raise HTTPException(404, "Socio no encontrado")
+    cambios = data.model_dump(exclude_unset=True)
+    for k, v in cambios.items():
+        setattr(socio, k, v)
+    log_audit(db, actor, "editar", "socio", socio.id,
+              f"Ficha de {socio.nombres} actualizada: {', '.join(cambios) or 'sin cambios'}",
+              caja_id=socio.caja_id)
     db.commit()
     return _socio_out(db, socio)
 
@@ -354,6 +394,45 @@ def registrar_aporte(data: schemas.AporteIn, db: Session = Depends(get_db),
     db.commit()
     item = schemas.AporteOut.model_validate(aporte)
     item.socio_nombres = socio.nombres
+    return item
+
+
+@aportes_router.patch("/{aporte_id}", response_model=schemas.AporteOut)
+def editar_aporte(aporte_id: int, data: schemas.AporteUpdate, db: Session = Depends(get_db),
+                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    ap = db.get(models.Aporte, aporte_id)
+    if not ap or (user.rol != "superadmin" and ap.caja_id != user.caja_id):
+        raise HTTPException(404, "Movimiento no encontrado")
+    if ap.anulado:
+        raise HTTPException(400, "Este movimiento está anulado")
+    _verificar_ventana(user, ap)
+    cambios = data.model_dump(exclude_unset=True)
+    for k, v in cambios.items():
+        setattr(ap, k, v)
+    log_audit(db, user, "editar", "aporte", ap.id,
+              f"Aporte de {ap.socio.nombres} corregido: {', '.join(cambios) or 'sin cambios'}",
+              caja_id=ap.caja_id)
+    db.commit()
+    item = schemas.AporteOut.model_validate(ap)
+    item.socio_nombres = ap.socio.nombres
+    return item
+
+
+@aportes_router.post("/{aporte_id}/anular", response_model=schemas.AporteOut)
+def anular_aporte(aporte_id: int, db: Session = Depends(get_db),
+                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    ap = db.get(models.Aporte, aporte_id)
+    if not ap or (user.rol != "superadmin" and ap.caja_id != user.caja_id):
+        raise HTTPException(404, "Movimiento no encontrado")
+    if ap.anulado:
+        raise HTTPException(400, "Este movimiento ya está anulado")
+    _verificar_ventana(user, ap)
+    ap.anulado = True
+    log_audit(db, user, "anular", "aporte", ap.id,
+              f"Aporte de ${ap.monto:.2f} de {ap.socio.nombres} anulado", caja_id=ap.caja_id)
+    db.commit()
+    item = schemas.AporteOut.model_validate(ap)
+    item.socio_nombres = ap.socio.nombres
     return item
 
 
@@ -559,6 +638,45 @@ def registrar_retiro(data: schemas.RetiroIn, db: Session = Depends(get_db),
     return item
 
 
+@retiros_router.patch("/{retiro_id}", response_model=schemas.RetiroOut)
+def editar_retiro(retiro_id: int, data: schemas.RetiroUpdate, db: Session = Depends(get_db),
+                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    r = db.get(models.Retiro, retiro_id)
+    if not r or (user.rol != "superadmin" and r.caja_id != user.caja_id):
+        raise HTTPException(404, "Movimiento no encontrado")
+    if r.anulado:
+        raise HTTPException(400, "Este movimiento está anulado")
+    _verificar_ventana(user, r)
+    cambios = data.model_dump(exclude_unset=True)
+    for k, v in cambios.items():
+        setattr(r, k, v)
+    log_audit(db, user, "editar", "retiro", r.id,
+              f"Retiro de {r.socio.nombres} corregido: {', '.join(cambios) or 'sin cambios'}",
+              caja_id=r.caja_id)
+    db.commit()
+    item = schemas.RetiroOut.model_validate(r)
+    item.socio_nombres = r.socio.nombres
+    return item
+
+
+@retiros_router.post("/{retiro_id}/anular", response_model=schemas.RetiroOut)
+def anular_retiro(retiro_id: int, db: Session = Depends(get_db),
+                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    r = db.get(models.Retiro, retiro_id)
+    if not r or (user.rol != "superadmin" and r.caja_id != user.caja_id):
+        raise HTTPException(404, "Movimiento no encontrado")
+    if r.anulado:
+        raise HTTPException(400, "Este movimiento ya está anulado")
+    _verificar_ventana(user, r)
+    r.anulado = True
+    log_audit(db, user, "anular", "retiro", r.id,
+              f"Retiro de ${r.monto:.2f} de {r.socio.nombres} anulado", caja_id=r.caja_id)
+    db.commit()
+    item = schemas.RetiroOut.model_validate(r)
+    item.socio_nombres = r.socio.nombres
+    return item
+
+
 # ---------------------------------------------------------------- reportes
 reportes_router = APIRouter(tags=["reportes"])
 
@@ -571,9 +689,11 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
     if not caja:
         raise HTTPException(404, "Caja no encontrada")
     total_aportes = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
-                              .where(models.Aporte.caja_id == cid)) or 0
+                              .where(models.Aporte.caja_id == cid,
+                                     models.Aporte.anulado.is_(False))) or 0
     total_retiros = db.scalar(select(func.coalesce(func.sum(models.Retiro.monto), 0))
-                              .where(models.Retiro.caja_id == cid)) or 0
+                              .where(models.Retiro.caja_id == cid,
+                                     models.Retiro.anulado.is_(False))) or 0
     desembolsado = db.scalar(select(func.coalesce(func.sum(models.Credito.monto), 0))
                              .where(models.Credito.caja_id == cid)) or 0
     pagado = db.execute(
@@ -632,8 +752,10 @@ def mi_libreta(socio_id: int | None = None, db: Session = Depends(get_db),
     if user.rol == "tesorero" and socio.caja_id != user.caja_id:
         raise HTTPException(404, "Socio no encontrado")
     caja = db.get(models.Caja, socio.caja_id)
-    aportes = sorted(socio.aportes, key=lambda a: (a.fecha, a.id), reverse=True)
-    retiros = db.scalars(select(models.Retiro).where(models.Retiro.socio_id == sid)
+    aportes = sorted([a for a in socio.aportes if not a.anulado],
+                     key=lambda a: (a.fecha, a.id), reverse=True)
+    retiros = db.scalars(select(models.Retiro).where(models.Retiro.socio_id == sid,
+                                                     models.Retiro.anulado.is_(False))
                          .order_by(models.Retiro.fecha.desc())).all()
     return schemas.LibretaOut(
         socio=_socio_out(db, socio),
@@ -717,9 +839,11 @@ def balances(caja_id: int | None = None, db: Session = Depends(get_db),
         m = movs[k]; m["periodo"], m["etiqueta"] = k, lbl
         return m
 
-    for a in db.scalars(select(models.Aporte).where(models.Aporte.caja_id == cid)):
+    for a in db.scalars(select(models.Aporte).where(models.Aporte.caja_id == cid,
+                                                    models.Aporte.anulado.is_(False))):
         slot(a.fecha)["aportes"] += a.monto
-    for r in db.scalars(select(models.Retiro).where(models.Retiro.caja_id == cid)):
+    for r in db.scalars(select(models.Retiro).where(models.Retiro.caja_id == cid,
+                                                    models.Retiro.anulado.is_(False))):
         slot(r.fecha)["retiros"] += r.monto
     for c in db.scalars(select(models.Credito).where(models.Credito.caja_id == cid)):
         slot(c.fecha_desembolso)["desembolsos"] += c.monto
@@ -757,3 +881,28 @@ def balances(caja_id: int | None = None, db: Session = Depends(get_db),
 
     return schemas.BalancesOut(dashboard=dash, serie=serie,
                                composicion_fondo=composicion, top_socios=top_socios)
+
+
+@reportes_router.get("/export")
+def exportar_respaldo(db: Session = Depends(get_db),
+                      user: models.Usuario = Depends(require_roles("superadmin"))):
+    """Respaldo completo en JSON (sin contraseñas). Para descarga del administrador."""
+    def filas(modelo, excluir=()):
+        out = []
+        for o in db.scalars(select(modelo)).all():
+            d = {c.name: getattr(o, c.name) for c in modelo.__table__.columns
+                 if c.name not in excluir}
+            out.append(d)
+        return out
+    return {
+        "generado_en": datetime.utcnow().isoformat(),
+        "cajas": filas(models.Caja),
+        "usuarios": filas(models.Usuario, excluir=("password_hash",)),
+        "membresias": filas(models.Membresia),
+        "socios": filas(models.Socio),
+        "aportes": filas(models.Aporte),
+        "retiros": filas(models.Retiro),
+        "creditos": filas(models.Credito),
+        "cuotas": filas(models.Cuota),
+        "auditoria": filas(models.Auditoria),
+    }

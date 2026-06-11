@@ -1,32 +1,134 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta } from "../lib/api.js";
+import ExportarEstado from "../components/ExportarEstado.jsx";
+
+const GENEROS = [["", "—"], ["F", "Femenino"], ["M", "Masculino"], ["Otro", "Otro"], ["NS", "Prefiere no decir"]];
+const CIVIL = ["", "Soltero/a", "Casado/a", "Unión libre", "Divorciado/a", "Viudo/a"];
+const INSTRUCCION = ["", "Ninguna", "Primaria", "Secundaria", "Superior", "Posgrado"];
+
+const FICHA_EXTRA = [
+  ["fecha_nacimiento", "Fecha de nacimiento", "date"],
+  ["genero", "Género", "select", GENEROS],
+  ["correo", "Correo electrónico", "email"],
+  ["whatsapp", "WhatsApp", "tel"],
+  ["direccion", "Dirección", "text"],
+  ["ocupacion", "Ocupación / lugar de trabajo", "text"],
+  ["estado_civil", "Estado civil", "select2", CIVIL],
+  ["nivel_instruccion", "Nivel de instrucción", "select2", INSTRUCCION],
+  ["num_cargas", "Cargas familiares", "number"],
+  ["contacto_emergencia", "Contacto de emergencia (nombre y teléfono)", "text"],
+];
+
+function CampoFicha({ def, value, onChange }) {
+  const [k, label, tipo, opts] = def;
+  return (
+    <div className="campo">
+      <label>{label}</label>
+      {tipo === "select" ? (
+        <select value={value || ""} onChange={onChange}>
+          {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      ) : tipo === "select2" ? (
+        <select value={value || ""} onChange={onChange}>
+          {opts.map((v) => <option key={v} value={v}>{v || "—"}</option>)}
+        </select>
+      ) : (
+        <input type={tipo === "number" ? "number" : tipo === "date" ? "date" : "text"}
+          inputMode={tipo === "tel" ? "tel" : tipo === "number" ? "numeric" : undefined}
+          value={value ?? ""} onChange={onChange} />
+      )}
+    </div>
+  );
+}
+
+function EditarFicha({ socio, onListo }) {
+  const init = {};
+  FICHA_EXTRA.forEach(([k]) => (init[k] = socio[k] ?? ""));
+  init.nombres = socio.nombres; init.telefono = socio.telefono || "";
+  const [f, setF] = useState(init);
+  const [error, setError] = useState(""); const [guardando, setGuardando] = useState(false);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+
+  const guardar = async () => {
+    setError(""); setGuardando(true);
+    try {
+      const body = { ...f };
+      if (body.num_cargas === "") body.num_cargas = 0; else body.num_cargas = +body.num_cargas;
+      if (!body.fecha_nacimiento) delete body.fecha_nacimiento;
+      await api(`/socios/${socio.id}`, { method: "PATCH", body });
+      onListo(true);
+    } catch (e) { setError(e.message); setGuardando(false); }
+  };
+
+  return (
+    <div className="expediente">
+      <h4>Editar ficha</h4>
+      {error && <div className="error">{error}</div>}
+      <div className="campo"><label>Nombres</label><input value={f.nombres} onChange={set("nombres")} /></div>
+      <div className="campo"><label>Teléfono</label><input value={f.telefono} onChange={set("telefono")} /></div>
+      <div className="dos-col">
+        {FICHA_EXTRA.map((def) => <CampoFicha key={def[0]} def={def} value={f[def[0]]} onChange={set(def[0])} />)}
+      </div>
+      <div className="dos-col">
+        <button className="boton secundario" onClick={() => onListo(false)}>Cancelar</button>
+        <button className="boton" onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar ficha"}</button>
+      </div>
+    </div>
+  );
+}
 
 function Expediente({ socioId, onCerrar }) {
   const [lib, setLib] = useState(null);
   const [error, setError] = useState("");
+  const [editando, setEditando] = useState(false);
 
-  useEffect(() => {
-    api(`/mi-libreta?socio_id=${socioId}`).then(setLib).catch((e) => setError(e.message));
-  }, [socioId]);
+  const cargar = () => api(`/mi-libreta?socio_id=${socioId}`).then(setLib).catch((e) => setError(e.message));
+  useEffect(() => { cargar(); }, [socioId]);
 
   if (error) return <div className="error">{error}</div>;
   if (!lib) return <div className="vacio">Cargando expediente…</div>;
-
   const { socio, aportes, creditos } = lib;
+
+  const dato = (l, v) => v ? <div className="fila"><span className="detalle">{l}</span><span>{v}</span></div> : null;
+
   return (
     <>
-      <button className="volver" onClick={onCerrar}>← Volver a la lista</button>
+      <button className="volver no-print" onClick={onCerrar}>← Volver a la lista</button>
       <div className="libreta" style={{ marginTop: 8 }}>
         <div className="eyebrow">Expediente · {socio.nombres}</div>
-        <div className="saldo">
-          <span className="moneda">$</span>
-          {socio.total_aportes.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
-        </div>
-        <div className="sub">
-          Aportes desde {fechaCorta(socio.fecha_ingreso)} · CI {socio.cedula}
-          {socio.saldo_credito > 0 && <> · debe <strong className="cifra">{usd(socio.saldo_credito)}</strong></>}
-        </div>
+        <div className="saldo"><span className="moneda">$</span>
+          {socio.total_aportes.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</div>
+        <div className="sub">Aportes desde {fechaCorta(socio.fecha_ingreso)} · CI {socio.cedula}
+          {socio.saldo_credito > 0 && <> · debe <strong className="cifra">{usd(socio.saldo_credito)}</strong></>}</div>
       </div>
+
+      <div className="tarjeta no-print">
+        <div className="seccion-titulo" style={{ margin: "0 0 8px" }}>
+          <h3 style={{ margin: 0 }}>Ficha del socio</h3>
+          <button className="boton mini" onClick={() => setEditando(!editando)}>{editando ? "Cerrar" : "Editar ficha"}</button>
+        </div>
+        {editando ? (
+          <EditarFicha socio={socio} onListo={(g) => { setEditando(false); if (g) cargar(); }} />
+        ) : (
+          <>
+            {dato("Teléfono", socio.telefono)}
+            {dato("WhatsApp", socio.whatsapp)}
+            {dato("Correo", socio.correo)}
+            {dato("Nacimiento", socio.fecha_nacimiento && fechaCorta(socio.fecha_nacimiento))}
+            {dato("Género", { F: "Femenino", M: "Masculino", Otro: "Otro", NS: "Prefiere no decir" }[socio.genero])}
+            {dato("Estado civil", socio.estado_civil)}
+            {dato("Instrucción", socio.nivel_instruccion)}
+            {dato("Ocupación", socio.ocupacion)}
+            {dato("Dirección", socio.direccion)}
+            {dato("Cargas familiares", socio.num_cargas ? String(socio.num_cargas) : null)}
+            {dato("Contacto emergencia", socio.contacto_emergencia)}
+            {!socio.telefono && !socio.correo && !socio.ocupacion &&
+              <div className="vacio">Ficha incompleta. Usa “Editar ficha” para completarla.</div>}
+          </>
+        )}
+      </div>
+
+      <ExportarEstado lib={lib} />
 
       {creditos.length > 0 && (
         <div className="tarjeta">
@@ -35,16 +137,11 @@ function Expediente({ socioId, onCerrar }) {
             <div key={c.id} style={{ borderBottom: "1px dashed var(--regla)", paddingBottom: 4 }}>
               <div className="fila" style={{ borderBottom: "none" }}>
                 <div>
-                  <div className="principal">
-                    {usd(c.monto)}{" "}
+                  <div className="principal">{usd(c.monto)}{" "}
                     {c.estado === "pagado" ? <span className="pill ok">pagado</span>
                       : c.en_mora ? <span className="pill mora">en mora</span>
-                      : <span className="pill neutro">al día</span>}
-                  </div>
-                  <div className="detalle">
-                    {c.destino || "Crédito"} · {c.plazo_meses} meses al {c.tasa_mensual}% ·{" "}
-                    {c.cuotas_pagadas}/{c.plazo_meses} cuotas
-                  </div>
+                      : <span className="pill neutro">al día</span>}</div>
+                  <div className="detalle">{c.destino || "Crédito"} · {c.plazo_meses} meses al {c.tasa_mensual}% · {c.cuotas_pagadas}/{c.plazo_meses} cuotas</div>
                 </div>
                 <div className="cifra">{usd(c.saldo_capital)}</div>
               </div>
@@ -52,17 +149,13 @@ function Expediente({ socioId, onCerrar }) {
                 <summary>Cuotas</summary>
                 {c.cuotas.map((q) => (
                   <div className="fila" key={q.id}>
-                    <div>
-                      <div className="principal" style={{ fontSize: 14 }}>Cuota {q.numero}</div>
-                      <div className="detalle">vence {fechaCorta(q.fecha_vencimiento)}</div>
-                    </div>
+                    <div><div className="principal" style={{ fontSize: 14 }}>Cuota {q.numero}</div>
+                      <div className="detalle">vence {fechaCorta(q.fecha_vencimiento)}</div></div>
                     <div style={{ textAlign: "right" }}>
                       <div className="cifra">{usd(q.total)}</div>
                       {q.pagada ? <span className="pill ok">pagada {fechaCorta(q.fecha_pago)}</span>
-                        : new Date(q.fecha_vencimiento) < new Date()
-                          ? <span className="pill mora">vencida</span>
-                          : <span className="pill neutro">pendiente</span>}
-                    </div>
+                        : new Date(q.fecha_vencimiento) < new Date() ? <span className="pill mora">vencida</span>
+                          : <span className="pill neutro">pendiente</span>}</div>
                   </div>
                 ))}
               </details>
@@ -76,10 +169,8 @@ function Expediente({ socioId, onCerrar }) {
         {aportes.length === 0 && <div className="vacio">Sin aportes registrados.</div>}
         {aportes.map((a) => (
           <div className="fila" key={a.id}>
-            <div>
-              <div className="principal">{a.tipo === "ordinario" ? "Aporte mensual" : a.tipo === "multa" ? "Multa" : "Extraordinario"}</div>
-              <div className="detalle">{fechaCorta(a.fecha)}{a.nota ? ` · ${a.nota}` : ""}</div>
-            </div>
+            <div><div className="principal">{a.tipo === "ordinario" ? "Aporte mensual" : a.tipo === "multa" ? "Multa" : "Extraordinario"}</div>
+              <div className="detalle">{fechaCorta(a.fecha)}{a.nota ? ` · ${a.nota}` : ""}</div></div>
             <div className="cifra pos">{usd(a.monto)}</div>
           </div>
         ))}
@@ -88,43 +179,44 @@ function Expediente({ socioId, onCerrar }) {
   );
 }
 
+const FORM0 = { nombres: "", cedula: "", whatsapp: "", correo: "", telefono: "",
+  fecha_nacimiento: "", genero: "", direccion: "", ocupacion: "",
+  estado_civil: "", nivel_instruccion: "", num_cargas: "", contacto_emergencia: "" };
+
 export default function Socios() {
   const [socios, setSocios] = useState(null);
-  const [error, setError] = useState("");
-  const [ok, setOk] = useState("");
-  const [form, setForm] = useState({ nombres: "", cedula: "", telefono: "" });
+  const [error, setError] = useState(""); const [ok, setOk] = useState("");
+  const [form, setForm] = useState(FORM0);
   const [creando, setCreando] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [abierto, setAbierto] = useState(null);  // socio_id del expediente abierto
+  const [verExtra, setVerExtra] = useState(false);
+  const [abierto, setAbierto] = useState(null);
 
   const cargar = () => api("/socios").then(setSocios).catch((e) => setError(e.message));
   useEffect(() => { cargar(); }, []);
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const crear = async () => {
     setError(""); setOk(""); setCreando(true);
     try {
-      const s = await api("/socios", { method: "POST", body: form });
+      const body = { ...form };
+      body.num_cargas = body.num_cargas === "" ? 0 : +body.num_cargas;
+      if (!body.fecha_nacimiento) delete body.fecha_nacimiento;
+      const s = await api("/socios", { method: "POST", body });
       setOk(`${s.nombres} registrado. Su acceso inicial es su cédula como usuario y contraseña.`);
-      setForm({ nombres: "", cedula: "", telefono: "" });
-      setMostrarForm(false);
-      cargar();
+      setForm(FORM0); setMostrarForm(false); setVerExtra(false); cargar();
     } catch (e) { setError(e.message); }
     finally { setCreando(false); }
   };
 
   if (!socios) return <div className="vacio">Cargando…</div>;
-
-  if (abierto) {
-    return <Expediente socioId={abierto} onCerrar={() => { setAbierto(null); cargar(); }} />;
-  }
+  if (abierto) return <Expediente socioId={abierto} onCerrar={() => { setAbierto(null); cargar(); }} />;
 
   return (
     <>
       <div className="seccion-titulo">
         <h2>Socios</h2>
-        <button className="boton mini" onClick={() => setMostrarForm(!mostrarForm)}>
-          {mostrarForm ? "Cancelar" : "+ Nuevo socio"}
-        </button>
+        <button className="boton mini" onClick={() => setMostrarForm(!mostrarForm)}>{mostrarForm ? "Cancelar" : "+ Nuevo socio"}</button>
       </div>
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
@@ -132,46 +224,49 @@ export default function Socios() {
       {mostrarForm && (
         <div className="tarjeta">
           <h3>Registrar socio</h3>
-          <div className="campo">
-            <label htmlFor="sn">Nombres completos</label>
-            <input id="sn" value={form.nombres}
-              onChange={(e) => setForm({ ...form, nombres: e.target.value })} />
+          <div className="campo"><label>Nombres completos</label><input value={form.nombres} onChange={set("nombres")} /></div>
+          <div className="dos-col">
+            <div className="campo"><label>Cédula</label>
+              <input inputMode="numeric" value={form.cedula} onChange={(e) => setForm({ ...form, cedula: e.target.value.trim() })} /></div>
+            <div className="campo"><label>WhatsApp</label>
+              <input inputMode="tel" value={form.whatsapp} onChange={set("whatsapp")} /></div>
           </div>
-          <div className="campo">
-            <label htmlFor="sc">Cédula</label>
-            <input id="sc" inputMode="numeric" value={form.cedula}
-              onChange={(e) => setForm({ ...form, cedula: e.target.value.trim() })} />
-          </div>
-          <div className="campo">
-            <label htmlFor="st">Teléfono (opcional)</label>
-            <input id="st" inputMode="tel" value={form.telefono}
-              onChange={(e) => setForm({ ...form, telefono: e.target.value.trim() })} />
-          </div>
-          <button className="boton" onClick={crear}
-            disabled={creando || !form.nombres || !form.cedula}>
+          <div className="campo"><label>Correo electrónico</label>
+            <input type="email" value={form.correo} onChange={set("correo")} /></div>
+
+          <button className="boton secundario boton-extra" onClick={() => setVerExtra(!verExtra)}>
+            {verExtra ? "▾ Ocultar datos adicionales" : "▸ Agregar datos adicionales (opcional)"}
+          </button>
+          {verExtra && (
+            <div className="dos-col">
+              <CampoFicha def={["fecha_nacimiento", "Fecha de nacimiento", "date"]} value={form.fecha_nacimiento} onChange={set("fecha_nacimiento")} />
+              <CampoFicha def={["genero", "Género", "select", GENEROS]} value={form.genero} onChange={set("genero")} />
+              <CampoFicha def={["estado_civil", "Estado civil", "select2", CIVIL]} value={form.estado_civil} onChange={set("estado_civil")} />
+              <CampoFicha def={["nivel_instruccion", "Nivel de instrucción", "select2", INSTRUCCION]} value={form.nivel_instruccion} onChange={set("nivel_instruccion")} />
+              <CampoFicha def={["ocupacion", "Ocupación / lugar de trabajo", "text"]} value={form.ocupacion} onChange={set("ocupacion")} />
+              <CampoFicha def={["direccion", "Dirección", "text"]} value={form.direccion} onChange={set("direccion")} />
+              <CampoFicha def={["num_cargas", "Cargas familiares", "number"]} value={form.num_cargas} onChange={set("num_cargas")} />
+              <CampoFicha def={["contacto_emergencia", "Contacto de emergencia", "text"]} value={form.contacto_emergencia} onChange={set("contacto_emergencia")} />
+            </div>
+          )}
+          <button className="boton" onClick={crear} disabled={creando || !form.nombres || !form.cedula}>
             {creando ? "Guardando…" : "Guardar socio"}
           </button>
         </div>
       )}
 
       <div className="tarjeta">
-        <div className="fila encabezado">
-          <span>Socio · toca para ver su expediente</span><span>Aportes / Debe</span>
-        </div>
+        <div className="fila encabezado"><span>Socio · toca para ver su expediente</span><span>Aportes / Debe</span></div>
         {socios.length === 0 && <div className="vacio">Aún no hay socios. Registra el primero.</div>}
         {socios.map((s) => (
           <div className="fila tocable" key={s.id} role="button" tabIndex={0}
-            onClick={() => setAbierto(s.id)}
-            onKeyDown={(e) => e.key === "Enter" && setAbierto(s.id)}>
-            <div>
-              <div className="principal">{s.nombres} {!s.activo && <span className="pill neutro">inactivo</span>}</div>
-              <div className="detalle">CI {s.cedula}{s.telefono ? ` · ${s.telefono}` : ""}</div>
-            </div>
+            onClick={() => setAbierto(s.id)} onKeyDown={(e) => e.key === "Enter" && setAbierto(s.id)}>
+            <div><div className="principal">{s.nombres} {!s.activo && <span className="pill neutro">inactivo</span>}</div>
+              <div className="detalle">CI {s.cedula}{s.whatsapp ? ` · ${s.whatsapp}` : s.telefono ? ` · ${s.telefono}` : ""}</div></div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <div style={{ textAlign: "right" }}>
                 <div className="cifra pos">{usd(s.total_aportes)}</div>
-                {s.saldo_credito > 0 && <div className="cifra neg" style={{ fontSize: 13 }}>debe {usd(s.saldo_credito)}</div>}
-              </div>
+                {s.saldo_credito > 0 && <div className="cifra neg" style={{ fontSize: 13 }}>debe {usd(s.saldo_credito)}</div>}</div>
               <span className="chevron" aria-hidden="true">›</span>
             </div>
           </div>

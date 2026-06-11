@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta } from "../lib/api.js";
+import ExportarEstado from "../components/ExportarEstado.jsx";
 
 export default function Libreta() {
   const [lib, setLib] = useState(null);

@@ -117,6 +117,34 @@ class SocioIn(BaseModel):
     telefono: str = ""
     fecha_ingreso: date | None = None
     caja_id: int | None = None  # solo superadmin
+    # Ficha ampliada (todo opcional)
+    fecha_nacimiento: date | None = None
+    genero: str = ""
+    correo: str = ""
+    whatsapp: str = ""
+    direccion: str = ""
+    ocupacion: str = ""
+    estado_civil: str = ""
+    nivel_instruccion: str = ""
+    num_cargas: int = 0
+    contacto_emergencia: str = ""
+
+
+class SocioUpdate(BaseModel):
+    """Edición de la ficha del socio (tesorero/superadmin)."""
+    nombres: str | None = None
+    telefono: str | None = None
+    fecha_ingreso: date | None = None
+    fecha_nacimiento: date | None = None
+    genero: str | None = None
+    correo: str | None = None
+    whatsapp: str | None = None
+    direccion: str | None = None
+    ocupacion: str | None = None
+    estado_civil: str | None = None
+    nivel_instruccion: str | None = None
+    num_cargas: int | None = None
+    contacto_emergencia: str | None = None
 
 
 class SocioOut(BaseModel):
@@ -127,6 +155,16 @@ class SocioOut(BaseModel):
     telefono: str
     fecha_ingreso: date
     activo: bool
+    fecha_nacimiento: date | None = None
+    genero: str = ""
+    correo: str = ""
+    whatsapp: str = ""
+    direccion: str = ""
+    ocupacion: str = ""
+    estado_civil: str = ""
+    nivel_instruccion: str = ""
+    num_cargas: int = 0
+    contacto_emergencia: str = ""
     total_aportes: float = 0      # ahorro neto: aportes (sin multas) - retiros
     total_multas: float = 0
     saldo_credito: float = 0
@@ -152,9 +190,18 @@ class AporteOut(BaseModel):
     fecha: date
     tipo: str
     nota: str
+    creado_en: datetime | None = None
+    anulado: bool = False
 
     class Config:
         from_attributes = True
+
+
+class AporteUpdate(BaseModel):
+    monto: float | None = Field(default=None, gt=0)
+    fecha: date | None = None
+    tipo: str | None = None
+    nota: str | None = None
 
 
 # ---------- Créditos ----------
@@ -260,9 +307,17 @@ class RetiroOut(BaseModel):
     monto: float
     fecha: date
     nota: str
+    creado_en: datetime | None = None
+    anulado: bool = False
 
     class Config:
         from_attributes = True
+
+
+class RetiroUpdate(BaseModel):
+    monto: float | None = Field(default=None, gt=0)
+    fecha: date | None = None
+    nota: str | None = None
 
 
 class AbonoIn(BaseModel):

@@ -67,6 +67,17 @@ class Socio(Base):
     telefono: Mapped[str] = mapped_column(String(20), default="")
     fecha_ingreso: Mapped[date] = mapped_column(Date, default=date.today)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # --- Ficha ampliada (para conocer al socio y hacer estudios) ---
+    fecha_nacimiento: Mapped[date | None] = mapped_column(Date, nullable=True)
+    genero: Mapped[str] = mapped_column(String(20), default="")        # F / M / Otro / NS
+    correo: Mapped[str] = mapped_column(String(120), default="")
+    whatsapp: Mapped[str] = mapped_column(String(20), default="")
+    direccion: Mapped[str] = mapped_column(String(200), default="")
+    ocupacion: Mapped[str] = mapped_column(String(120), default="")     # actividad / lugar de trabajo
+    estado_civil: Mapped[str] = mapped_column(String(20), default="")
+    nivel_instruccion: Mapped[str] = mapped_column(String(30), default="")
+    num_cargas: Mapped[int] = mapped_column(Integer, default=0)          # cargas familiares
+    contacto_emergencia: Mapped[str] = mapped_column(String(160), default="")
 
     caja: Mapped["Caja"] = relationship(back_populates="socios")
     aportes: Mapped[list["Aporte"]] = relationship(back_populates="socio")
@@ -84,6 +95,7 @@ class Aporte(Base):
     nota: Mapped[str] = mapped_column(String(200), default="")
     registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    anulado: Mapped[bool] = mapped_column(Boolean, default=False)
 
     socio: Mapped["Socio"] = relationship(back_populates="aportes")
 
@@ -148,5 +160,6 @@ class Retiro(Base):
     nota: Mapped[str] = mapped_column(String(200), default="")
     registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    anulado: Mapped[bool] = mapped_column(Boolean, default=False)
 
     socio: Mapped["Socio"] = relationship()
