@@ -60,6 +60,24 @@ def init_db():
                 log.warning("Esquema viejo detectado: base recreada para multi-membresía.")
 
         Base.metadata.create_all(bind=engine)
+
+        # Migración ligera e idempotente: añade columnas nuevas a 'cajas' si faltan
+        # (create_all no altera tablas existentes). Evita tener que recrear la base.
+        from sqlalchemy import inspect, text
+        insp = inspect(engine)
+        if "cajas" in insp.get_table_names():
+            existentes = {c["name"] for c in insp.get_columns("cajas")}
+            nuevas = {
+                "color_primario": "VARCHAR(9) DEFAULT '#1B3A6B'",
+                "color_acento": "VARCHAR(9) DEFAULT '#E8A838'",
+                "logo": "VARCHAR(8) DEFAULT ''",
+            }
+            with engine.begin() as conn:
+                for col, ddl in nuevas.items():
+                    if col not in existentes:
+                        conn.execute(text(f"ALTER TABLE cajas ADD COLUMN {col} {ddl}"))
+                        log.warning("Columna '%s' añadida a 'cajas'.", col)
+
         # Superadmin inicial desde variables de entorno
         ced = os.getenv("SUPERADMIN_CEDULA", "admin")
         pwd = os.getenv("SUPERADMIN_PASSWORD", "kullki2026")

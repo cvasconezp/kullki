@@ -52,14 +52,17 @@ class Actor:
 
 
 def create_token(user: models.Usuario, caja_id: int | None = None,
-                 rol: str | None = None, socio_id: int | None = None) -> str:
+                 rol: str | None = None, socio_id: int | None = None,
+                 impersonando: bool = False) -> str:
     """Token de identidad. Si caja_id/rol vienen dados, la sesión ya quedó
-    'anclada' a una caja (login con caja elegida o membresía única)."""
+    'anclada' a una caja (login con caja elegida o membresía única).
+    `impersonando=True` lo emite el superadmin para actuar como tesorero/socio."""
     payload = {
         "sub": str(user.id),
         "caja_id": caja_id,
         "rol": rol,
         "socio_id": socio_id,
+        "imp": impersonando,
         "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -85,6 +88,10 @@ def get_actor(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
         raise cred_exc
 
     if user.es_superadmin:
+        # Impersonación: el admin entró a una caja como tesorero/socio.
+        if payload.get("imp") and payload.get("rol") and payload.get("caja_id"):
+            return Actor(usuario=user, rol=payload["rol"],
+                         caja_id=payload["caja_id"], socio_id=payload.get("socio_id"))
         return Actor(usuario=user, rol="superadmin", caja_id=None, socio_id=None)
 
     caja_id = payload.get("caja_id")

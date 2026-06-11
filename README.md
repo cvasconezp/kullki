@@ -1,9 +1,10 @@
-# Kullki — Gestión transparente de cajas de ahorro comunitarias
+# Kullki — El sistema inteligente para administrar los recursos de tu comunidad
 
 **Yachay Deep Labs**
 
-Kullki ("dinero" en kichwa) reemplaza el Excel del tesorero por un sistema donde
-cada movimiento queda registrado, auditado y visible para todos los socios.
+> Kullki ("dinero" en kichwa) reemplaza el cuaderno y el Excel del tesorero por
+> una plataforma donde cada movimiento queda registrado, auditado y visible.
+> **Confianza, transparencia y seguridad** para tu caja de ahorro comunitaria.
 
 ## Qué resuelve
 
@@ -46,7 +47,14 @@ npm run dev                 # http://localhost:5173
 
 Credenciales demo: tesorera `1700000000` / `tesorera123`.
 Socios: su cédula (`1700000001` … `1700000012`) como usuario y contraseña.
-Superadmin por defecto: `admin` / `kullki2026` (cámbialo con variables de entorno).
+Superadmin por defecto: `admin` / `kullki2026`.
+
+> ⚠️ **Seguridad — credenciales por defecto.** Las contraseñas se guardan
+> *hasheadas* (PBKDF2-SHA256, no en texto plano), pero hay valores iniciales
+> conocidos que **debes cambiar en producción** vía variables de entorno
+> (`SUPERADMIN_CEDULA`, `SUPERADMIN_PASSWORD`, `SECRET_KEY`). Para socios y
+> tesoreros, la contraseña inicial es su cédula / la que asigne el superadmin;
+> conviene forzar su cambio en el primer ingreso.
 
 ## Despliegue
 
@@ -112,6 +120,22 @@ kullki/
   detalle por socio + simulación de cierre de ejercicio (reparto de intereses
   proporcional al ahorro).
 - **PWA instalable** (manifest + ícono): "Agregar a pantalla de inicio" en el celular.
+
+## Implementado en v0.3
+
+- **Landing pública** en `/` (marca Yachay Deep). El login vive en `/ingresar`;
+  ya autenticado, la URL usa el nombre de la caja (ej. `/sanpedro`).
+- **Identidad por caja**: cada caja define color primario, color de acento y logo.
+  El interfaz (y el `theme-color`) se acoplan automáticamente al entrar.
+- **Dashboard de balances interactivo** para el tesorero: evolución del fondo,
+  movimientos por mes, composición del fondo y mayores ahorristas (gráficos SVG
+  con hover y filtros, sin dependencias).
+- **Edición de caja**: el superadmin puede modificar los valores de una caja ya
+  creada (tasa, aporte, multa, colores, logo, estado).
+- **Cambio de rol sin cerrar sesión**: el superadmin entra a cualquier caja como
+  tesorero o socio; toda acción queda en la bitácora a su nombre.
+- **Diseño responsivo**: móvil (barra inferior) y escritorio (barra lateral).
+- **Favicon e identidad** alineados a Yachay Deep.
 
 ## Hoja de ruta
 

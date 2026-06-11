@@ -430,3 +430,68 @@ def test_persona_socia_y_tesorera_en_distintas_cajas(setup):
     roles = {c["caja_nombre"]: c["rol"] for c in data["cajas"]}
     assert roles["Caja caja-c"] == "tesorero"
     assert roles["Caja caja-a"] == "socio"
+
+
+# ---------------- nuevos: branding, edición de caja, impersonación, balances ----------------
+
+def test_branding_por_defecto_y_edicion(setup):
+    sa = setup["sa"]
+    cajas = client.get("/cajas", headers=sa).json()
+    ca = next(c for c in cajas if c["slug"] == "caja-a")
+    assert ca["color_primario"] == "#1B3A6B" and ca["color_acento"] == "#E8A838"
+    r = client.patch(f"/cajas/{ca['id']}", headers=sa, json={
+        "color_primario": "#7A1F1F", "logo": "🌽", "aporte_ordinario": 15})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["color_primario"] == "#7A1F1F" and d["logo"] == "🌽" and d["aporte_ordinario"] == 15
+
+
+def test_editar_caja_requiere_superadmin(setup):
+    r = client.patch("/cajas/1", headers=setup["ta"], json={"comunidad": "X"})
+    assert r.status_code == 403
+
+
+def test_superadmin_asume_caja_como_tesorero(setup):
+    sa = setup["sa"]
+    cajas = client.get("/cajas", headers=sa).json()
+    ca = next(c for c in cajas if c["slug"] == "caja-a")
+    r = client.post("/auth/asumir-caja", headers=sa, json={"caja_id": ca["id"], "rol": "tesorero"})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["rol"] == "tesorero" and j["es_impersonacion"] is True
+    h = {"Authorization": f"Bearer {j['access_token']}"}
+    # con ese token, el admin opera como tesorero de la caja
+    socios = client.get("/socios", headers=h)
+    assert socios.status_code == 200
+    dash = client.get("/dashboard", headers=h)
+    assert dash.status_code == 200
+
+
+def test_superadmin_asume_como_socio_requiere_socio_id(setup):
+    sa = setup["sa"]
+    cajas = client.get("/cajas", headers=sa).json()
+    ca = next(c for c in cajas if c["slug"] == "caja-a")
+    r = client.post("/auth/asumir-caja", headers=sa, json={"caja_id": ca["id"], "rol": "socio"})
+    assert r.status_code == 400
+    r = client.post("/auth/asumir-caja", headers=sa,
+                    json={"caja_id": ca["id"], "rol": "socio", "socio_id": setup["socio_a"]["id"]})
+    assert r.status_code == 200
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    lib = client.get("/mi-libreta", headers=h)
+    assert lib.status_code == 200
+    assert lib.json()["socio"]["id"] == setup["socio_a"]["id"]
+
+
+def test_tesorero_no_puede_asumir_caja(setup):
+    r = client.post("/auth/asumir-caja", headers=setup["ta"], json={"caja_id": 1, "rol": "tesorero"})
+    assert r.status_code == 403
+
+
+def test_balances_series_y_composicion(setup):
+    r = client.get("/balances", headers=setup["ta"])
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "dashboard" in d and "serie" in d
+    assert set(["ahorros_disponibles", "capital_en_calle", "intereses"]) <= set(d["composicion_fondo"])
+    for p in d["serie"]:
+        assert "periodo" in p and "fondo_acumulado" in p

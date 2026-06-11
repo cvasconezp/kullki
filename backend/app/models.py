@@ -15,6 +15,10 @@ class Caja(Base):
     tasa_interes_mensual: Mapped[float] = mapped_column(Float, default=1.5)  # % mensual por defecto
     aporte_ordinario: Mapped[float] = mapped_column(Float, default=10.0)
     multa_mora: Mapped[float] = mapped_column(Float, default=0.0)  # USD por cuota vencida
+    # --- Identidad visual: el interfaz se acopla a estos valores por caja ---
+    color_primario: Mapped[str] = mapped_column(String(9), default="#1B3A6B")  # navy Yachay Deep
+    color_acento: Mapped[str] = mapped_column(String(9), default="#E8A838")    # dorado Yachay Deep
+    logo: Mapped[str] = mapped_column(String(8), default="")  # emoji o 1-2 letras; vacío => inicial
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

@@ -71,7 +71,7 @@ export default function Login({ onLogin }) {
   return (
     <div className="login">
       <div className="logo-grande">Kullki</div>
-      <p className="lema">Tu caja de ahorro, clara y al día.</p>
+      <p className="lema">El sistema inteligente para administrar los recursos de tu comunidad.</p>
       {error && <div className="error">{error}</div>}
       <div className="campo">
         <label htmlFor="ced">Cédula</label>

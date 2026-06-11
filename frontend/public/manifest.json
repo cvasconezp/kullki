@@ -1,12 +1,13 @@
 {
-  "name": "Kullki — Caja de ahorro",
+  "name": "Kullki — Sistema de cajas de ahorro",
   "short_name": "Kullki",
-  "description": "Gestión transparente de cajas de ahorro comunitarias",
+  "description": "El sistema inteligente para administrar tus recursos y los de tus socios con transparencia y seguridad.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f6f2",
-  "theme_color": "#0E7A5C",
+  "background_color": "#0F2444",
+  "theme_color": "#1B3A6B",
   "icons": [
-    { "src": "/icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/favicon.png", "sizes": "445x445", "type": "image/png", "purpose": "any maskable" }
   ]
 }

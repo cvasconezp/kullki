@@ -21,9 +21,13 @@ class TokenOut(BaseModel):
 class CajaMembresia(BaseModel):
     caja_id: int
     caja_nombre: str
+    caja_slug: str = ""
     comunidad: str = ""
     rol: str
     socio_id: int | None = None
+    color_primario: str | None = None
+    color_acento: str | None = None
+    logo: str | None = None
 
 
 class LoginOut(BaseModel):
@@ -33,13 +37,26 @@ class LoginOut(BaseModel):
     rol: str | None = None              # None cuando requiere_seleccion
     caja_id: int | None = None
     caja_nombre: str | None = None
+    caja_slug: str | None = None        # para enrutar a /{slug}
     socio_id: int | None = None
+    # Branding de la caja activa: el front acopla colores y logo
+    color_primario: str | None = None
+    color_acento: str | None = None
+    logo: str | None = None
+    es_impersonacion: bool = False      # True si un superadmin entró como tesorero/socio
     requiere_seleccion: bool = False    # True => el front muestra el selector de caja
     cajas: list[CajaMembresia] = []
 
 
 class SeleccionCaja(BaseModel):
     caja_id: int
+
+
+class AsumirCaja(BaseModel):
+    """El superadmin entra a una caja como tesorero o (opcionalmente) un socio."""
+    caja_id: int
+    rol: str = "tesorero"           # tesorero | socio
+    socio_id: int | None = None     # requerido si rol == "socio"
 
 
 class CambioPassword(BaseModel):
@@ -55,9 +72,25 @@ class CajaIn(BaseModel):
     tasa_interes_mensual: float = 1.5
     aporte_ordinario: float = 10.0
     multa_mora: float = 0.0
+    color_primario: str = "#1B3A6B"
+    color_acento: str = "#E8A838"
+    logo: str = ""
     tesorero_nombre: str
     tesorero_cedula: str
     tesorero_password: str = Field(min_length=6)
+
+
+class CajaUpdate(BaseModel):
+    """Edición de una caja ya creada. Todos los campos son opcionales."""
+    nombre: str | None = None
+    comunidad: str | None = None
+    tasa_interes_mensual: float | None = None
+    aporte_ordinario: float | None = None
+    multa_mora: float | None = None
+    color_primario: str | None = None
+    color_acento: str | None = None
+    logo: str | None = None
+    activa: bool | None = None
 
 
 class CajaOut(BaseModel):
@@ -68,6 +101,9 @@ class CajaOut(BaseModel):
     tasa_interes_mensual: float
     aporte_ordinario: float
     multa_mora: float
+    color_primario: str = "#1B3A6B"
+    color_acento: str = "#E8A838"
+    logo: str = ""
     activa: bool
 
     class Config:
@@ -262,3 +298,27 @@ class CierreSimulacion(BaseModel):
     intereses_a_repartir: float
     total_ahorro: float
     filas: list[FilaCierre]
+
+
+# ---------- Balances (dashboard interactivo del tesorero) ----------
+class PuntoSerie(BaseModel):
+    periodo: str            # "2025-01"
+    etiqueta: str           # "ene 25"
+    aportes: float = 0
+    retiros: float = 0
+    desembolsos: float = 0
+    recuperado: float = 0   # capital + interes cobrados ese mes
+    intereses: float = 0
+    fondo_acumulado: float = 0
+
+
+class TopSocio(BaseModel):
+    socio: str
+    ahorro_neto: float
+
+
+class BalancesOut(BaseModel):
+    dashboard: DashboardOut
+    serie: list[PuntoSerie]
+    composicion_fondo: dict[str, float]   # ahorros / capital_en_calle / intereses
+    top_socios: list[TopSocio]

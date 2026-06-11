@@ -1,4 +1,5 @@
 from datetime import date
+from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -83,8 +84,10 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
         caja = db.get(models.Caja, m.caja_id)
         if caja and caja.activa:
             cajas.append(schemas.CajaMembresia(
-                caja_id=caja.id, caja_nombre=caja.nombre, comunidad=caja.comunidad,
-                rol=m.rol, socio_id=m.socio_id))
+                caja_id=caja.id, caja_nombre=caja.nombre, caja_slug=caja.slug,
+                comunidad=caja.comunidad, rol=m.rol, socio_id=m.socio_id,
+                color_primario=caja.color_primario, color_acento=caja.color_acento,
+                logo=caja.logo))
 
     if not cajas:
         raise HTTPException(403, "Tu cuenta no está vinculada a ninguna caja activa")
@@ -95,7 +98,9 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
         return schemas.LoginOut(
             access_token=create_token(user, caja_id=c.caja_id, rol=c.rol, socio_id=c.socio_id),
             rol=c.rol, nombre=user.nombre, caja_id=c.caja_id, caja_nombre=c.caja_nombre,
-            socio_id=c.socio_id, requiere_seleccion=False, cajas=cajas)
+            caja_slug=c.caja_slug, socio_id=c.socio_id,
+            color_primario=c.color_primario, color_acento=c.color_acento, logo=c.logo,
+            requiere_seleccion=False, cajas=cajas)
 
     # Varias cajas: token "sin anclar"; el front muestra el selector
     return schemas.LoginOut(
@@ -120,8 +125,46 @@ def seleccionar_caja(data: schemas.SeleccionCaja, db: Session = Depends(get_db),
     return schemas.LoginOut(
         access_token=create_token(user, caja_id=m.caja_id, rol=m.rol, socio_id=m.socio_id),
         rol=m.rol, nombre=user.nombre, caja_id=m.caja_id,
-        caja_nombre=caja.nombre if caja else None, socio_id=m.socio_id,
+        caja_nombre=caja.nombre if caja else None, caja_slug=caja.slug if caja else None,
+        socio_id=m.socio_id,
+        color_primario=caja.color_primario if caja else None,
+        color_acento=caja.color_acento if caja else None,
+        logo=caja.logo if caja else None,
         requiere_seleccion=False, cajas=[])
+
+
+@auth_router.post("/asumir-caja", response_model=schemas.LoginOut)
+def asumir_caja(data: schemas.AsumirCaja, db: Session = Depends(get_db),
+                actor: Actor = Depends(get_identidad)):
+    """Solo superadmin: entra a una caja como tesorero o socio SIN cerrar sesión.
+    Toda acción posterior queda en la bitácora con el nombre del administrador."""
+    user = actor.usuario
+    if not user.es_superadmin:
+        raise HTTPException(403, "Solo el administrador puede asumir un rol en una caja")
+    caja = db.get(models.Caja, data.caja_id)
+    if not caja:
+        raise HTTPException(404, "Caja no encontrada")
+    if data.rol not in ("tesorero", "socio"):
+        raise HTTPException(400, "Rol inválido (tesorero | socio)")
+    socio_id = None
+    if data.rol == "socio":
+        if not data.socio_id:
+            raise HTTPException(400, "Indica el socio que quieres ver")
+        socio = db.get(models.Socio, data.socio_id)
+        if not socio or socio.caja_id != caja.id:
+            raise HTTPException(404, "Socio no encontrado en esta caja")
+        socio_id = socio.id
+    token = create_token(user, caja_id=caja.id, rol=data.rol,
+                         socio_id=socio_id, impersonando=True)
+    log_audit(db, actor, "editar", "caja", caja.id,
+              f"Administrador {user.nombre} entró como {data.rol} a '{caja.nombre}'",
+              caja_id=caja.id)
+    db.commit()
+    return schemas.LoginOut(
+        access_token=token, rol=data.rol, nombre=user.nombre, caja_id=caja.id,
+        caja_nombre=caja.nombre, caja_slug=caja.slug, socio_id=socio_id,
+        color_primario=caja.color_primario, color_acento=caja.color_acento,
+        logo=caja.logo, es_impersonacion=True, requiere_seleccion=False, cajas=[])
 
 
 @auth_router.get("/mis-cajas", response_model=list[schemas.CajaMembresia])
@@ -134,8 +177,10 @@ def mis_cajas(db: Session = Depends(get_db), actor: Actor = Depends(get_identida
         caja = db.get(models.Caja, m.caja_id)
         if caja and caja.activa:
             out.append(schemas.CajaMembresia(
-                caja_id=caja.id, caja_nombre=caja.nombre, comunidad=caja.comunidad,
-                rol=m.rol, socio_id=m.socio_id))
+                caja_id=caja.id, caja_nombre=caja.nombre, caja_slug=caja.slug,
+                comunidad=caja.comunidad, rol=m.rol, socio_id=m.socio_id,
+                color_primario=caja.color_primario, color_acento=caja.color_acento,
+                logo=caja.logo))
     return out
 
 
@@ -168,7 +213,10 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
     caja = models.Caja(nombre=data.nombre, slug=data.slug, comunidad=data.comunidad,
                        tasa_interes_mensual=data.tasa_interes_mensual,
                        aporte_ordinario=data.aporte_ordinario,
-                       multa_mora=data.multa_mora)
+                       multa_mora=data.multa_mora,
+                       color_primario=data.color_primario or "#1B3A6B",
+                       color_acento=data.color_acento or "#E8A838",
+                       logo=data.logo or "")
     db.add(caja)
     db.flush()
 
@@ -186,6 +234,23 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
     db.flush()
     log_audit(db, actor, "crear", "caja", caja.id,
               f"Caja '{caja.nombre}' creada con tesorero {tesorero.nombre}", caja_id=caja.id)
+    db.commit()
+    db.refresh(caja)
+    return caja
+
+
+@cajas_router.patch("/{caja_id}", response_model=schemas.CajaOut)
+def editar_caja(caja_id: int, data: schemas.CajaUpdate, db: Session = Depends(get_db),
+                actor: Actor = Depends(require_roles("superadmin"))):
+    caja = db.get(models.Caja, caja_id)
+    if not caja:
+        raise HTTPException(404, "Caja no encontrada")
+    cambios = data.model_dump(exclude_unset=True)
+    for k, v in cambios.items():
+        setattr(caja, k, v)
+    log_audit(db, actor, "editar", "caja", caja.id,
+              f"Caja '{caja.nombre}' editada: {', '.join(cambios) or 'sin cambios'}",
+              caja_id=caja.id)
     db.commit()
     db.refresh(caja)
     return caja
@@ -628,3 +693,67 @@ def cierre_simulacion(caja_id: int | None = None, db: Session = Depends(get_db),
             utilidad=round(dash.intereses_cobrados * pct / 100, 2)))
     return schemas.CierreSimulacion(intereses_a_repartir=dash.intereses_cobrados,
                                     total_ahorro=round(total_ahorro, 2), filas=filas)
+
+
+@reportes_router.get("/balances", response_model=schemas.BalancesOut)
+def balances(caja_id: int | None = None, db: Session = Depends(get_db),
+             user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Series mensuales para el dashboard interactivo de balances del tesorero."""
+    cid = caja_scope(user, caja_id)
+    dash = dashboard(caja_id=cid, db=db, user=user)
+
+    MES = ["ene", "feb", "mar", "abr", "may", "jun",
+           "jul", "ago", "sep", "oct", "nov", "dic"]
+
+    def clave(d: date):
+        return f"{d.year:04d}-{d.month:02d}", f"{MES[d.month-1]} {d.year % 100:02d}"
+
+    movs: dict[str, dict] = defaultdict(lambda: dict(
+        periodo="", etiqueta="", aportes=0.0, retiros=0.0,
+        desembolsos=0.0, recuperado=0.0, intereses=0.0))
+
+    def slot(d: date):
+        k, lbl = clave(d)
+        m = movs[k]; m["periodo"], m["etiqueta"] = k, lbl
+        return m
+
+    for a in db.scalars(select(models.Aporte).where(models.Aporte.caja_id == cid)):
+        slot(a.fecha)["aportes"] += a.monto
+    for r in db.scalars(select(models.Retiro).where(models.Retiro.caja_id == cid)):
+        slot(r.fecha)["retiros"] += r.monto
+    for c in db.scalars(select(models.Credito).where(models.Credito.caja_id == cid)):
+        slot(c.fecha_desembolso)["desembolsos"] += c.monto
+    cuotas = db.scalars(select(models.Cuota).join(models.Credito)
+                        .where(models.Credito.caja_id == cid,
+                               models.Cuota.pagada, models.Cuota.fecha_pago.isnot(None)))
+    for q in cuotas:
+        m = slot(q.fecha_pago)
+        m["recuperado"] += q.capital + q.interes
+        m["intereses"] += q.interes
+
+    serie, acum = [], 0.0
+    for k in sorted(movs):
+        m = movs[k]
+        # flujo neto del fondo en el mes
+        acum += m["aportes"] - m["retiros"] - m["desembolsos"] + m["recuperado"]
+        serie.append(schemas.PuntoSerie(
+            periodo=m["periodo"], etiqueta=m["etiqueta"],
+            aportes=round(m["aportes"], 2), retiros=round(m["retiros"], 2),
+            desembolsos=round(m["desembolsos"], 2), recuperado=round(m["recuperado"], 2),
+            intereses=round(m["intereses"], 2), fondo_acumulado=round(acum, 2)))
+
+    composicion = {
+        "ahorros_disponibles": round(max(0.0, dash.total_aportes - dash.total_retiros
+                                         - dash.capital_prestado), 2),
+        "capital_en_calle": round(dash.capital_prestado, 2),
+        "intereses": round(dash.intereses_cobrados, 2),
+    }
+
+    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
+                                                   models.Socio.activo)).all()
+    tops = sorted((( _socio_out(db, s).total_aportes, s.nombres) for s in socios),
+                  reverse=True)[:6]
+    top_socios = [schemas.TopSocio(socio=n, ahorro_neto=round(v, 2)) for v, n in tops if v > 0]
+
+    return schemas.BalancesOut(dashboard=dash, serie=serie,
+                               composicion_fondo=composicion, top_socios=top_socios)

@@ -9,6 +9,16 @@ export function setSesion(s) {
   else localStorage.removeItem("kullki_sesion");
 }
 
+// Sesión original del superadmin mientras "actúa como" tesorero/socio
+export function getAdminSesion() {
+  try { return JSON.parse(localStorage.getItem("kullki_admin")) || null; }
+  catch { return null; }
+}
+export function setAdminSesion(s) {
+  if (s) localStorage.setItem("kullki_admin", JSON.stringify(s));
+  else localStorage.removeItem("kullki_admin");
+}
+
 export async function api(path, { method = "GET", body, token } = {}) {
   const sesion = getSesion();
   // token explícito (selección de caja) tiene prioridad sobre el de la sesión
