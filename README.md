@@ -1,6 +1,6 @@
 # Kullki — Gestión transparente de cajas de ahorro comunitarias
 
-**Yachay Deep Labs · Pacha Tech**
+**Yachay Deep Labs**
 
 Kullki ("dinero" en kichwa) reemplaza el Excel del tesorero por un sistema donde
 cada movimiento queda registrado, auditado y visible para todos los socios.
@@ -20,7 +20,7 @@ cada movimiento queda registrado, auditado y visible para todos los socios.
 
 | Rol | Puede |
 |---|---|
-| `superadmin` | Crear cajas y su tesorero (Pacha Tech) |
+| `superadmin` | Crear cajas y su tesorero (Yachay Deep Labs) |
 | `tesorero` | Gestionar socios, aportes, créditos y cobros de su caja |
 | `socio` | Ver su libreta y la bitácora de su caja |
 

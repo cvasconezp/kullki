@@ -39,7 +39,7 @@ export default function Login({ onLogin }) {
       <button className="boton" onClick={entrar} disabled={cargando || !cedula || !password}>
         {cargando ? "Entrando…" : "Entrar"}
       </button>
-      <p className="pie">Un producto de Yachay Deep Labs · Pacha Tech</p>
+      <p className="pie">Un producto de Yachay Deep Labs</p>
     </div>
   );
 }
