@@ -31,12 +31,20 @@ export async function api(path, { method = "GET", body, token } = {}) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401) {
-    setSesion(null);
-    window.location.reload();
-    throw new Error("Sesión expirada");
-  }
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    // Solo cerramos sesión si había una sesión activa (token vencido en una
+    // petición autenticada). En el login/selección de caja mostramos el error
+    // real del servidor (p. ej. "Cédula o contraseña incorrecta").
+    const sesionPrevia = !!sesion?.access_token;
+    if (sesionPrevia && !token) {
+      setSesion(null);
+      setAdminSesion(null);
+      window.location.href = "/ingresar";
+      throw new Error("Tu sesión expiró. Inicia sesión de nuevo.");
+    }
+    throw new Error(data.detail || "Cédula o contraseña incorrecta");
+  }
   if (!res.ok) throw new Error(data.detail || "Algo salió mal, intenta de nuevo");
   return data;
 }
