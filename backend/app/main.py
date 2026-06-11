@@ -87,6 +87,17 @@ def init_db():
                 db.add(models.Usuario(nombre="Administrador Kullki", cedula=ced,
                                       password_hash=hash_password(pwd), es_superadmin=True))
                 db.commit()
+            # Auto-siembra de datos demo SOLO si no hay ninguna caja (base vacía).
+            # Nunca toca datos reales existentes. Desactivable con SEED_DEMO=0.
+            if (os.getenv("SEED_DEMO", "1") != "0"
+                    and not db.scalar(select(models.Caja))):
+                try:
+                    from .seed import run as seed_demo
+                    seed_demo()
+                    log.warning("Base vacía: datos demo sembrados (tesorera 1700000000 / "
+                                "socios con su cédula como usuario y contraseña).")
+                except Exception:
+                    log.exception("Auto-seed demo falló (no crítico).")
         finally:
             db.close()
     except Exception:
