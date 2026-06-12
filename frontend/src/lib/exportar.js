@@ -215,6 +215,10 @@ export function imprimirSolicitudCredito(lib, sol) {
   const acento = ses.color_acento || "#E8A838";
   const logo = ses.logo || (lib.caja_nombre || "K").replace(/^caja (de ahorro )?/i, "").trim()[0] || "K";
   const s = lib.socio;
+  const gen = (s.genero || "").toUpperCase();
+  const art = gen === "F" ? "socia" : gen === "M" ? "socio" : "socio(a)";
+  const cuenta = s.numero_cuenta || ("N.º " + (s.id || "—"));
+  const tipoCred = sol.tipo === "emergente" ? "emergente (extraordinario)" : "ordinario";
   const tasa = lib.caja_tasa || 0, i = tasa / 100, n = sol.plazo_meses, m = sol.monto;
   const cuota = i > 0 ? m * (i * (1 + i) ** n) / ((1 + i) ** n - 1) : m / n;
   const hoy = new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" });
@@ -228,18 +232,32 @@ export function imprimirSolicitudCredito(lib, sol) {
   h3{color:${color};font-size:14px;margin:22px 0 8px}
   table{width:100%;border-collapse:collapse;font-size:13.5px} td{padding:8px 10px;border-bottom:1px solid #eef1f4}
   td.l{color:#66707d;width:38%} td.v{font-weight:600}
-  .firmas{display:flex;justify-content:space-between;margin-top:60px} .firma{width:42%;border-top:1px solid #98a;padding-top:6px;text-align:center;font-size:12px;color:#555}
+  .lugar{margin:22px 0 14px;font-size:13px;color:#1d2530;text-align:right}
+  .cuerpo{font-size:13.5px;line-height:1.6;color:#1d2530;margin:12px 0;text-align:justify}
+  .firmas{display:flex;justify-content:space-around;gap:18px;margin-top:70px;flex-wrap:wrap}
+  .firma{flex:1;min-width:150px;border-top:1px solid #444;padding-top:6px;text-align:center;font-size:12px;color:#333}
+  .firma .fci{color:#777;font-size:11px}
   .pie{margin-top:26px;font-size:11px;color:#8a929c;text-align:center;border-top:1px solid #eef1f4;padding-top:12px}</style></head><body>
    <div class="cab"><div class="logo">${logo}</div>
      <div><h1>${lib.caja_nombre || "Caja de ahorro"}</h1><div class="sub">Kullki por Yachay Deep Labs</div></div>
      <div class="doc"><div class="t">Solicitud de crédito</div><div class="d">${hoy}</div></div></div>
-   <h3>Datos del solicitante</h3>
-   <table>${fila("Socio", s.nombres)}${fila("Cédula", s.cedula)}${fila("Ahorro actual", usd(s.total_aportes))}</table>
-   <h3>Detalle del crédito solicitado</h3>
+   <div class="lugar">${lib.caja_nombre || "____________"}, ${hoy}</div>
+   <p class="cuerpo">Yo, <strong>${s.nombres}</strong>, ${art} de la <strong>${lib.caja_nombre || "caja de ahorros"}</strong>,
+   con número de cédula <strong>${s.cedula}</strong> y número de cuenta <strong>${cuenta}</strong>, por medio del presente
+   solicito de manera formal un <strong>crédito ${tipoCred}</strong> de acuerdo con el detalle que se presenta a continuación:</p>
    <table>${fila("Monto solicitado", usd(m))}${fila("Plazo", n + " meses")}${fila("Tasa", tasa + "% mensual")}
    ${fila("Cuota estimada", usd(cuota) + " / mes")}${fila("Total estimado a pagar", usd(cuota * n))}
-   ${fila("Destino", sol.destino || "—")}${fila("Garante / aval", sol.garante || "—")}${fila("Documentos", sol.documentos || "—")}</table>
-   <div class="firmas"><div class="firma">Firma del socio</div><div class="firma">Firma del garante</div></div>
+   ${fila("Destino del crédito", sol.destino || "—")}
+   ${fila("Garante(s)", (sol.garante || "—") + (sol.garante2 ? " y " + sol.garante2 : ""))}
+   ${fila("Mi ahorro actual", usd(s.total_aportes))}</table>
+   <p class="cuerpo">Me comprometo a cumplir con el pago de las cuotas en los plazos establecidos y a respetar el
+   reglamento interno de la caja de ahorros. Agradezco de antemano la atención a la presente.</p>
+   <p class="cuerpo">Atentamente,</p>
+   <div class="firmas">
+     <div class="firma">${s.nombres}<br><span class="fci">C.I. ${s.cedula}</span><br>Solicitante</div>
+     <div class="firma">${sol.garante || ""}<br><span class="fci">Garante</span></div>
+     ${sol.garante2 ? '<div class="firma">' + sol.garante2 + '<br><span class="fci">Segundo garante</span></div>' : ""}
+   </div>
    <div class="pie">Documento generado por Kullki · ${lib.caja_nombre || ""} · ${hoy}. Sujeto a aprobación de la directiva/tesorería.</div>
    <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script></body></html>`;
   const w = window.open("", "_blank");

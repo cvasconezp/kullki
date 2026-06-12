@@ -268,6 +268,52 @@ def totp_estado(actor: Actor = Depends(get_identidad)):
     return {"activo": actor.usuario.totp_activo}
 
 
+# ---------- Recuperación de acceso (administradores) ----------
+def _usuario_administrable(db: Session, actor: Actor, cedula: str) -> models.Usuario:
+    """Devuelve el usuario objetivo si el actor tiene permiso para gestionarlo.
+    Superadmin: cualquiera. Tesorero: solo miembros (socios/directiva) de SU caja."""
+    objetivo = db.scalar(select(models.Usuario).where(models.Usuario.cedula == cedula))
+    if not objetivo:
+        raise HTTPException(404, "No existe un usuario con esa cédula")
+    if actor.rol == "superadmin":
+        return objetivo
+    if actor.rol == "tesorero" and actor.caja_id:
+        m = db.scalar(select(models.Membresia).where(
+            models.Membresia.usuario_id == objetivo.id,
+            models.Membresia.caja_id == actor.caja_id,
+            models.Membresia.activo))
+        if m and m.rol in ("socio", "directiva"):
+            return objetivo
+    raise HTTPException(403, "No tienes permiso para gestionar este usuario")
+
+
+@auth_router.post("/restablecer/2fa")
+def restablecer_2fa(data: schemas.CedulaIn, db: Session = Depends(get_db),
+                    actor: Actor = Depends(require_roles("superadmin", "tesorero"))):
+    """Desactiva el 2FA del usuario (p. ej. si perdió el teléfono). El usuario podrá
+    volver a activarlo desde su perfil."""
+    u = _usuario_administrable(db, actor, data.cedula)
+    u.totp_activo = False; u.totp_secret = ""
+    log_audit(db, actor, "editar", "usuario", u.id,
+              f"Restableció el 2FA de {u.nombre}", caja_id=actor.caja_id)
+    db.commit()
+    return {"ok": True, "nombre": u.nombre}
+
+
+@auth_router.post("/restablecer/password")
+def restablecer_password(data: schemas.CedulaIn, db: Session = Depends(get_db),
+                         actor: Actor = Depends(require_roles("superadmin", "tesorero"))):
+    """Reinicia la contraseña a la cédula y obliga a cambiarla en el próximo ingreso."""
+    u = _usuario_administrable(db, actor, data.cedula)
+    if u.es_superadmin and actor.rol != "superadmin":
+        raise HTTPException(403, "No puedes reiniciar la clave de un administrador")
+    u.password_hash = hash_password(u.cedula); u.debe_cambiar_password = True
+    log_audit(db, actor, "editar", "usuario", u.id,
+              f"Reinició la contraseña de {u.nombre}", caja_id=actor.caja_id)
+    db.commit()
+    return {"ok": True, "nombre": u.nombre, "password_temporal": u.cedula}
+
+
 @auth_router.get("/mis-cajas", response_model=list[schemas.CajaMembresia])
 def mis_cajas(db: Session = Depends(get_db), actor: Actor = Depends(get_identidad)):
     """Lista las cajas a las que la persona pertenece (para el selector)."""
@@ -824,15 +870,26 @@ def crear_solicitud_credito(data: schemas.SolicitudCreditoIn, db: Session = Depe
         raise HTTPException(404, "Socio no encontrado")
     prev = db.scalar(select(models.SolicitudCredito).where(
         models.SolicitudCredito.socio_id == socio.id,
-        models.SolicitudCredito.estado == "pendiente"))
+        models.SolicitudCredito.estado.in_(["pendiente", "en_aprobacion"])))
     if prev:
-        raise HTTPException(400, "Ya tienes una solicitud de crédito pendiente")
-    sol = models.SolicitudCredito(caja_id=socio.caja_id, socio_id=socio.id, socio_nombre=socio.nombres,
-                                  monto=data.monto, plazo_meses=data.plazo_meses, destino=data.destino,
-                                  garante=data.garante, garante2=data.garante2, tipo=data.tipo,
-                                  documentos=data.documentos, documento_nombre=data.documento_nombre,
-                                  documento_b64=data.documento_b64)
-    db.add(sol)
+        raise HTTPException(400, "Ya tienes una solicitud de crédito en trámite")
+    # Si había una devuelta para corrección, se reutiliza esa misma fila
+    sol = db.scalar(select(models.SolicitudCredito).where(
+        models.SolicitudCredito.socio_id == socio.id,
+        models.SolicitudCredito.estado == "correccion"))
+    if sol:
+        sol.monto = data.monto; sol.plazo_meses = data.plazo_meses; sol.destino = data.destino
+        sol.garante = data.garante; sol.garante2 = data.garante2; sol.tipo = data.tipo
+        sol.documentos = data.documentos; sol.documento_nombre = data.documento_nombre
+        sol.documento_b64 = data.documento_b64
+        sol.estado = "pendiente"; sol.motivo = ""; sol.creado_en = datetime.utcnow()
+    else:
+        sol = models.SolicitudCredito(caja_id=socio.caja_id, socio_id=socio.id, socio_nombre=socio.nombres,
+                                      monto=data.monto, plazo_meses=data.plazo_meses, destino=data.destino,
+                                      garante=data.garante, garante2=data.garante2, tipo=data.tipo,
+                                      documentos=data.documentos, documento_nombre=data.documento_nombre,
+                                      documento_b64=data.documento_b64)
+        db.add(sol)
     log_audit(db, actor, "crear", "solicitud", socio.id,
               f"{socio.nombres} solicitó un crédito de ${data.monto:.2f} a {data.plazo_meses} meses",
               caja_id=socio.caja_id, afecta_socio_id=socio.id)
@@ -846,18 +903,31 @@ def mi_solicitud_credito(db: Session = Depends(get_db), actor: Actor = Depends(g
         return None
     sol = db.scalar(select(models.SolicitudCredito).where(
         models.SolicitudCredito.socio_id == actor.socio_id,
-        models.SolicitudCredito.estado == "pendiente"))
+        models.SolicitudCredito.estado.in_(["pendiente", "en_aprobacion", "correccion"]))
+        .order_by(models.SolicitudCredito.creado_en.desc()))
     return _solcred_out(sol) if sol else None
 
 
 @creditos_router.get("/solicitudes", response_model=list[schemas.SolicitudCreditoOut])
-def listar_solicitudes_credito(caja_id: int | None = None, db: Session = Depends(get_db),
+def listar_solicitudes_credito(caja_id: int | None = None, estado: str | None = None,
+                               db: Session = Depends(get_db),
                                user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
+    # Por defecto: el tesorero revisa las "pendiente"; la directiva, las que ya pasaron el filtro.
+    estados = [estado] if estado else (["en_aprobacion"] if user.rol == "directiva" else ["pendiente"])
     sols = db.scalars(select(models.SolicitudCredito).where(
-        models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado == "pendiente")
+        models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado.in_(estados))
         .order_by(models.SolicitudCredito.creado_en.desc())).all()
-    return [_solcred_out(x) for x in sols]
+    out = []
+    for x in sols:
+        o = _solcred_out(x)
+        socio = db.get(models.Socio, x.socio_id)
+        if socio:
+            o.creditos_activos = db.scalar(select(func.count(models.Credito.id)).where(
+                models.Credito.socio_id == socio.id, models.Credito.estado == "activo")) or 0
+            o.ahorro = _socio_out(db, socio).total_aportes
+        out.append(o)
+    return out
 
 
 @creditos_router.get("/garantes")
@@ -887,8 +957,8 @@ def aprobar_solicitud_credito(sol_id: int, db: Session = Depends(get_db),
     sol = db.get(models.SolicitudCredito, sol_id)
     if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
         raise HTTPException(404, "Solicitud no encontrada")
-    if sol.estado != "pendiente":
-        raise HTTPException(400, "La solicitud ya fue resuelta")
+    if sol.estado != "en_aprobacion":
+        raise HTTPException(400, "La solicitud debe pasar primero el filtro del tesorero")
     socio = db.get(models.Socio, sol.socio_id)
     garante_txt = sol.garante + (" / " + sol.garante2 if sol.garante2 else "")
     credito = _otorgar_credito(db, user, socio, sol.monto, sol.plazo_meses, None,
@@ -899,13 +969,47 @@ def aprobar_solicitud_credito(sol_id: int, db: Session = Depends(get_db),
     return _credito_out(credito, detalle=True)
 
 
-@creditos_router.post("/solicitudes/{sol_id}/rechazar", response_model=schemas.SolicitudCreditoOut)
-def rechazar_solicitud_credito(sol_id: int, motivo: str = "", db: Session = Depends(get_db),
-                               user: models.Usuario = Depends(require_roles("directiva", "superadmin"))):
+@creditos_router.post("/solicitudes/{sol_id}/derivar", response_model=schemas.SolicitudCreditoOut)
+def derivar_solicitud_credito(sol_id: int, db: Session = Depends(get_db),
+                              user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Filtro previo del tesorero: documentos completos y sin pendientes -> pasa a la directiva."""
     sol = db.get(models.SolicitudCredito, sol_id)
     if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
         raise HTTPException(404, "Solicitud no encontrada")
     if sol.estado != "pendiente":
+        raise HTTPException(400, "Esta solicitud ya no está pendiente de revisión")
+    sol.estado = "en_aprobacion"; sol.motivo = ""
+    log_audit(db, user, "editar", "solicitud", sol.socio_id,
+              f"Solicitud de crédito de {sol.socio_nombre} derivada a la directiva", caja_id=sol.caja_id,
+              afecta_socio_id=sol.socio_id)
+    db.commit()
+    return _solcred_out(sol)
+
+
+@creditos_router.post("/solicitudes/{sol_id}/correccion", response_model=schemas.SolicitudCreditoOut)
+def pedir_correccion_credito(sol_id: int, motivo: str = "", db: Session = Depends(get_db),
+                             user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """El tesorero devuelve la solicitud al socio para que la corrija y la reenvíe."""
+    sol = db.get(models.SolicitudCredito, sol_id)
+    if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
+        raise HTTPException(404, "Solicitud no encontrada")
+    if sol.estado not in ("pendiente", "en_aprobacion"):
+        raise HTTPException(400, "La solicitud ya fue resuelta")
+    sol.estado = "correccion"; sol.motivo = motivo or "Corrige y vuelve a enviar la solicitud."
+    log_audit(db, user, "editar", "solicitud", sol.socio_id,
+              f"Solicitud de crédito de {sol.socio_nombre} devuelta para corrección", caja_id=sol.caja_id,
+              afecta_socio_id=sol.socio_id)
+    db.commit()
+    return _solcred_out(sol)
+
+
+@creditos_router.post("/solicitudes/{sol_id}/rechazar", response_model=schemas.SolicitudCreditoOut)
+def rechazar_solicitud_credito(sol_id: int, motivo: str = "", db: Session = Depends(get_db),
+                               user: models.Usuario = Depends(require_roles("tesorero", "directiva", "superadmin"))):
+    sol = db.get(models.SolicitudCredito, sol_id)
+    if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
+        raise HTTPException(404, "Solicitud no encontrada")
+    if sol.estado not in ("pendiente", "en_aprobacion"):
         raise HTTPException(400, "La solicitud ya fue resuelta")
     sol.estado = "rechazada"; sol.motivo = motivo; sol.resuelto_por = user.nombre
     sol.resuelto_en = datetime.utcnow()

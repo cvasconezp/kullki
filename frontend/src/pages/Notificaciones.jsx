@@ -14,7 +14,7 @@ export default function Notificaciones() {
     <>
       <div className="seccion-titulo"><h2>Notificaciones</h2></div>
 
-      <SolicitudesCredito puedeAprobar={false} />
+      <SolicitudesCredito modo="tesorero" />
 
       <div className="tarjeta" style={{ borderColor: "var(--sara)" }}>
         <h3>Solicitudes de cambio de datos ({datos.length})</h3>
@@ -31,13 +31,6 @@ export default function Notificaciones() {
         ))}
       </div>
 
-      {datos.length === 0 && (
-        <div className="tarjeta">
-          <div className="detalle" style={{ color: "var(--tinta-suave)" }}>
-            Aquí verás las solicitudes de crédito y los pedidos de cambio de datos de los socios apenas lleguen.
-          </div>
-        </div>
-      )}
     </>
   );
 }

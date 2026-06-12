@@ -775,10 +775,47 @@ def test_solicitud_credito_aprueba_directiva(setup):
         "garante": "Ana A", "garante2": "Beto B", "documentos": "letra de cambio"})
     assert r.status_code == 200, r.text
     sid = r.json()["id"]
-    # tesorero NO puede aprobar
+    # la directiva no puede aprobar antes del filtro del tesorero
+    assert client.post(f"/creditos/solicitudes/{sid}/aprobar", headers=dire).status_code == 400
+    # el tesorero hace el filtro previo y deriva a la directiva
+    der = client.post(f"/creditos/solicitudes/{sid}/derivar", headers=ta)
+    assert der.status_code == 200 and der.json()["estado"] == "en_aprobacion"
+    # el tesorero NO puede aprobar
     assert client.post(f"/creditos/solicitudes/{sid}/aprobar", headers=ta).status_code == 403
-    # la directiva sí
+    # ahora sí la directiva aprueba
     ap = client.post(f"/creditos/solicitudes/{sid}/aprobar", headers=dire)
     assert ap.status_code == 200 and ap.json()["tipo"] == "emergente" and ap.json()["monto"] == 300
-    # el socio ya no tiene solicitud pendiente
     assert client.get("/creditos/solicitud", headers=socio).json() is None
+
+
+def test_solicitud_credito_correccion_y_reenvio(setup):
+    sa, ta = setup["sa"], setup["ta"]
+    client.post("/socios", headers=ta, json={"nombres": "Corrige Doc", "cedula": "2000000981"})
+    socio = login("2000000981", "2000000981")
+    body = {"monto": 200, "plazo_meses": 4, "tipo": "ordinario", "destino": "Salud",
+            "garante": "Ana A", "documentos": "incompleto"}
+    sid = client.post("/creditos/solicitud", headers=socio, json=body).json()["id"]
+    # tesorero pide corrección
+    c = client.post(f"/creditos/solicitudes/{sid}/correccion?motivo=Falta+la+letra", headers=ta)
+    assert c.status_code == 200 and c.json()["estado"] == "correccion"
+    # el socio ve el motivo
+    mi = client.get("/creditos/solicitud", headers=socio).json()
+    assert mi["estado"] == "correccion" and "letra" in mi["motivo"].lower()
+    # reenvía: reutiliza la misma fila y vuelve a "pendiente"
+    r2 = client.post("/creditos/solicitud", headers=socio, json={**body, "documentos": "letra de cambio"})
+    assert r2.status_code == 200 and r2.json()["id"] == sid and r2.json()["estado"] == "pendiente"
+
+
+def test_restablecer_acceso(setup):
+    sa, ta = setup["sa"], setup["ta"]
+    client.post("/socios", headers=ta, json={"nombres": "Olvida Clave", "cedula": "2000000990"})
+    # tesorero reinicia contraseña de su socio
+    r = client.post("/auth/restablecer/password", headers=ta, json={"cedula": "2000000990"})
+    assert r.status_code == 200 and r.json()["password_temporal"] == "2000000990"
+    # y restablece su 2FA
+    assert client.post("/auth/restablecer/2fa", headers=ta, json={"cedula": "2000000990"}).status_code == 200
+    # superadmin puede con cualquiera; cédula inexistente -> 404
+    assert client.post("/auth/restablecer/2fa", headers=sa, json={"cedula": "0000000000"}).status_code == 404
+    # un socio no puede usar estos endpoints
+    socio = login("2000000990", "2000000990")
+    assert client.post("/auth/restablecer/2fa", headers=socio, json={"cedula": "2000000990"}).status_code == 403

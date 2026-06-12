@@ -162,7 +162,7 @@ export default function Creditos() {
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
 
-      <SolicitudesCredito onCambio={cargar} puedeAprobar={false} />
+      <SolicitudesCredito onCambio={cargar} modo="tesorero" />
       <Recordatorios />
 
       {mostrarForm && (

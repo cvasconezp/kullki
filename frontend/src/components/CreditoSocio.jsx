@@ -16,6 +16,7 @@ export default function CreditoSocio({ lib }) {
   const [garantes, setGarantes] = useState([]);
   const [pend, setPend] = useState(null);
   const [error, setError] = useState(""); const [ok, setOk] = useState(""); const [enviando, setEnviando] = useState(false);
+  const [corrigiendo, setCorrigiendo] = useState(false);
 
   const cargar = () => api("/creditos/solicitud").then(setPend).catch(() => setPend(null));
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function CreditoSocio({ lib }) {
       }});
       setOk("✓ Solicitud enviada. Llega al tesorero y la aprueba la directiva o la asamblea.");
       setMonto(""); setDestino(""); setDestinoOtro(""); setGarante(""); setGarante2("");
-      setDocNombre(""); setDocB64("");
+      setDocNombre(""); setDocB64(""); setCorrigiendo(false);
       cargar();
     } catch (e) { setError(e.message); } finally { setEnviando(false); }
   };
@@ -62,15 +63,32 @@ export default function CreditoSocio({ lib }) {
       <h3>Solicitar un crédito</h3>
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
-      {pend ? (
+      {pend && !corrigiendo ? (
         <>
-          <div className="login-hint">
-            Tienes una <strong>solicitud pendiente</strong>: {usd(pend.monto)} a {pend.plazo_meses} meses
-            {pend.destino ? ` (${pend.destino})` : ""} · tipo {pend.tipo === "emergente" ? "emergente" : "ordinario"}.
-            Llegó al tesorero; la aprueba la directiva o la asamblea.
+          {pend.estado === "correccion" ? (
+            <div className="error" style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D" }}>
+              El tesorero pidió correcciones: <strong>{pend.motivo || "revisa los datos y el documento."}</strong>
+            </div>
+          ) : (
+            <div className="login-hint">
+              Tu solicitud de <strong>{usd(pend.monto)}</strong> a {pend.plazo_meses} meses
+              {pend.destino ? ` (${pend.destino})` : ""} · {pend.tipo === "emergente" ? "emergente" : "ordinario"}.{" "}
+              {pend.estado === "en_aprobacion"
+                ? "El tesorero la revisó y la derivó a la directiva para su aprobación."
+                : "Llegó al tesorero; está en revisión antes de pasar a la directiva."}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <button className="boton secundario" onClick={() => imprimirSolicitudCredito(lib, pend)}>
+              🖨 Descargar solicitud (PDF)</button>
+            {pend.estado === "correccion" && (
+              <button className="boton" onClick={() => {
+                setTipo(pend.tipo || "ordinario"); setMonto(String(pend.monto || ""));
+                setPlazo(String(pend.plazo_meses || "6")); setGarante(pend.garante || ""); setGarante2(pend.garante2 || "");
+                setCorrigiendo(true);
+              }}>Corregir y reenviar</button>
+            )}
           </div>
-          <button className="boton secundario" style={{ marginTop: 10 }} onClick={() => imprimirSolicitudCredito(lib, pend)}>
-            🖨 Descargar solicitud (PDF)</button>
         </>
       ) : (
         <>

@@ -58,6 +58,10 @@ class VerificarIn(BaseModel):
     password: str
 
 
+class CedulaIn(BaseModel):
+    cedula: str
+
+
 class TotpCodigo(BaseModel):
     codigo: str
 
@@ -93,6 +97,8 @@ class SolicitudCreditoOut(BaseModel):
     estado: str
     motivo: str = ""
     creado_en: datetime
+    creditos_activos: int = 0
+    ahorro: float = 0
 
     class Config:
         from_attributes = True

@@ -99,6 +99,21 @@ function Expediente({ socioId, onCerrar }) {
     try { await api(`/socios/${socioId}/anonimizar`, { method: "POST" }); onCerrar(); }
     catch (e) { setError(e.message); }
   };
+  const [aviso, setAviso] = useState("");
+  const reiniciarClave = async () => {
+    if (!window.confirm("¿Reiniciar la contraseña de este socio? Volverá a ser su número de cédula y deberá cambiarla al ingresar.")) return;
+    setError(""); setAviso("");
+    try { const r = await api("/auth/restablecer/password", { method: "POST", body: { cedula: lib.socio.cedula } });
+      setAviso(`Contraseña reiniciada. Clave temporal: ${r.password_temporal} (la cédula). El socio debe cambiarla al ingresar.`); }
+    catch (e) { setError(e.message); }
+  };
+  const reiniciar2FA = async () => {
+    if (!window.confirm("¿Restablecer (desactivar) el segundo factor 2FA de este socio? Podrá volver a activarlo desde su perfil.")) return;
+    setError(""); setAviso("");
+    try { await api("/auth/restablecer/2fa", { method: "POST", body: { cedula: lib.socio.cedula } });
+      setAviso("2FA desactivado. El socio puede volver a activarlo desde su perfil."); }
+    catch (e) { setError(e.message); }
+  };
 
   if (error) return <div className="error">{error}</div>;
   if (!lib) return <div className="vacio">Cargando expediente…</div>;
@@ -176,6 +191,20 @@ function Expediente({ socioId, onCerrar }) {
           </>
         )}
       </div>
+
+      {!soloLectura && socio.activo && (
+        <div className="tarjeta no-print">
+          <h3 style={{ marginTop: 0 }}>Acceso y seguridad</h3>
+          {aviso && <div className="exito">{aviso}</div>}
+          <div className="detalle" style={{ color: "var(--tinta-suave)", fontSize: 13, margin: "0 0 8px" }}>
+            Si el socio olvidó su contraseña o perdió el teléfono con su 2FA, restablécelo aquí.
+          </div>
+          <div className="dos-col">
+            <button className="boton secundario" onClick={reiniciarClave}>Reiniciar contraseña</button>
+            <button className="boton secundario" onClick={reiniciar2FA}>Restablecer 2FA</button>
+          </div>
+        </div>
+      )}
 
       <ExportarEstado lib={lib} />
 

@@ -14,7 +14,7 @@ export default function AprobacionCreditos() {
         Como directiva, revisas y apruebas (o rechazas) las solicitudes de crédito. El tesorero registra los cobros.
       </p>
 
-      <SolicitudesCredito puedeAprobar={true} onCambio={cargar} />
+      <SolicitudesCredito modo="directiva" onCambio={cargar} />
 
       <div className="tarjeta">
         <h3>Créditos vigentes</h3>

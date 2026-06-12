@@ -1,26 +1,28 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta } from "../lib/api.js";
 
-// Lista de solicitudes de crédito.
-// puedeAprobar=true  -> directiva/superadmin: puede aprobar/rechazar.
-// puedeAprobar=false -> tesorero: solo ve (la solicitud "llegó"), aprueba la directiva.
-export default function SolicitudesCredito({ onCambio, puedeAprobar = false }) {
+// modo "tesorero": filtro previo -> derivar a directiva / pedir corrección / rechazar.
+// modo "directiva": aprobar y otorgar / rechazar (solo las que el tesorero ya derivó).
+export default function SolicitudesCredito({ onCambio, modo = "tesorero" }) {
   const [sols, setSols] = useState([]);
   const [error, setError] = useState("");
   const cargar = () => api("/creditos/solicitudes").then(setSols).catch(() => setSols([]));
   useEffect(() => { cargar(); }, []);
 
-  const aprobar = async (id) => {
-    if (!window.confirm("¿Aprobar esta solicitud y otorgar el crédito? Se generará la tabla de cuotas.")) return;
+  const accion = async (id, ruta, conMotivo) => {
+    let qs = "";
+    if (conMotivo) {
+      const m = window.prompt(conMotivo);
+      if (m === null) return;
+      qs = `?motivo=${encodeURIComponent(m)}`;
+    }
     setError("");
-    try { await api(`/creditos/solicitudes/${id}/aprobar`, { method: "POST" }); cargar(); onCambio && onCambio(); }
+    try { await api(`/creditos/solicitudes/${id}/${ruta}${qs}`, { method: "POST" }); cargar(); onCambio && onCambio(); }
     catch (e) { setError(e.message); }
   };
-  const rechazar = async (id) => {
-    const m = window.prompt("Motivo del rechazo (opcional):") || "";
-    setError("");
-    try { await api(`/creditos/solicitudes/${id}/rechazar?motivo=${encodeURIComponent(m)}`, { method: "POST" }); cargar(); onCambio && onCambio(); }
-    catch (e) { setError(e.message); }
+  const aprobar = (id) => {
+    if (!window.confirm("¿Aprobar esta solicitud y otorgar el crédito? Se generará la tabla de cuotas.")) return;
+    accion(id, "aprobar");
   };
   const verDoc = async (s) => {
     try {
@@ -35,37 +37,65 @@ export default function SolicitudesCredito({ onCambio, puedeAprobar = false }) {
     } catch (e) { alert(e.message); }
   };
 
-  if (!sols.length) return null;
+  if (!sols.length) {
+    return (
+      <div className="tarjeta">
+        <h3>Solicitudes de crédito</h3>
+        <div className="vacio">
+          {modo === "directiva"
+            ? "No hay solicitudes derivadas por el tesorero por ahora."
+            : "No hay solicitudes nuevas para revisar."}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="tarjeta" style={{ borderColor: "var(--sara)" }}>
       <h3>Solicitudes de crédito ({sols.length})</h3>
-      {!puedeAprobar && (
-        <div className="detalle" style={{ color: "var(--tinta-suave)", fontSize: 13, margin: "0 0 8px" }}>
-          Estas solicitudes las aprueba la <strong>directiva o la asamblea</strong>. Aquí las ves y das seguimiento.
-        </div>
-      )}
+      <div className="detalle" style={{ color: "var(--tinta-suave)", fontSize: 13, margin: "0 0 8px" }}>
+        {modo === "tesorero"
+          ? "Revisa que los documentos estén completos y que el socio no tenga pendientes. Luego deriva a la directiva, pide correcciones o rechaza."
+          : "El tesorero ya hizo el filtro previo. La directiva (o la asamblea) decide la aprobación final."}
+      </div>
       {error && <div className="error">{error}</div>}
       {sols.map((s) => (
-        <div key={s.id} style={{ borderBottom: "1px dashed var(--regla)", padding: "8px 0" }}>
+        <div key={s.id} style={{ borderBottom: "1px dashed var(--regla)", padding: "10px 0" }}>
           <div className="principal">
             {s.socio_nombre} · {usd(s.monto)} · {s.plazo_meses} meses{" "}
             <span className={"pill " + (s.tipo === "emergente" ? "mora" : "neutro")}>
               {s.tipo === "emergente" ? "emergente" : "ordinario"}
             </span>
           </div>
-          <div className="detalle" style={{ margin: "2px 0 8px" }}>
+          <div className="detalle" style={{ margin: "2px 0 4px" }}>
             {s.destino || "Sin destino"}
             {s.garante ? ` · garante: ${s.garante}` : ""}
             {s.garante2 ? ` y ${s.garante2}` : ""}
             {" · "}{fechaCorta(s.creado_en)}
           </div>
+          <div className="detalle" style={{ margin: "0 0 8px", fontSize: 12.5 }}>
+            {s.documento_nombre
+              ? <span style={{ color: "var(--kullki)" }}>📎 documento adjunto</span>
+              : <span style={{ color: "var(--cochinilla)" }}>⚠ sin documento</span>}
+            {" · ahorro: "}{usd(s.ahorro || 0)}
+            {" · "}{(s.creditos_activos || 0) > 0
+              ? <span style={{ color: "var(--cochinilla)" }}>ya tiene {s.creditos_activos} crédito(s) activo(s)</span>
+              : "sin créditos activos"}
+          </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {s.documento_nombre && (
               <button className="boton mini secundario" onClick={() => verDoc(s)}>📎 Ver documento</button>
             )}
-            {puedeAprobar && (
+            {modo === "tesorero" ? (
               <>
-                <button className="boton mini secundario" onClick={() => rechazar(s.id)}>Rechazar</button>
+                <button className="boton mini secundario" onClick={() => accion(s.id, "correccion", "¿Qué debe corregir el socio?")}>Pedir correcciones</button>
+                <button className="boton mini secundario" style={{ color: "var(--cochinilla)" }}
+                  onClick={() => accion(s.id, "rechazar", "Motivo del rechazo (opcional):")}>Rechazar</button>
+                <button className="boton mini" onClick={() => accion(s.id, "derivar")}>Continuar trámite →</button>
+              </>
+            ) : (
+              <>
+                <button className="boton mini secundario" onClick={() => accion(s.id, "rechazar", "Motivo del rechazo (opcional):")}>Rechazar</button>
                 <button className="boton mini" onClick={() => aprobar(s.id)}>Aprobar y otorgar</button>
               </>
             )}
