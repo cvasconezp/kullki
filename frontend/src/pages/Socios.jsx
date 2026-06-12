@@ -109,12 +109,12 @@ function Expediente({ socioId, onCerrar }) {
           t + c.cuotas.filter((q) => q.pagada).reduce((u, q) => u + q.interes, 0), 0);
         return (
           <div className="kpis">
-            <div className="kpi"><div className="v">{usd(socio.total_aportes)}</div><div className="l">Ahorro neto</div></div>
-            <div className="kpi"><div className="v pos">{usd(aportesBrutos)}</div><div className="l">Aportes</div></div>
-            <div className="kpi"><div className="v neg">{usd(totalRetiros)}</div><div className="l">Retiros</div></div>
-            <div className="kpi"><div className="v pos">{usd(interesesPagados)}</div><div className="l">Intereses pagados</div></div>
-            <div className="kpi"><div className="v">{usd(socio.saldo_credito)}</div><div className="l">Saldo de crédito</div></div>
-            <div className="kpi"><div className="v">{usd(socio.total_multas)}</div><div className="l">Multas</div></div>
+            <div className="kpi k-in"><div className="v">{usd(socio.total_aportes)}</div><div className="l">Ahorro neto</div></div>
+            <div className="kpi k-in"><div className="v">{usd(aportesBrutos)}</div><div className="l">Aportes</div></div>
+            <div className="kpi k-out"><div className="v">{usd(totalRetiros)}</div><div className="l">Retiros</div></div>
+            <div className="kpi k-warn"><div className="v">{usd(interesesPagados)}</div><div className="l">Intereses pagados</div></div>
+            <div className="kpi k-out"><div className="v">{usd(socio.saldo_credito)}</div><div className="l">Saldo de crédito</div></div>
+            <div className="kpi k-warn"><div className="v">{usd(socio.total_multas)}</div><div className="l">Multas</div></div>
           </div>
         );
       })()}

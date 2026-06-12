@@ -189,9 +189,9 @@ export default function Balances() {
       </div>
 
       <div className="kpis">
-        <div className="kpi"><div className="v">{usd(k.total_aportes)}</div><div className="l">Aportes acumulados</div></div>
-        <div className="kpi"><div className="v">{usd(k.capital_prestado)}</div><div className="l">Capital en la calle</div></div>
-        <div className="kpi"><div className="v pos">{usd(k.intereses_cobrados)}</div><div className="l">Intereses ganados</div></div>
+        <div className="kpi k-in"><div className="v">{usd(k.total_aportes)}</div><div className="l">Aportes acumulados</div></div>
+        <div className="kpi k-out"><div className="v">{usd(k.capital_prestado)}</div><div className="l">Capital en la calle</div></div>
+        <div className="kpi k-in"><div className="v">{usd(k.intereses_cobrados)}</div><div className="l">Intereses ganados</div></div>
         <div className={"kpi" + (k.cuotas_en_mora > 0 ? " alerta" : "")}>
           <div className="v">{k.cuotas_en_mora > 0 ? usd(k.monto_en_mora) : "—"}</div>
           <div className="l">{k.cuotas_en_mora > 0 ? `${k.cuotas_en_mora} cuota(s) en mora` : "Sin mora"}</div>
