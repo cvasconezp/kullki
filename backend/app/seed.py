@@ -25,6 +25,16 @@ def _add_months(d, n):
     return date(y, m % 12 + 1, min(d.day, 28))
 
 
+def _usuario(db, nombre, cedula, password):
+    """Reutiliza el usuario si la cédula ya existe (la cédula es única global);
+    si no, lo crea. Evita choques al regenerar el demo cuando la cédula ya se usó."""
+    u = db.query(models.Usuario).filter_by(cedula=cedula).first()
+    if not u:
+        u = models.Usuario(nombre=nombre, cedula=cedula, password_hash=hash_password(password))
+        db.add(u); db.flush()
+    return u
+
+
 def construir_demo(db):
     """Crea la caja demo con datos heterogéneos. Asume que aún no existe."""
     random.seed(7)
@@ -35,14 +45,10 @@ def construir_demo(db):
                        multa_mora=2.0, color_primario="#0E7A5C",
                        color_acento="#D9A116", logo="🌾")
     db.add(caja); db.flush()
-    tes = models.Usuario(nombre="Tesorera Demo", cedula="1700000000",
-                         password_hash=hash_password("tesorera123"))
-    db.add(tes); db.flush()
+    tes = _usuario(db, "Tesorera Demo", "1700000000", "tesorera123")
     db.add(models.Membresia(usuario_id=tes.id, caja_id=caja.id, rol="tesorero"))
 
-    dire = models.Usuario(nombre="Presidenta Demo", cedula="1700000013",
-                          password_hash=hash_password("1700000013"))
-    db.add(dire); db.flush()
+    dire = _usuario(db, "Presidenta Demo", "1700000013", "1700000013")
     db.add(models.Membresia(usuario_id=dire.id, caja_id=caja.id, rol="directiva"))
 
     socios = []
@@ -57,8 +63,7 @@ def construir_demo(db):
                          nivel_instruccion=INSTR[i % len(INSTR)], estado_civil=CIVIL[i % len(CIVIL)],
                          ocupacion=OCUP[i % len(OCUP)], num_cargas=i % 5)
         db.add(s); db.flush()
-        u = models.Usuario(nombre=n, cedula=ced, password_hash=hash_password(ced))
-        db.add(u); db.flush()
+        u = _usuario(db, n, ced, ced)
         db.add(models.Membresia(usuario_id=u.id, caja_id=caja.id, socio_id=s.id, rol="socio"))
         socios.append(s)
 
