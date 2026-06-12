@@ -462,3 +462,12 @@ details[open] summary::before { content: "▾ "; }
 .suspender { background: var(--papel); border: 1px solid var(--regla); border-radius: 9px;
   font-size: 15px; line-height: 1; padding: 7px 9px; cursor: pointer; }
 .suspender:hover { border-color: var(--kullki); }
+
+/* ---------- Campana de notificaciones ---------- */
+.campana { position: relative; background: var(--papel); border: 1px solid var(--regla);
+  border-radius: 9px; font-size: 15px; line-height: 1; padding: 7px 9px; cursor: pointer; }
+.campana:hover { border-color: var(--kullki); }
+.campana-badge { position: absolute; top: -6px; right: -6px; background: var(--cochinilla);
+  color: #fff; font-size: 10px; font-weight: 700; min-width: 17px; height: 17px;
+  border-radius: 99px; display: flex; align-items: center; justify-content: center;
+  padding: 0 4px; border: 2px solid var(--carta); }

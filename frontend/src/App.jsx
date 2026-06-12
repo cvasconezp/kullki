@@ -16,6 +16,7 @@ import Estadisticas from "./pages/Estadisticas.jsx";
 import AnalisisAdmin from "./components/AnalisisAdmin.jsx";
 import CambiarPassword from "./components/CambiarPassword.jsx";
 import Lock from "./components/Lock.jsx";
+import Campana from "./components/Campana.jsx";
 
 // id interno · ruta (URL) · etiqueta · ícono
 const NAV_TESORERO = [
@@ -131,6 +132,7 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-acc">
+          {esTesorero && <Campana slug={sesion.caja_slug} />}
           <button className="suspender" onClick={bloquear} title="Suspender sesión" aria-label="Suspender">🔒</button>
           <button className="salir" onClick={impersonando ? volverAdmin : salir}>
             {impersonando ? "↩ Admin" : "Salir"}
