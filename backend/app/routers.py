@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from collections import defaultdict
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -341,27 +342,115 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
     return _socio_out(db, socio)
 
 
-@socios_router.patch("/mi-ficha", response_model=schemas.SocioOut)
-def actualizar_mi_ficha(data: schemas.SocioUpdate, db: Session = Depends(get_db),
-                        actor: Actor = Depends(get_current_user)):
-    """El socio actualiza sus propios datos de contacto/demográficos.
-    No puede cambiar su nombre ni su cédula (identidad la controla el tesorero)."""
+PERMITIDOS_SOCIO = {"telefono", "whatsapp", "correo", "direccion", "ocupacion",
+                    "estado_civil", "nivel_instruccion", "num_cargas",
+                    "contacto_emergencia", "fecha_nacimiento", "genero"}
+
+
+def _solicitud_out(sol: models.SolicitudCambio) -> schemas.SolicitudOut:
+    try:
+        campos = json.loads(sol.campos or "{}")
+    except Exception:
+        campos = {}
+    return schemas.SolicitudOut(
+        id=sol.id, socio_id=sol.socio_id, socio_nombre=sol.socio_nombre,
+        campos=campos, estado=sol.estado, creado_en=sol.creado_en,
+        resuelto_por=sol.resuelto_por or "")
+
+
+@socios_router.post("/solicitud", response_model=schemas.SolicitudOut)
+def crear_solicitud_cambio(data: schemas.SocioUpdate, db: Session = Depends(get_db),
+                           actor: Actor = Depends(get_current_user)):
+    """El socio SOLICITA actualizar sus datos. No se aplican hasta que el tesorero apruebe.
+    (Evita que alguien cambie su contacto para esquivar la cobranza.)"""
     if actor.rol != "socio" or not actor.socio_id:
-        raise HTTPException(403, "Solo un socio puede actualizar su propia ficha")
+        raise HTTPException(403, "Solo un socio puede solicitar cambios de su ficha")
     socio = db.get(models.Socio, actor.socio_id)
     if not socio:
         raise HTTPException(404, "Socio no encontrado")
-    permitidos = {"telefono", "whatsapp", "correo", "direccion", "ocupacion",
-                  "estado_civil", "nivel_instruccion", "num_cargas",
-                  "contacto_emergencia", "fecha_nacimiento", "genero"}
-    cambios = {k: v for k, v in data.model_dump(exclude_unset=True).items() if k in permitidos}
-    for k, v in cambios.items():
+    cambios = {k: v for k, v in data.model_dump(exclude_unset=True).items() if k in PERMITIDOS_SOCIO}
+    if not cambios:
+        raise HTTPException(400, "No hay cambios que solicitar")
+    # fechas a string para JSON
+    payload = {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in cambios.items()}
+    prev = db.scalar(select(models.SolicitudCambio).where(
+        models.SolicitudCambio.socio_id == socio.id,
+        models.SolicitudCambio.estado == "pendiente"))
+    if prev:
+        prev.campos = json.dumps(payload); prev.creado_en = datetime.utcnow()
+        sol = prev
+    else:
+        sol = models.SolicitudCambio(caja_id=socio.caja_id, socio_id=socio.id,
+                                     socio_nombre=socio.nombres, campos=json.dumps(payload))
+        db.add(sol)
+    log_audit(db, actor, "crear", "solicitud", socio.id,
+              f"{socio.nombres} solicitó actualizar: {', '.join(cambios)}",
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
+    db.commit(); db.refresh(sol)
+    return _solicitud_out(sol)
+
+
+@socios_router.get("/solicitud", response_model=schemas.SolicitudOut | None)
+def mi_solicitud(db: Session = Depends(get_db), actor: Actor = Depends(get_current_user)):
+    if actor.rol != "socio" or not actor.socio_id:
+        return None
+    sol = db.scalar(select(models.SolicitudCambio).where(
+        models.SolicitudCambio.socio_id == actor.socio_id,
+        models.SolicitudCambio.estado == "pendiente"))
+    return _solicitud_out(sol) if sol else None
+
+
+@socios_router.get("/solicitudes", response_model=list[schemas.SolicitudOut])
+def listar_solicitudes(caja_id: int | None = None, db: Session = Depends(get_db),
+                       user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    cid = caja_scope(user, caja_id)
+    sols = db.scalars(select(models.SolicitudCambio).where(
+        models.SolicitudCambio.caja_id == cid,
+        models.SolicitudCambio.estado == "pendiente")
+        .order_by(models.SolicitudCambio.creado_en.desc())).all()
+    return [_solicitud_out(x) for x in sols]
+
+
+@socios_router.post("/solicitudes/{sol_id}/aprobar", response_model=schemas.SocioOut)
+def aprobar_solicitud(sol_id: int, db: Session = Depends(get_db),
+                      actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    sol = db.get(models.SolicitudCambio, sol_id)
+    if not sol or (actor.rol != "superadmin" and sol.caja_id != actor.caja_id):
+        raise HTTPException(404, "Solicitud no encontrada")
+    if sol.estado != "pendiente":
+        raise HTTPException(400, "La solicitud ya fue resuelta")
+    socio = db.get(models.Socio, sol.socio_id)
+    campos = json.loads(sol.campos or "{}")
+    from datetime import date as _date
+    for k, v in campos.items():
+        if k not in PERMITIDOS_SOCIO:
+            continue
+        if k == "fecha_nacimiento" and v:
+            try: v = _date.fromisoformat(v)
+            except Exception: continue
         setattr(socio, k, v)
+    sol.estado = "aprobada"; sol.resuelto_por = actor.nombre; sol.resuelto_en = datetime.utcnow()
     log_audit(db, actor, "editar", "socio", socio.id,
-              f"{socio.nombres} actualizó sus datos de contacto", caja_id=socio.caja_id,
-              afecta_socio_id=socio.id)
+              f"Aprobada actualización de datos de {socio.nombres}",
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
     db.commit()
     return _socio_out(db, socio)
+
+
+@socios_router.post("/solicitudes/{sol_id}/rechazar", response_model=schemas.SolicitudOut)
+def rechazar_solicitud(sol_id: int, db: Session = Depends(get_db),
+                       actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    sol = db.get(models.SolicitudCambio, sol_id)
+    if not sol or (actor.rol != "superadmin" and sol.caja_id != actor.caja_id):
+        raise HTTPException(404, "Solicitud no encontrada")
+    if sol.estado != "pendiente":
+        raise HTTPException(400, "La solicitud ya fue resuelta")
+    sol.estado = "rechazada"; sol.resuelto_por = actor.nombre; sol.resuelto_en = datetime.utcnow()
+    log_audit(db, actor, "editar", "solicitud", sol.socio_id,
+              f"Rechazada solicitud de cambio de {sol.socio_nombre}",
+              caja_id=sol.caja_id, afecta_socio_id=sol.socio_id)
+    db.commit()
+    return _solicitud_out(sol)
 
 
 @socios_router.patch("/{socio_id}", response_model=schemas.SocioOut)

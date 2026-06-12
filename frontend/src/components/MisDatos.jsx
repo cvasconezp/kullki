@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, fechaCorta } from "../lib/api.js";
 
 const GEN = { F: "Femenino", M: "Masculino", Otro: "Otro", NS: "Prefiere no decir" };
 const GENEROS = [["", "—"], ["F", "Femenino"], ["M", "Masculino"], ["Otro", "Otro"], ["NS", "Prefiere no decir"]];
 const CIVIL = ["", "Soltero/a", "Casado/a", "Unión libre", "Divorciado/a", "Viudo/a"];
 const INSTR = ["", "Ninguna", "Primaria", "Secundaria", "Superior", "Posgrado"];
+const ETIQ = { telefono: "Teléfono", whatsapp: "WhatsApp", correo: "Correo", direccion: "Dirección",
+  ocupacion: "Ocupación", estado_civil: "Estado civil", nivel_instruccion: "Instrucción",
+  num_cargas: "Cargas familiares", contacto_emergencia: "Contacto emergencia",
+  fecha_nacimiento: "Nacimiento", genero: "Género" };
 
-export default function MisDatos({ socio, onActualizado }) {
+export default function MisDatos({ socio }) {
+  const [pendiente, setPendiente] = useState(null);
   const [edit, setEdit] = useState(false);
   const [f, setF] = useState({
     whatsapp: socio.whatsapp || "", correo: socio.correo || "", telefono: socio.telefono || "",
@@ -18,14 +23,17 @@ export default function MisDatos({ socio, onActualizado }) {
   const [error, setError] = useState(""); const [ok, setOk] = useState(""); const [guardando, setGuardando] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
-  const guardar = async () => {
+  const cargarPend = () => api("/socios/solicitud").then(setPendiente).catch(() => setPendiente(null));
+  useEffect(() => { cargarPend(); }, []);
+
+  const enviar = async () => {
     setError(""); setOk(""); setGuardando(true);
     try {
       const body = { ...f };
       body.num_cargas = body.num_cargas === "" ? 0 : +body.num_cargas;
       if (!body.fecha_nacimiento) delete body.fecha_nacimiento;
-      await api("/socios/mi-ficha", { method: "PATCH", body });
-      setOk("Tus datos fueron actualizados."); setEdit(false); onActualizado && onActualizado();
+      await api("/socios/solicitud", { method: "POST", body });
+      setOk("Solicitud enviada. El tesorero la revisará y aprobará."); setEdit(false); cargarPend();
     } catch (e) { setError(e.message); }
     finally { setGuardando(false); }
   };
@@ -36,10 +44,19 @@ export default function MisDatos({ socio, onActualizado }) {
     <div className="tarjeta no-print">
       <div className="seccion-titulo" style={{ margin: "0 0 8px" }}>
         <h3 style={{ margin: 0 }}>Mis datos</h3>
-        <button className="boton mini" onClick={() => { setEdit(!edit); setOk(""); }}>{edit ? "Cancelar" : "Actualizar"}</button>
+        {!pendiente && <button className="boton mini" onClick={() => { setEdit(!edit); setOk(""); }}>
+          {edit ? "Cancelar" : "Solicitar actualización"}</button>}
       </div>
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
+
+      {pendiente && (
+        <div className="login-hint" style={{ marginBottom: 10 }}>
+          Tienes una <strong>solicitud de actualización pendiente</strong> (enviada {fechaCorta(pendiente.creado_en)}).
+          El tesorero debe aprobarla: {Object.entries(pendiente.campos).map(([k, v]) => `${ETIQ[k] || k}: ${v}`).join(" · ")}
+        </div>
+      )}
+
       {!edit ? (
         <>
           {dato("WhatsApp", socio.whatsapp)}
@@ -53,10 +70,13 @@ export default function MisDatos({ socio, onActualizado }) {
           {dato("Instrucción", socio.nivel_instruccion)}
           {dato("Contacto de emergencia", socio.contacto_emergencia)}
           {!socio.whatsapp && !socio.correo &&
-            <div className="vacio">Aún no registras tus datos de contacto. Usa “Actualizar”.</div>}
+            <div className="vacio">Aún no registras tus datos de contacto. Usa “Solicitar actualización”.</div>}
         </>
       ) : (
         <>
+          <p className="detalle" style={{ color: "var(--tinta-suave)", fontSize: 12.5, margin: "0 0 8px" }}>
+            Tus cambios no se aplican de inmediato: se envían al tesorero para su aprobación.
+          </p>
           <div className="dos-col">
             <div className="campo"><label>WhatsApp</label><input inputMode="tel" value={f.whatsapp} onChange={set("whatsapp")} /></div>
             <div className="campo"><label>Teléfono</label><input inputMode="tel" value={f.telefono} onChange={set("telefono")} /></div>
@@ -75,7 +95,7 @@ export default function MisDatos({ socio, onActualizado }) {
             <div className="campo"><label>Cargas familiares</label><input type="number" value={f.num_cargas} onChange={set("num_cargas")} /></div>
             <div className="campo"><label>Contacto de emergencia</label><input value={f.contacto_emergencia} onChange={set("contacto_emergencia")} /></div>
           </div>
-          <button className="boton" onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar mis datos"}</button>
+          <button className="boton" onClick={enviar} disabled={guardando}>{guardando ? "Enviando…" : "Enviar solicitud al tesorero"}</button>
         </>
       )}
     </div>

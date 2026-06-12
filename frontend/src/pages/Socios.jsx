@@ -209,6 +209,41 @@ function Expediente({ socioId, onCerrar }) {
   );
 }
 
+const ETIQ = { telefono: "Teléfono", whatsapp: "WhatsApp", correo: "Correo", direccion: "Dirección",
+  ocupacion: "Ocupación", estado_civil: "Estado civil", nivel_instruccion: "Instrucción",
+  num_cargas: "Cargas", contacto_emergencia: "Contacto emergencia", fecha_nacimiento: "Nacimiento", genero: "Género" };
+
+function Solicitudes({ onCambio }) {
+  const [sols, setSols] = useState([]);
+  const [error, setError] = useState("");
+  const cargar = () => api("/socios/solicitudes").then(setSols).catch(() => setSols([]));
+  useEffect(() => { cargar(); }, []);
+  const resolver = async (id, accion) => {
+    setError("");
+    try { await api(`/socios/solicitudes/${id}/${accion}`, { method: "POST" }); cargar(); onCambio && onCambio(); }
+    catch (e) { setError(e.message); }
+  };
+  if (!sols.length) return null;
+  return (
+    <div className="tarjeta" style={{ borderColor: "var(--sara)" }}>
+      <h3>Solicitudes de actualización ({sols.length})</h3>
+      {error && <div className="error">{error}</div>}
+      {sols.map((s) => (
+        <div key={s.id} style={{ borderBottom: "1px dashed var(--regla)", padding: "8px 0" }}>
+          <div className="principal">{s.socio_nombre}</div>
+          <div className="detalle" style={{ margin: "2px 0 8px" }}>
+            {Object.entries(s.campos).map(([k, v]) => `${ETIQ[k] || k}: ${v}`).join(" · ")}
+          </div>
+          <div className="dos-col">
+            <button className="boton secundario" onClick={() => resolver(s.id, "rechazar")}>Rechazar</button>
+            <button className="boton" onClick={() => resolver(s.id, "aprobar")}>Aprobar</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const FORM0 = { nombres: "", cedula: "", whatsapp: "", correo: "", telefono: "",
   fecha_nacimiento: "", genero: "", direccion: "", ocupacion: "",
   estado_civil: "", nivel_instruccion: "", num_cargas: "", contacto_emergencia: "" };
@@ -250,6 +285,8 @@ export default function Socios() {
       </div>
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
+
+      <Solicitudes onCambio={cargar} />
 
       {mostrarForm && (
         <div className="tarjeta">

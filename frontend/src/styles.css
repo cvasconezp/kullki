@@ -114,8 +114,8 @@ button { font-family: var(--cuerpo); cursor: pointer; }
 .kpi .v.pos { color: var(--verde); }
 .kpi.k-in  { border-left: 4px solid var(--verde); }
 .kpi.k-in .v  { color: var(--verde); }
-.kpi.k-out { border-left: 4px solid var(--cochinilla); }
-.kpi.k-out .v { color: var(--cochinilla); }
+.kpi.k-out { border-left: 4px solid var(--sara); }
+.kpi.k-out .v { color: var(--ambar-ink); }
 .kpi.k-warn { border-left: 4px solid var(--sara); }
 .kpi.k-warn .v { color: var(--ambar-ink); }
 .kpi.k-neutro { border-left: 4px solid var(--regla); }

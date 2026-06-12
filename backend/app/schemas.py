@@ -381,3 +381,17 @@ class BalancesOut(BaseModel):
     serie: list[PuntoSerie]
     composicion_fondo: dict[str, float]   # ahorros / capital_en_calle / intereses
     top_socios: list[TopSocio]
+
+
+# ---------- Solicitudes de actualización de datos del socio ----------
+class SolicitudOut(BaseModel):
+    id: int
+    socio_id: int
+    socio_nombre: str
+    campos: dict = {}
+    estado: str
+    creado_en: datetime
+    resuelto_por: str = ""
+
+    class Config:
+        from_attributes = True

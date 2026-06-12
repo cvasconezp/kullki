@@ -154,6 +154,20 @@ class Auditoria(Base):
     fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class SolicitudCambio(Base):
+    """Solicitud del socio para actualizar sus datos; la aprueba el tesorero."""
+    __tablename__ = "solicitudes_cambio"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
+    socio_id: Mapped[int] = mapped_column(ForeignKey("socios.id"), index=True)
+    socio_nombre: Mapped[str] = mapped_column(String(120))
+    campos: Mapped[str] = mapped_column(Text, default="{}")   # JSON con los cambios propuestos
+    estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # pendiente|aprobada|rechazada
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    resuelto_por: Mapped[str] = mapped_column(String(120), default="")
+    resuelto_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class Acceso(Base):
     """Registro de ingresos (logins) para estadísticas de uso."""
     __tablename__ = "accesos"
