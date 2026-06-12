@@ -187,7 +187,7 @@ class SolicitudCambio(Base):
     socio_id: Mapped[int] = mapped_column(ForeignKey("socios.id"), index=True)
     socio_nombre: Mapped[str] = mapped_column(String(120))
     campos: Mapped[str] = mapped_column(Text, default="{}")   # JSON con los cambios propuestos
-    estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # pendiente|aprobada|rechazada
+    estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # garantes|pendiente|en_aprobacion|correccion|aprobada|rechazada
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     resuelto_por: Mapped[str] = mapped_column(String(120), default="")
     resuelto_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -205,11 +205,15 @@ class SolicitudCredito(Base):
     destino: Mapped[str] = mapped_column(String(200), default="")
     garante: Mapped[str] = mapped_column(String(160), default="")
     garante2: Mapped[str] = mapped_column(String(160), default="")
+    garante_id: Mapped[int | None] = mapped_column(ForeignKey("socios.id"), nullable=True)
+    garante2_id: Mapped[int | None] = mapped_column(ForeignKey("socios.id"), nullable=True)
+    garante_estado: Mapped[str] = mapped_column(String(20), default="pendiente")   # pendiente|aceptado|rechazado
+    garante2_estado: Mapped[str] = mapped_column(String(20), default="")
     tipo: Mapped[str] = mapped_column(String(20), default="ordinario")  # ordinario | emergente
     documentos: Mapped[str] = mapped_column(Text, default="")
     documento_nombre: Mapped[str] = mapped_column(String(160), default="")
     documento_b64: Mapped[str] = mapped_column(Text, default="")
-    estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # pendiente|aprobada|rechazada
+    estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # garantes|pendiente|en_aprobacion|correccion|aprobada|rechazada
     motivo: Mapped[str] = mapped_column(String(200), default="")
     credito_id: Mapped[int | None] = mapped_column(ForeignKey("creditos.id"), nullable=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

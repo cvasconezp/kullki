@@ -819,3 +819,52 @@ def test_restablecer_acceso(setup):
     # un socio no puede usar estos endpoints
     socio = login("2000000990", "2000000990")
     assert client.post("/auth/restablecer/2fa", headers=socio, json={"cedula": "2000000990"}).status_code == 403
+
+
+def test_flujo_garantes(setup):
+    sa, ta = setup["sa"], setup["ta"]
+    ca = next(c for c in client.get("/cajas", headers=sa).json() if c["slug"] == "caja-a")
+    client.post(f"/cajas/{ca['id']}/directiva", headers=sa,
+                json={"nombre": "Dire G", "cedula": "1000000960", "password": "clave123"})
+    dire = login("1000000960", "clave123")
+    sA = client.post("/socios", headers=ta, json={"nombres": "Solicita G", "cedula": "2000001001"}).json()
+    sB = client.post("/socios", headers=ta, json={"nombres": "Garante Uno", "cedula": "2000001002"}).json()
+    sC = client.post("/socios", headers=ta, json={"nombres": "Garante Dos", "cedula": "2000001003"}).json()
+    socioA = login("2000001001", "2000001001")
+    socioB = login("2000001002", "2000001002")
+    socioC = login("2000001003", "2000001003")
+    # A solicita con dos garantes (B y C)
+    r = client.post("/creditos/solicitud", headers=socioA, json={
+        "monto": 300, "plazo_meses": 6, "tipo": "ordinario", "destino": "Salud",
+        "garante_id": sB["id"], "garante2_id": sC["id"], "documentos": "letra"})
+    assert r.status_code == 200 and r.json()["estado"] == "garantes"
+    sid = r.json()["id"]
+    # aún no llega al tesorero
+    assert not any(s["id"] == sid for s in client.get("/creditos/solicitudes", headers=ta).json())
+    # B ve su garantía y acepta
+    assert any(g["id"] == sid for g in client.get("/creditos/garantias", headers=socioB).json())
+    client.post(f"/creditos/solicitudes/{sid}/garantia?accion=aceptar", headers=socioB)
+    # sigue en garantes (falta C)
+    assert client.get("/creditos/solicitud", headers=socioA).json()["estado"] == "garantes"
+    # C acepta -> pasa al tesorero
+    client.post(f"/creditos/solicitudes/{sid}/garantia?accion=aceptar", headers=socioC)
+    assert client.get("/creditos/solicitud", headers=socioA).json()["estado"] == "pendiente"
+    assert any(s["id"] == sid for s in client.get("/creditos/solicitudes", headers=ta).json())
+    # tesorero deriva, directiva aprueba
+    client.post(f"/creditos/solicitudes/{sid}/derivar", headers=ta)
+    assert client.post(f"/creditos/solicitudes/{sid}/aprobar", headers=dire).status_code == 200
+
+
+def test_garante_rechaza_vuelve_al_socio(setup):
+    sa, ta = setup["sa"], setup["ta"]
+    sA = client.post("/socios", headers=ta, json={"nombres": "Sol Rch", "cedula": "2000001010"}).json()
+    sB = client.post("/socios", headers=ta, json={"nombres": "Gar Rch", "cedula": "2000001011"}).json()
+    socioA = login("2000001010", "2000001010")
+    socioB = login("2000001011", "2000001011")
+    sid = client.post("/creditos/solicitud", headers=socioA, json={
+        "monto": 200, "plazo_meses": 4, "tipo": "ordinario", "destino": "Salud",
+        "garante_id": sB["id"], "documentos": "letra"}).json()["id"]
+    # B rechaza -> vuelve al solicitante (correccion)
+    client.post(f"/creditos/solicitudes/{sid}/garantia?accion=rechazar", headers=socioB)
+    mi = client.get("/creditos/solicitud", headers=socioA).json()
+    assert mi["estado"] == "correccion" and "garante" in mi["motivo"].lower()

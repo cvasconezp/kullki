@@ -870,26 +870,39 @@ def crear_solicitud_credito(data: schemas.SolicitudCreditoIn, db: Session = Depe
         raise HTTPException(404, "Socio no encontrado")
     prev = db.scalar(select(models.SolicitudCredito).where(
         models.SolicitudCredito.socio_id == socio.id,
-        models.SolicitudCredito.estado.in_(["pendiente", "en_aprobacion"])))
+        models.SolicitudCredito.estado.in_(["garantes", "pendiente", "en_aprobacion"])))
     if prev:
         raise HTTPException(400, "Ya tienes una solicitud de crédito en trámite")
+
+    def _validar_garante(gid):
+        if gid is None:
+            return None
+        g = db.get(models.Socio, gid)
+        if not g or g.caja_id != socio.caja_id or not g.activo:
+            raise HTTPException(400, "El garante debe ser un socio activo de tu caja")
+        if g.id == socio.id:
+            raise HTTPException(400, "No puedes ser tu propio garante")
+        return g
+    g1 = _validar_garante(data.garante_id)
+    g2 = _validar_garante(data.garante2_id)
+    if g2 and g1 and g2.id == g1.id:
+        raise HTTPException(400, "Los dos garantes deben ser personas distintas")
+
     # Si había una devuelta para corrección, se reutiliza esa misma fila
     sol = db.scalar(select(models.SolicitudCredito).where(
         models.SolicitudCredito.socio_id == socio.id,
         models.SolicitudCredito.estado == "correccion"))
-    if sol:
-        sol.monto = data.monto; sol.plazo_meses = data.plazo_meses; sol.destino = data.destino
-        sol.garante = data.garante; sol.garante2 = data.garante2; sol.tipo = data.tipo
-        sol.documentos = data.documentos; sol.documento_nombre = data.documento_nombre
-        sol.documento_b64 = data.documento_b64
-        sol.estado = "pendiente"; sol.motivo = ""; sol.creado_en = datetime.utcnow()
-    else:
-        sol = models.SolicitudCredito(caja_id=socio.caja_id, socio_id=socio.id, socio_nombre=socio.nombres,
-                                      monto=data.monto, plazo_meses=data.plazo_meses, destino=data.destino,
-                                      garante=data.garante, garante2=data.garante2, tipo=data.tipo,
-                                      documentos=data.documentos, documento_nombre=data.documento_nombre,
-                                      documento_b64=data.documento_b64)
+    if not sol:
+        sol = models.SolicitudCredito(caja_id=socio.caja_id, socio_id=socio.id, socio_nombre=socio.nombres)
         db.add(sol)
+    sol.monto = data.monto; sol.plazo_meses = data.plazo_meses; sol.destino = data.destino; sol.tipo = data.tipo
+    sol.garante = (g1.nombres if g1 else data.garante); sol.garante2 = (g2.nombres if g2 else data.garante2)
+    sol.garante_id = g1.id if g1 else None; sol.garante2_id = g2.id if g2 else None
+    sol.garante_estado = "pendiente"; sol.garante2_estado = ("pendiente" if g2 else "")
+    sol.documentos = data.documentos; sol.documento_nombre = data.documento_nombre; sol.documento_b64 = data.documento_b64
+    # Si hay garante(s) identificado(s), primero deben aceptar; si no, va directo al tesorero.
+    sol.estado = "garantes" if (g1 or g2) else "pendiente"
+    sol.motivo = ""; sol.creado_en = datetime.utcnow()
     log_audit(db, actor, "crear", "solicitud", socio.id,
               f"{socio.nombres} solicitó un crédito de ${data.monto:.2f} a {data.plazo_meses} meses",
               caja_id=socio.caja_id, afecta_socio_id=socio.id)
@@ -903,7 +916,7 @@ def mi_solicitud_credito(db: Session = Depends(get_db), actor: Actor = Depends(g
         return None
     sol = db.scalar(select(models.SolicitudCredito).where(
         models.SolicitudCredito.socio_id == actor.socio_id,
-        models.SolicitudCredito.estado.in_(["pendiente", "en_aprobacion", "correccion"]))
+        models.SolicitudCredito.estado.in_(["garantes", "pendiente", "en_aprobacion", "correccion"]))
         .order_by(models.SolicitudCredito.creado_en.desc()))
     return _solcred_out(sol) if sol else None
 
@@ -928,6 +941,61 @@ def listar_solicitudes_credito(caja_id: int | None = None, estado: str | None = 
             o.ahorro = _socio_out(db, socio).total_aportes
         out.append(o)
     return out
+
+
+@creditos_router.get("/garantias")
+def mis_garantias(db: Session = Depends(get_db), actor: Actor = Depends(get_current_user)):
+    """Solicitudes en las que el socio actual fue elegido como garante y debe responder."""
+    if actor.rol != "socio" or not actor.socio_id:
+        return []
+    sid = actor.socio_id
+    sols = db.scalars(select(models.SolicitudCredito).where(
+        models.SolicitudCredito.estado == "garantes",
+        ((models.SolicitudCredito.garante_id == sid) & (models.SolicitudCredito.garante_estado == "pendiente")) |
+        ((models.SolicitudCredito.garante2_id == sid) & (models.SolicitudCredito.garante2_estado == "pendiente"))
+    ).order_by(models.SolicitudCredito.creado_en.desc())).all()
+    return [{"id": x.id, "solicitante": x.socio_nombre, "monto": x.monto, "plazo_meses": x.plazo_meses,
+             "tipo": x.tipo, "destino": x.destino, "creado_en": x.creado_en.isoformat()} for x in sols]
+
+
+@creditos_router.post("/solicitudes/{sol_id}/garantia", response_model=schemas.SolicitudCreditoOut)
+def responder_garantia(sol_id: int, accion: str, db: Session = Depends(get_db),
+                       actor: Actor = Depends(get_current_user)):
+    """El garante acepta o rechaza. Si todos aceptan -> pasa al tesorero (pendiente).
+    Si uno rechaza -> vuelve al solicitante para que elija otro garante (correccion)."""
+    if actor.rol != "socio" or not actor.socio_id:
+        raise HTTPException(403, "Solo un socio garante puede responder")
+    sol = db.get(models.SolicitudCredito, sol_id)
+    if not sol or sol.estado != "garantes":
+        raise HTTPException(404, "Solicitud no disponible")
+    sid = actor.socio_id
+    if sol.garante_id == sid and sol.garante_estado == "pendiente":
+        slot = "garante"
+    elif sol.garante2_id == sid and sol.garante2_estado == "pendiente":
+        slot = "garante2"
+    else:
+        raise HTTPException(403, "No eres garante pendiente de esta solicitud")
+    nombre_g = actor.usuario.nombre
+    if accion == "rechazar":
+        setattr(sol, slot + "_estado", "rechazado")
+        sol.estado = "correccion"
+        sol.motivo = f"Tu garante {nombre_g} no aceptó. Elige otro garante y vuelve a enviar."
+        log_audit(db, actor, "editar", "solicitud", sol.socio_id,
+                  f"{nombre_g} rechazó ser garante de {sol.socio_nombre}", caja_id=sol.caja_id,
+                  afecta_socio_id=sol.socio_id)
+    elif accion == "aceptar":
+        setattr(sol, slot + "_estado", "aceptado")
+        pend1 = sol.garante_id and sol.garante_estado != "aceptado"
+        pend2 = sol.garante2_id and sol.garante2_estado != "aceptado"
+        if not pend1 and not pend2:
+            sol.estado = "pendiente"   # todos aceptaron -> llega al tesorero
+        log_audit(db, actor, "editar", "solicitud", sol.socio_id,
+                  f"{nombre_g} aceptó ser garante de {sol.socio_nombre}", caja_id=sol.caja_id,
+                  afecta_socio_id=sol.socio_id)
+    else:
+        raise HTTPException(400, "Acción inválida")
+    db.commit(); db.refresh(sol)
+    return _solcred_out(sol)
 
 
 @creditos_router.get("/garantes")

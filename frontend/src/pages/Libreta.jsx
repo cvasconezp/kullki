@@ -4,6 +4,7 @@ import ExportarEstado from "../components/ExportarEstado.jsx";
 import MisDatos from "../components/MisDatos.jsx";
 import Seguridad2FA from "../components/Seguridad2FA.jsx";
 import CreditoSocio from "../components/CreditoSocio.jsx";
+import GarantiasPendientes from "../components/GarantiasPendientes.jsx";
 
 // vista: "libreta" (Mi libreta) | "credito" (Crédito) | "perfil" (Perfil)
 export default function Libreta({ vista = "libreta" }) {
@@ -25,6 +26,7 @@ export default function Libreta({ vista = "libreta" }) {
     return (
       <>
         <div className="seccion-titulo"><h2>Crédito</h2></div>
+        <GarantiasPendientes onCambio={cargar} />
         <CreditoSocio lib={lib} />
         {activos.map((c) => {
           const siguiente = c.cuotas.find((q) => !q.pagada);

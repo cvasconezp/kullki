@@ -56,10 +56,10 @@ export default function CreditoSocio({ lib }) {
     try {
       await api("/creditos/solicitud", { method: "POST", body: {
         monto: m, plazo_meses: n, tipo, destino: destinoFinal,
-        garante, garante2, documentos: docNombre,
+        garante_id: +garante, garante2_id: garante2 ? +garante2 : null, documentos: docNombre,
         documento_nombre: docNombre, documento_b64: docB64,
       }});
-      setOk("✓ Solicitud enviada. La revisa el tesorero y la aprueba la directiva o la asamblea.");
+      setOk("✓ Solicitud enviada. Tus garantes recibirán la notificación para aceptar; luego la revisa el tesorero.");
       setMonto(""); setDestino(""); setDestinoOtro(""); setGarante(""); setGarante2("");
       setDocNombre(""); setDocB64(""); setCorrigiendo(false); setPaso("simular");
       cargar();
@@ -79,7 +79,9 @@ export default function CreditoSocio({ lib }) {
           <div className="login-hint">
             Tu solicitud de <strong>{usd(pend.monto)}</strong> a {pend.plazo_meses} meses
             {pend.destino ? ` (${pend.destino})` : ""} · {pend.tipo === "emergente" ? "emergente" : "ordinario"}.{" "}
-            {pend.estado === "en_aprobacion"
+            {pend.estado === "garantes"
+              ? "Esperando que tus garantes acepten. Cuando todos acepten, pasará al tesorero."
+              : pend.estado === "en_aprobacion"
               ? "El tesorero la revisó y la derivó a la directiva para su aprobación."
               : "Llegó al tesorero; está en revisión antes de pasar a la directiva."}
           </div>
@@ -90,7 +92,7 @@ export default function CreditoSocio({ lib }) {
           {pend.estado === "correccion" && (
             <button className="boton" onClick={() => {
               setTipo(pend.tipo || "ordinario"); setMonto(String(pend.monto || ""));
-              setPlazo(String(pend.plazo_meses || "6")); setGarante(pend.garante || ""); setGarante2(pend.garante2 || "");
+              setPlazo(String(pend.plazo_meses || "6")); setGarante(""); setGarante2("");
               setCorrigiendo(true); setPaso("solicitar");
             }}>Corregir y reenviar</button>
           )}
@@ -185,13 +187,13 @@ export default function CreditoSocio({ lib }) {
       <div className="campo"><label>Garante (socio de la caja)</label>
         <select value={garante} onChange={(e) => setGarante(e.target.value)}>
           <option value="">Elige un garante…</option>
-          {garantes.map((g) => <option key={g.id} value={g.nombre}>{g.nombre}</option>)}
+          {garantes.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
         </select>
       </div>
       <div className="campo"><label>Segundo garante (si la caja lo exige)</label>
         <select value={garante2} onChange={(e) => setGarante2(e.target.value)}>
           <option value="">— Ninguno —</option>
-          {garantes.filter((g) => g.nombre !== garante).map((g) => <option key={g.id} value={g.nombre}>{g.nombre}</option>)}
+          {garantes.filter((g) => String(g.id) !== garante).map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
         </select>
       </div>
 

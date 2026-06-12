@@ -77,6 +77,8 @@ class SolicitudCreditoIn(BaseModel):
     destino: str = ""
     garante: str = ""
     garante2: str = ""
+    garante_id: int | None = None
+    garante2_id: int | None = None
     documentos: str = ""
     documento_nombre: str = ""
     documento_b64: str = ""
@@ -91,6 +93,8 @@ class SolicitudCreditoOut(BaseModel):
     destino: str = ""
     garante: str = ""
     garante2: str = ""
+    garante_estado: str = "pendiente"
+    garante2_estado: str = ""
     tipo: str = "ordinario"
     documentos: str = ""
     documento_nombre: str = ""
