@@ -1786,6 +1786,42 @@ def crear_backup(user: models.Usuario = Depends(require_roles("superadmin"))):
     return {"ok": True, "archivo": _os.path.basename(ruta)}
 
 
+@reportes_router.get("/admin/usuarios")
+def listar_usuarios(caja_id: int | None = None, rol: str | None = None, q: str | None = None,
+                    db: Session = Depends(get_db),
+                    actor: Actor = Depends(require_roles("superadmin"))):
+    """Directorio de cuentas y accesos (superadmin). Una fila por membresía; el
+    superadmin aparece como fila propia. Filtros por caja, rol y texto (nombre/cédula)."""
+    filas = []
+    # Superadmins (sin membresía/caja)
+    if not caja_id and rol in (None, "superadmin"):
+        for u in db.scalars(select(models.Usuario).where(models.Usuario.es_superadmin)).all():
+            filas.append({"usuario_id": u.id, "nombre": u.nombre, "cedula": u.cedula,
+                          "rol": "superadmin", "caja_id": None, "caja_nombre": "—",
+                          "totp_activo": u.totp_activo, "activo": u.activo,
+                          "debe_cambiar_password": u.debe_cambiar_password,
+                          "ultimo_acceso": u.ultimo_acceso.isoformat() if u.ultimo_acceso else None})
+    # Membresías (tesorero/socio/directiva)
+    consulta = select(models.Membresia, models.Usuario, models.Caja).join(
+        models.Usuario, models.Membresia.usuario_id == models.Usuario.id).join(
+        models.Caja, models.Membresia.caja_id == models.Caja.id).where(models.Membresia.activo)
+    if caja_id:
+        consulta = consulta.where(models.Membresia.caja_id == caja_id)
+    if rol and rol != "superadmin":
+        consulta = consulta.where(models.Membresia.rol == rol)
+    for m, u, caja in db.execute(consulta).all():
+        filas.append({"usuario_id": u.id, "nombre": u.nombre, "cedula": u.cedula,
+                      "rol": m.rol, "caja_id": caja.id, "caja_nombre": caja.nombre,
+                      "totp_activo": u.totp_activo, "activo": u.activo,
+                      "debe_cambiar_password": u.debe_cambiar_password,
+                      "ultimo_acceso": u.ultimo_acceso.isoformat() if u.ultimo_acceso else None})
+    if q:
+        ql = q.strip().lower()
+        filas = [f for f in filas if ql in f["nombre"].lower() or ql in f["cedula"]]
+    filas.sort(key=lambda f: (f["caja_nombre"], f["nombre"]))
+    return filas
+
+
 @reportes_router.get("/notificaciones")
 def notificaciones(caja_id: int | None = None, db: Session = Depends(get_db),
                    user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):

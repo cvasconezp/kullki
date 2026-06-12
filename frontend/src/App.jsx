@@ -17,6 +17,7 @@ import Bitacora from "./pages/Bitacora.jsx";
 import Informes from "./pages/Informes.jsx";
 import Cajas from "./pages/Cajas.jsx";
 import Estadisticas from "./pages/Estadisticas.jsx";
+import Usuarios from "./pages/Usuarios.jsx";
 import AnalisisAdmin from "./components/AnalisisAdmin.jsx";
 import CambiarPassword from "./components/CambiarPassword.jsx";
 import Lock from "./components/Lock.jsx";
@@ -42,6 +43,7 @@ const NAV_SOCIO = [
 const NAV_SUPER = [
   { id: "cajas", ruta: "", label: "Cajas", ico: "🏛", c: "#0E7A5C" },
   { id: "analisis", ruta: "analisis", label: "Análisis", ico: "📈", c: "#7C3AED" },
+  { id: "usuarios", ruta: "usuarios", label: "Usuarios", ico: "🔑", c: "#DC2626" },
   { id: "uso", ruta: "uso", label: "Uso", ico: "📊", c: "#2563EB" },
 ];
 const NAV_DIRECTIVA = [
@@ -187,7 +189,8 @@ export default function App() {
         <main className="contenido">
           {esSuper && activa === "uso" && <Estadisticas />}
           {esSuper && activa === "analisis" && <AnalisisAdmin />}
-          {esSuper && activa !== "uso" && activa !== "analisis" && <Cajas onAsumir={asumir} />}
+          {esSuper && activa === "usuarios" && <Usuarios />}
+          {esSuper && activa !== "uso" && activa !== "analisis" && activa !== "usuarios" && <Cajas onAsumir={asumir} />}
           {(esTesorero || esDirectiva) && activa === "inicio" && <Balances />}
           {(esTesorero || esDirectiva) && activa === "socios" && <Socios />}
           {(esTesorero || esDirectiva) && activa === "informes" && <Informes />}

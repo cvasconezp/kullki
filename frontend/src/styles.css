@@ -517,3 +517,7 @@ details[open] summary::before { content: "▾ "; }
 .tut-tit { font-family: var(--display); font-weight: 800; color: var(--kullki-oscuro); font-size: 18px; margin: 10px 0 6px; }
 .tut-txt { font-size: 14px; color: var(--tinta-suave); line-height: 1.5; }
 .tut-pie { text-align: center; color: var(--tinta-suave); font-size: 12px; margin: 8px 0 12px; }
+
+.filtros-usuarios{display:flex;gap:10px;flex-wrap:wrap}
+.filtros-usuarios input,.filtros-usuarios select{flex:1;min-width:160px;padding:9px 11px;border:1px solid var(--regla);border-radius:9px;font-size:14px;font-family:var(--cuerpo)}
+.acc-usuarios{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
