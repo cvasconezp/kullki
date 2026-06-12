@@ -40,6 +40,11 @@ def construir_demo(db):
     db.add(tes); db.flush()
     db.add(models.Membresia(usuario_id=tes.id, caja_id=caja.id, rol="tesorero"))
 
+    dire = models.Usuario(nombre="Presidenta Demo", cedula="1700000013",
+                          password_hash=hash_password("1700000013"))
+    db.add(dire); db.flush()
+    db.add(models.Membresia(usuario_id=dire.id, caja_id=caja.id, rol="directiva"))
+
     socios = []
     for i, n in enumerate(NOMBRES):
         ced = f"17{i+1:08d}"
