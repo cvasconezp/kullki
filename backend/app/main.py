@@ -122,6 +122,13 @@ def init_db():
                                 "socios con su cédula como usuario y contraseña).")
                 except Exception:
                     log.exception("Auto-seed demo falló (no crítico).")
+            # Enriquecer la caja demo existente con datos demográficos (idempotente)
+            if os.getenv("SEED_DEMO", "1") != "0":
+                try:
+                    from .seed import enriquecer_demo
+                    enriquecer_demo()
+                except Exception:
+                    log.exception("Enriquecer demo falló (no crítico).")
         finally:
             db.close()
     except Exception:

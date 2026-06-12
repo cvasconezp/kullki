@@ -28,11 +28,26 @@ def run():
         db.add(models.Membresia(usuario_id=tes.id, caja_id=caja.id, rol="tesorero"))
         random.seed(7)
         socios = []
+        GENEROS = ["F", "M"]
+        INSTR = ["Primaria", "Secundaria", "Superior", "Ninguna"]
+        CIVIL = ["Soltero/a", "Casado/a", "Unión libre", "Viudo/a"]
+        OCUP = ["Agricultor/a", "Comerciante", "Artesano/a", "Ama de casa", "Jornalero/a",
+                "Docente", "Albañil", "Costurera", "Ganadero/a", "Tendero/a"]
         for i, n in enumerate(NOMBRES):
             ced = f"17{i+1:08d}"
+            anio = 1962 + (i * 3) % 42      # edades variadas (1962..2003)
+            mes = (i * 5) % 12 + 1; dia = (i * 7) % 27 + 1
+            wsp = f"09{random.randint(10000000, 99999999)}"
             s = models.Socio(caja_id=caja.id, nombres=n, cedula=ced,
-                             telefono=f"09{random.randint(10000000, 99999999)}",
-                             fecha_ingreso=date(2025, 1, 15))
+                             telefono=wsp, whatsapp=wsp,
+                             correo=(n.split()[0] + str(i) + "@example.com").lower() if i % 3 else "",
+                             fecha_ingreso=date(2025, 1, 15),
+                             fecha_nacimiento=date(anio, mes, dia),
+                             genero=GENEROS[i % 2],
+                             nivel_instruccion=INSTR[i % len(INSTR)],
+                             estado_civil=CIVIL[i % len(CIVIL)],
+                             ocupacion=OCUP[i % len(OCUP)],
+                             num_cargas=i % 5)
             db.add(s); db.flush()
             u = models.Usuario(nombre=n, cedula=ced, password_hash=hash_password(ced))
             db.add(u); db.flush()
@@ -54,11 +69,16 @@ def run():
             y = d.year + m // 12
             return date(y, m % 12 + 1, min(d.day, 28))
 
-        for s_i, monto, plazo in ((socios[0], 300, 6), (socios[2], 500, 8), (socios[5], 200, 4)):
-            inicio = date(2025, 3, 10)
+        creds = ((socios[0], 300, 6, "Capital de trabajo", date(2025, 3, 10)),
+                 (socios[2], 500, 8, "Siembra", date(2025, 4, 12)),
+                 (socios[5], 200, 4, "Salud", date(2025, 5, 8)),
+                 (socios[7], 800, 10, "Vivienda", date(2025, 2, 20)),
+                 (socios[9], 150, 3, "Educación", date(2025, 6, 1)),
+                 (socios[3], 400, 6, "Capital de trabajo", date(2025, 1, 25)))
+        for s_i, monto, plazo, destino, inicio in creds:
             cr = models.Credito(caja_id=caja.id, socio_id=s_i.id, monto=monto,
                                 tasa_mensual=1.5, plazo_meses=plazo, fecha_desembolso=inicio,
-                                destino="capital de trabajo", registrado_por=tes.id)
+                                destino=destino, registrado_por=tes.id)
             db.add(cr); db.flush()
             i = 0.015; saldo = monto
             cuota_fija = monto * (i * (1 + i) ** plazo) / ((1 + i) ** plazo - 1)
@@ -87,3 +107,41 @@ def run():
 
 if __name__ == "__main__":
     run()
+
+
+def enriquecer_demo():
+    """Rellena datos demográficos de los socios de la caja demo (nukanchik) si están vacíos.
+    Idempotente: solo toca socios sin fecha_nacimiento. No afecta cajas reales."""
+    from datetime import date as _date
+    db = SessionLocal()
+    try:
+        caja = db.query(models.Caja).filter_by(slug="nukanchik").first()
+        if not caja:
+            return
+        socios = db.query(models.Socio).filter_by(caja_id=caja.id).order_by(models.Socio.id).all()
+        GENEROS = ["F", "M"]
+        INSTR = ["Primaria", "Secundaria", "Superior", "Ninguna"]
+        CIVIL = ["Soltero/a", "Casado/a", "Unión libre", "Viudo/a"]
+        OCUP = ["Agricultor/a", "Comerciante", "Artesano/a", "Ama de casa", "Jornalero/a",
+                "Docente", "Albañil", "Costurera", "Ganadero/a", "Tendero/a"]
+        n = 0
+        for i, s in enumerate(socios):
+            if s.fecha_nacimiento:
+                continue
+            anio = 1962 + (i * 3) % 42; mes = (i * 5) % 12 + 1; dia = (i * 7) % 27 + 1
+            s.fecha_nacimiento = _date(anio, mes, dia)
+            s.genero = GENEROS[i % 2]
+            s.nivel_instruccion = INSTR[i % len(INSTR)]
+            s.estado_civil = CIVIL[i % len(CIVIL)]
+            s.ocupacion = OCUP[i % len(OCUP)]
+            s.num_cargas = i % 5
+            if not s.whatsapp:
+                s.whatsapp = s.telefono or ""
+            if not s.correo and i % 3:
+                s.correo = (s.nombres.split()[0] + str(i) + "@example.com").lower()
+            n += 1
+        if n:
+            db.commit()
+            print(f"Demo enriquecido: {n} socios con datos demográficos.")
+    finally:
+        db.close()

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
+import { api, usd, fechaCorta, mascaraCedula, getSesion } from "../lib/api.js";
 import ExportarEstado from "../components/ExportarEstado.jsx";
 
 const GENEROS = [["", "—"], ["F", "Femenino"], ["M", "Masculino"], ["Otro", "Otro"], ["NS", "Prefiere no decir"]];
@@ -81,6 +81,7 @@ function Expediente({ socioId, onCerrar }) {
   const [lib, setLib] = useState(null);
   const [error, setError] = useState("");
   const [editando, setEditando] = useState(false);
+  const soloLectura = (getSesion() || {}).rol === "directiva";
 
   const cargar = () => api(`/mi-libreta?socio_id=${socioId}`).then(setLib).catch((e) => setError(e.message));
   useEffect(() => { cargar(); }, [socioId]);
@@ -122,7 +123,7 @@ function Expediente({ socioId, onCerrar }) {
       <div className="tarjeta no-print">
         <div className="seccion-titulo" style={{ margin: "0 0 8px" }}>
           <h3 style={{ margin: 0 }}>Ficha del socio</h3>
-          <button className="boton mini" onClick={() => setEditando(!editando)}>{editando ? "Cerrar" : "Editar ficha"}</button>
+          {!soloLectura && <button className="boton mini" onClick={() => setEditando(!editando)}>{editando ? "Cerrar" : "Editar ficha"}</button>}
         </div>
         {editando ? (
           <EditarFicha socio={socio} onListo={(g) => { setEditando(false); if (g) cargar(); }} />
@@ -256,6 +257,7 @@ export default function Socios() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [verExtra, setVerExtra] = useState(false);
   const [abierto, setAbierto] = useState(null);
+  const soloLectura = (getSesion() || {}).rol === "directiva";
 
   const cargar = () => api("/socios").then(setSocios).catch((e) => setError(e.message));
   useEffect(() => { cargar(); }, []);
@@ -281,12 +283,12 @@ export default function Socios() {
     <>
       <div className="seccion-titulo">
         <h2>Socios</h2>
-        <button className="boton mini" onClick={() => setMostrarForm(!mostrarForm)}>{mostrarForm ? "Cancelar" : "+ Nuevo socio"}</button>
+        {!soloLectura && <button className="boton mini" onClick={() => setMostrarForm(!mostrarForm)}>{mostrarForm ? "Cancelar" : "+ Nuevo socio"}</button>}
       </div>
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
 
-      <Solicitudes onCambio={cargar} />
+      {!soloLectura && <Solicitudes onCambio={cargar} />}
 
       {mostrarForm && (
         <div className="tarjeta">

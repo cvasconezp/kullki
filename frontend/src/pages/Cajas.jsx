@@ -117,6 +117,38 @@ function ElegirSocio({ caja, onElegir, onCancel }) {
   );
 }
 
+function AgregarDirectiva({ caja, onListo }) {
+  const [f, setF] = useState({ nombre: "", cedula: "", password: "" });
+  const [error, setError] = useState(""); const [ok, setOk] = useState(""); const [g, setG] = useState(false);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const guardar = async () => {
+    setError(""); setOk(""); setG(true);
+    try {
+      await api(`/cajas/${caja.id}/directiva`, { method: "POST", body: f });
+      setOk(`${f.nombre} agregado/a a la directiva (acceso de solo lectura).`);
+      setF({ nombre: "", cedula: "", password: "" });
+    } catch (e) { setError(e.message); }
+    finally { setG(false); }
+  };
+  return (
+    <div className="expediente">
+      <h4>Agregar directiva (solo lectura)</h4>
+      {error && <div className="error">{error}</div>}
+      {ok && <div className="exito">{ok}</div>}
+      <div className="campo"><label>Nombres</label><input value={f.nombre} onChange={set("nombre")} /></div>
+      <div className="dos-col">
+        <div className="campo"><label>Cédula</label><input inputMode="numeric" value={f.cedula} onChange={set("cedula")} /></div>
+        <div className="campo"><label>Contraseña inicial</label><input value={f.password} onChange={set("password")} /></div>
+      </div>
+      <div className="dos-col">
+        <button className="boton secundario" onClick={onListo}>Cerrar</button>
+        <button className="boton" onClick={guardar} disabled={g || !f.nombre || !f.cedula || f.password.length < 6}>
+          {g ? "Guardando…" : "Agregar directiva"}</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Cajas({ onAsumir }) {
   const [cajas, setCajas] = useState(null);
   const [error, setError] = useState(""); const [ok, setOk] = useState("");
@@ -125,6 +157,7 @@ export default function Cajas({ onAsumir }) {
   const [creando, setCreando] = useState(false);
   const [editando, setEditando] = useState(null);   // caja.id en edición
   const [eligiendo, setEligiendo] = useState(null); // caja.id para "ver como socio"
+  const [dirigiendo, setDirigiendo] = useState(null); // caja.id para alta de directiva
 
   const cargar = () => api("/cajas").then(setCajas).catch((e) => setError(e.message));
   useEffect(() => { cargar(); }, []);
@@ -241,8 +274,11 @@ export default function Cajas({ onAsumir }) {
               <button onClick={() => { setEligiendo(eligiendo === c.id ? null : c.id); setEditando(null); }}>
                 Ver como socio
               </button>
-              <button onClick={() => { setEditando(editando === c.id ? null : c.id); setEligiendo(null); }}>
+              <button onClick={() => { setEditando(editando === c.id ? null : c.id); setEligiendo(null); setDirigiendo(null); }}>
                 {editando === c.id ? "Cerrar" : "Editar"}
+              </button>
+              <button onClick={() => { setDirigiendo(dirigiendo === c.id ? null : c.id); setEditando(null); setEligiendo(null); }}>
+                {dirigiendo === c.id ? "Cerrar" : "+ Directiva"}
               </button>
             </div>
             {editando === c.id && (
@@ -251,6 +287,9 @@ export default function Cajas({ onAsumir }) {
             {eligiendo === c.id && (
               <ElegirSocio caja={c} onCancel={() => setEligiendo(null)}
                 onElegir={(sid) => asumir(c, "socio", sid)} />
+            )}
+            {dirigiendo === c.id && (
+              <AgregarDirectiva caja={c} onListo={() => setDirigiendo(null)} />
             )}
           </div>
         ))}

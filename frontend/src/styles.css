@@ -447,3 +447,8 @@ details[open] summary::before { content: "▾ "; }
 .lib-ci { font-family: var(--mono); font-size: 12px; font-weight: 600; opacity: .9;
   background: rgba(255,255,255,.14); padding: 3px 9px; border-radius: 99px; letter-spacing: .02em; }
 .libreta .eyebrow + .lib-titular { margin-top: 4px; }
+
+/* ---------- Botón ojo (mostrar/ocultar cédula) ---------- */
+.ojo { background: rgba(255,255,255,.15); border: none; border-radius: 6px; cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 2px 5px; margin-left: 4px; vertical-align: middle; }
+.ojo:hover { background: rgba(255,255,255,.28); }

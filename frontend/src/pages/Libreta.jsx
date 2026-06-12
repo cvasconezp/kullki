@@ -6,6 +6,7 @@ import MisDatos from "../components/MisDatos.jsx";
 export default function Libreta() {
   const [lib, setLib] = useState(null);
   const [error, setError] = useState("");
+  const [verCedula, setVerCedula] = useState(false);
 
   const cargar = () => api("/mi-libreta").then(setLib).catch((e) => setError(e.message));
   useEffect(() => { cargar(); }, []);
@@ -21,7 +22,12 @@ export default function Libreta() {
       <div className="libreta">
         <div className="eyebrow">{caja_nombre}</div>
         <div className="lib-titular">
-          {socio.nombres}<span className="lib-ci">CI {mascaraCedula(socio.cedula)}</span>
+          {socio.nombres}
+          <span className="lib-ci">CI {verCedula ? socio.cedula : mascaraCedula(socio.cedula)}
+            <button className="ojo" onClick={() => setVerCedula((v) => !v)}
+              aria-label={verCedula ? "Ocultar cédula" : "Ver cédula"} title={verCedula ? "Ocultar" : "Ver"}>
+              {verCedula ? "🙈" : "👁"}</button>
+          </span>
         </div>
         <div className="saldo">
           <span className="moneda">$</span>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, usd } from "../lib/api.js";
+import Analitica from "./Analitica.jsx";
 
 const fmtK = (n) => {
   const a = Math.abs(n);
@@ -165,6 +166,7 @@ export default function Balances() {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
   const [rango, setRango] = useState(12);
+  const [tab, setTab] = useState("resumen");
 
   useEffect(() => { api("/balances").then(setD).catch((e) => setError(e.message)); }, []);
 
@@ -180,6 +182,11 @@ export default function Balances() {
   return (
     <>
       <div className="seccion-titulo"><h2>Balances</h2></div>
+      <div className="segmentos" style={{ maxWidth: 340 }}>
+        <button className={"seg" + (tab === "resumen" ? " activo" : "")} onClick={() => setTab("resumen")}>Resumen</button>
+        <button className={"seg" + (tab === "analisis" ? " activo" : "")} onClick={() => setTab("analisis")}>Análisis</button>
+      </div>
+      {tab === "analisis" ? <Analitica /> : (<>
 
       <div className="libreta">
         <div className="eyebrow">{k.caja.nombre}</div>
@@ -239,6 +246,7 @@ export default function Balances() {
             </div>}
         </div>
       </div>
+      </>)}
     </>
   );
 }

@@ -658,3 +658,28 @@ def test_bitacora_socio_no_ve_a_otros_socios(setup):
     items2 = client.get("/auditoria", headers=socio_a).json()
     assert "Privado Otro" in " ".join(i["detalle"] for i in items2)
     client.patch(f"/cajas/{ca['id']}", headers=sa, json={"transparencia_total": False})
+
+
+def test_rol_directiva_solo_lectura(setup):
+    sa = setup["sa"]
+    ca = next(c for c in client.get("/cajas", headers=sa).json() if c["slug"] == "caja-a")
+    r = client.post(f"/cajas/{ca['id']}/directiva", headers=sa,
+                    json={"nombre": "Presi Directiva", "cedula": "1000000900", "password": "clave123"})
+    assert r.status_code == 200, r.text
+    dire = login("1000000900", "clave123")
+    # lectura: OK
+    assert client.get("/dashboard", headers=dire).status_code == 200
+    assert client.get("/socios", headers=dire).status_code == 200
+    assert client.get("/analitica", headers=dire).status_code == 200
+    assert client.get("/balances", headers=dire).status_code == 200
+    # escritura: prohibido
+    assert client.post("/socios", headers=dire, json={"nombres": "X", "cedula": "9999"}).status_code == 403
+    assert client.post("/aportes", headers=dire, json={"socio_id": setup["socio_a"]["id"], "monto": 5}).status_code == 403
+
+
+def test_analitica_contenido(setup):
+    r = client.get("/analitica", headers=setup["ta"])
+    assert r.status_code == 200
+    d = r.json()
+    for k in ("serie", "top_ingresos", "destinos", "distribucion_montos", "tipos_aporte", "resumen_creditos"):
+        assert k in d

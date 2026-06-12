@@ -13,6 +13,7 @@ import Bitacora from "./pages/Bitacora.jsx";
 import Informes from "./pages/Informes.jsx";
 import Cajas from "./pages/Cajas.jsx";
 import Estadisticas from "./pages/Estadisticas.jsx";
+import AnalisisAdmin from "./components/AnalisisAdmin.jsx";
 import CambiarPassword from "./components/CambiarPassword.jsx";
 
 // id interno · ruta (URL) · etiqueta · ícono
@@ -30,9 +31,16 @@ const NAV_SOCIO = [
 ];
 const NAV_SUPER = [
   { id: "cajas", ruta: "", label: "Cajas", ico: "🏛" },
+  { id: "analisis", ruta: "analisis", label: "Análisis", ico: "📈" },
   { id: "uso", ruta: "uso", label: "Uso", ico: "▦" },
 ];
-const SECCION_DEF = { tesorero: "balances", socio: "libreta" };
+const NAV_DIRECTIVA = [
+  { id: "inicio", ruta: "balances", label: "Resumen", ico: "▦" },
+  { id: "socios", ruta: "socios", label: "Socios", ico: "👥" },
+  { id: "informes", ruta: "informe", label: "Informe", ico: "🗎" },
+  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "≡" },
+];
+const SECCION_DEF = { tesorero: "balances", socio: "libreta", directiva: "balances" };
 
 function rutaDe(s) {
   if (!s) return "/ingresar";
@@ -76,6 +84,7 @@ export default function App() {
   const esTesorero = sesion.rol === "tesorero";
   const esSocio = sesion.rol === "socio";
   const esSuper = sesion.rol === "superadmin";
+  const esDirectiva = sesion.rol === "directiva";
 
   // Coherencia ruta ↔ sesión
   if (esSuper && partes[0] !== "admin") { navigate("/admin"); return null; }
@@ -84,7 +93,7 @@ export default function App() {
     navigate(rutaDe(sesion)); return null;
   }
 
-  const nav = esTesorero ? NAV_TESORERO : esSocio ? NAV_SOCIO : esSuper ? NAV_SUPER : [];
+  const nav = esTesorero ? NAV_TESORERO : esSocio ? NAV_SOCIO : esDirectiva ? NAV_DIRECTIVA : esSuper ? NAV_SUPER : [];
   const seccionUrl = partes[1];
   const item = nav.find((n) => n.ruta === seccionUrl);
   const activa = item ? item.id : (esTesorero ? "inicio" : esSocio ? "libreta" : "cajas");
@@ -127,12 +136,13 @@ export default function App() {
 
         <main className="contenido">
           {esSuper && activa === "uso" && <Estadisticas />}
-          {esSuper && activa !== "uso" && <Cajas onAsumir={asumir} />}
-          {esTesorero && activa === "inicio" && <Balances />}
-          {esTesorero && activa === "socios" && <Socios />}
+          {esSuper && activa === "analisis" && <AnalisisAdmin />}
+          {esSuper && activa !== "uso" && activa !== "analisis" && <Cajas onAsumir={asumir} />}
+          {(esTesorero || esDirectiva) && activa === "inicio" && <Balances />}
+          {(esTesorero || esDirectiva) && activa === "socios" && <Socios />}
+          {(esTesorero || esDirectiva) && activa === "informes" && <Informes />}
           {esTesorero && activa === "aportes" && <Aportes />}
           {esTesorero && activa === "creditos" && <Creditos />}
-          {esTesorero && activa === "informes" && <Informes />}
           {esSocio && activa === "libreta" && <Libreta sesion={sesion} />}
           {activa === "bitacora" && !esSuper && <Bitacora />}
         </main>

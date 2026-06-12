@@ -175,8 +175,8 @@ def asumir_caja(data: schemas.AsumirCaja, db: Session = Depends(get_db),
     caja = db.get(models.Caja, data.caja_id)
     if not caja:
         raise HTTPException(404, "Caja no encontrada")
-    if data.rol not in ("tesorero", "socio"):
-        raise HTTPException(400, "Rol inválido (tesorero | socio)")
+    if data.rol not in ("tesorero", "socio", "directiva"):
+        raise HTTPException(400, "Rol inválido (tesorero | socio | directiva)")
     socio_id = None
     if data.rol == "socio":
         if not data.socio_id:
@@ -290,13 +290,38 @@ def editar_caja(caja_id: int, data: schemas.CajaUpdate, db: Session = Depends(ge
     return caja
 
 
+@cajas_router.post("/{caja_id}/directiva")
+def crear_directiva(caja_id: int, data: schemas.DirectivaIn, db: Session = Depends(get_db),
+                    actor: Actor = Depends(require_roles("superadmin"))):
+    """Crea (o vincula) un usuario de DIRECTIVA con acceso de solo lectura a la caja."""
+    caja = db.get(models.Caja, caja_id)
+    if not caja:
+        raise HTTPException(404, "Caja no encontrada")
+    u = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
+    if not u:
+        u = models.Usuario(nombre=data.nombre, cedula=data.cedula,
+                           password_hash=hash_password(data.password), debe_cambiar_password=True)
+        db.add(u); db.flush()
+    elif u.es_superadmin:
+        raise HTTPException(400, "Esa cédula pertenece al administrador del sistema")
+    ya = db.scalar(select(models.Membresia).where(
+        models.Membresia.usuario_id == u.id, models.Membresia.caja_id == caja_id))
+    if ya:
+        raise HTTPException(400, "Esa persona ya pertenece a esta caja")
+    db.add(models.Membresia(usuario_id=u.id, caja_id=caja_id, rol="directiva"))
+    log_audit(db, actor, "crear", "caja", caja_id,
+              f"Directiva {u.nombre} agregada a '{caja.nombre}'", caja_id=caja_id)
+    db.commit()
+    return {"ok": True, "nombre": u.nombre, "cedula": u.cedula}
+
+
 # ---------------------------------------------------------------- socios
 socios_router = APIRouter(prefix="/socios", tags=["socios"])
 
 
 @socios_router.get("", response_model=list[schemas.SocioOut])
 def listar_socios(caja_id: int | None = None, db: Session = Depends(get_db),
-                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
     socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid)
                         .order_by(models.Socio.nombres)).all()
@@ -490,7 +515,7 @@ aportes_router = APIRouter(prefix="/aportes", tags=["aportes"])
 @aportes_router.get("", response_model=list[schemas.AporteOut])
 def listar_aportes(caja_id: int | None = None, socio_id: int | None = None,
                    limit: int = 200, db: Session = Depends(get_db),
-                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
     q = select(models.Aporte).where(models.Aporte.caja_id == cid)
     if socio_id:
@@ -586,7 +611,7 @@ def _credito_out(c: models.Credito, detalle: bool = False):
 @creditos_router.get("", response_model=list[schemas.CreditoOut])
 def listar_creditos(caja_id: int | None = None, estado: str | None = None,
                     db: Session = Depends(get_db),
-                    user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                    user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
     q = select(models.Credito).where(models.Credito.caja_id == cid)
     if estado:
@@ -603,7 +628,7 @@ def detalle_credito(credito_id: int, db: Session = Depends(get_db),
         raise HTTPException(404, "Crédito no encontrado")
     if user.rol == "socio" and c.socio_id != user.socio_id:
         raise HTTPException(403, "No puedes ver créditos de otros socios")
-    if user.rol == "tesorero" and c.caja_id != user.caja_id:
+    if user.rol in ("tesorero", "directiva") and c.caja_id != user.caja_id:
         raise HTTPException(404, "Crédito no encontrado")
     return _credito_out(c, detalle=True)
 
@@ -731,7 +756,7 @@ retiros_router = APIRouter(prefix="/retiros", tags=["retiros"])
 
 @retiros_router.get("", response_model=list[schemas.RetiroOut])
 def listar_retiros(caja_id: int | None = None, limit: int = 100, db: Session = Depends(get_db),
-                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
     retiros = db.scalars(select(models.Retiro).where(models.Retiro.caja_id == cid)
                          .order_by(models.Retiro.fecha.desc(), models.Retiro.id.desc())
@@ -818,7 +843,7 @@ reportes_router = APIRouter(tags=["reportes"])
 
 @reportes_router.get("/dashboard", response_model=schemas.DashboardOut)
 def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
-              user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+              user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
     caja = db.get(models.Caja, cid)
     if not caja:
@@ -884,7 +909,7 @@ def mi_libreta(socio_id: int | None = None, db: Session = Depends(get_db),
     socio = db.get(models.Socio, sid)
     if not socio:
         raise HTTPException(404, "Socio no encontrado")
-    if user.rol == "tesorero" and socio.caja_id != user.caja_id:
+    if user.rol in ("tesorero", "directiva") and socio.caja_id != user.caja_id:
         raise HTTPException(404, "Socio no encontrado")
     caja = db.get(models.Caja, socio.caja_id)
     aportes = sorted([a for a in socio.aportes if not a.anulado],
@@ -923,7 +948,7 @@ def auditoria(caja_id: int | None = None, limit: int = 200, db: Session = Depend
 
 @reportes_router.get("/informe-asamblea", response_model=schemas.InformeAsamblea)
 def informe_asamblea(caja_id: int | None = None, db: Session = Depends(get_db),
-                     user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                     user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     """Informe imprimible para la asamblea: estado de la caja y fila por socio."""
     cid = caja_scope(user, caja_id)
     dash = dashboard(caja_id=cid, db=db, user=user)
@@ -944,7 +969,7 @@ def informe_asamblea(caja_id: int | None = None, db: Session = Depends(get_db),
 
 @reportes_router.get("/cierre/simulacion", response_model=schemas.CierreSimulacion)
 def cierre_simulacion(caja_id: int | None = None, db: Session = Depends(get_db),
-                      user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                      user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     """Simula el reparto de intereses cobrados, proporcional al ahorro neto de cada socio."""
     cid = caja_scope(user, caja_id)
     dash = dashboard(caja_id=cid, db=db, user=user)
@@ -964,7 +989,7 @@ def cierre_simulacion(caja_id: int | None = None, db: Session = Depends(get_db),
 
 @reportes_router.get("/balances", response_model=schemas.BalancesOut)
 def balances(caja_id: int | None = None, db: Session = Depends(get_db),
-             user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+             user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     """Series mensuales para el dashboard interactivo de balances del tesorero."""
     cid = caja_scope(user, caja_id)
     dash = dashboard(caja_id=cid, db=db, user=user)
@@ -1055,7 +1080,7 @@ def exportar_respaldo(db: Session = Depends(get_db),
 
 @reportes_router.get("/demografia")
 def demografia(caja_id: int | None = None, db: Session = Depends(get_db),
-               user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+               user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     """Perfil de la base social para estudios (a partir de la ficha del socio)."""
     cid = caja_scope(user, caja_id)
     socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
@@ -1089,7 +1114,7 @@ def demografia(caja_id: int | None = None, db: Session = Depends(get_db),
 
 @reportes_router.get("/recordatorios")
 def recordatorios(caja_id: int | None = None, dias: int = 7, db: Session = Depends(get_db),
-                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     """Socios con cuota vencida o por vencer en los próximos `dias`. Para enviar
     recordatorios por WhatsApp (el front arma el enlace wa.me)."""
     from datetime import timedelta
@@ -1203,4 +1228,71 @@ def estadisticas_uso(db: Session = Depends(get_db),
         "accesos_por_dia": serie,
         "por_caja": por_caja,
         "usuarios": lista_u,
+    }
+
+
+@reportes_router.get("/analitica")
+def analitica(caja_id: int | None = None, db: Session = Depends(get_db),
+              user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
+    """Análisis del comportamiento de la caja y los socios: meses pico, destinos
+    de crédito, distribución de montos, tipos de aporte y morosidad."""
+    cid = caja_scope(user, caja_id)
+    bal = balances(caja_id=cid, db=db, user=user)
+    serie = bal.serie
+
+    def top(metric, n=3):
+        return sorted(
+            [{"etiqueta": p.etiqueta, "valor": getattr(p, metric)} for p in serie if getattr(p, metric) > 0],
+            key=lambda x: -x["valor"])[:n]
+
+    # destinos de crédito
+    creditos = db.scalars(select(models.Credito).where(models.Credito.caja_id == cid)).all()
+    dest = {}
+    for c in creditos:
+        k = (c.destino or "Sin especificar").strip().capitalize() or "Sin especificar"
+        d = dest.setdefault(k, {"etiqueta": k, "monto": 0.0, "count": 0})
+        d["monto"] += c.monto; d["count"] += 1
+    destinos = sorted(dest.values(), key=lambda x: -x["monto"])
+
+    # distribución de montos
+    buckets = [("< $100", 0, 100), ("$100–300", 100, 300), ("$300–600", 300, 600),
+               ("$600–1000", 600, 1000), ("> $1000", 1000, 10**9)]
+    dist = [{"etiqueta": b[0], "valor": 0} for b in buckets]
+    montos = [c.monto for c in creditos]
+    for m in montos:
+        for i, b in enumerate(buckets):
+            if b[1] <= m < b[2]:
+                dist[i]["valor"] += 1; break
+
+    # tipos de aporte (sin anulados)
+    aportes = db.scalars(select(models.Aporte).where(models.Aporte.caja_id == cid,
+                                                     models.Aporte.anulado.is_(False))).all()
+    tipos = {"ordinario": 0.0, "extraordinario": 0.0, "multa": 0.0}
+    for a in aportes:
+        tipos[a.tipo] = tipos.get(a.tipo, 0.0) + a.monto
+    tipos_aporte = [{"etiqueta": k.capitalize(), "valor": round(v, 2)} for k, v in tipos.items() if v > 0]
+
+    # resumen de créditos
+    activos = [c for c in creditos if c.estado == "activo"]
+    resumen_cred = {
+        "total": len(creditos),
+        "activos": len(activos),
+        "pagados": sum(1 for c in creditos if c.estado == "pagado"),
+        "monto_total": round(sum(montos), 2),
+        "monto_promedio": round(sum(montos) / len(montos), 2) if montos else 0,
+        "plazo_promedio": round(sum(c.plazo_meses for c in creditos) / len(creditos), 1) if creditos else 0,
+        "en_mora": sum(1 for c in activos if _en_mora(c)),
+    }
+
+    return {
+        "caja": bal.dashboard.caja.nombre,
+        "serie": [p.model_dump() for p in serie],
+        "top_ingresos": top("aportes"),
+        "top_retiros": top("retiros"),
+        "top_desembolsos": top("desembolsos"),
+        "destinos": destinos,
+        "distribucion_montos": dist,
+        "tipos_aporte": tipos_aporte,
+        "resumen_creditos": resumen_cred,
+        "dashboard": bal.dashboard.model_dump(),
     }

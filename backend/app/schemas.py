@@ -82,6 +82,12 @@ class CajaIn(BaseModel):
     tesorero_password: str = Field(min_length=6)
 
 
+class DirectivaIn(BaseModel):
+    nombre: str
+    cedula: str
+    password: str = Field(min_length=6)
+
+
 class CajaUpdate(BaseModel):
     """Edición de una caja ya creada. Todos los campos son opcionales."""
     nombre: str | None = None
