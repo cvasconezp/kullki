@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
 import ExportarEstado from "../components/ExportarEstado.jsx";
 import MisDatos from "../components/MisDatos.jsx";
+import Seguridad2FA from "../components/Seguridad2FA.jsx";
 
 export default function Libreta() {
   const [lib, setLib] = useState(null);
@@ -59,6 +60,8 @@ export default function Libreta() {
       <ExportarEstado lib={lib} />
 
       <MisDatos socio={socio} onActualizado={cargar} />
+
+      <Seguridad2FA />
 
       {activos.map((c) => {
         const siguiente = c.cuotas.find((q) => !q.pagada);

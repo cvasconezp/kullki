@@ -136,7 +136,7 @@ export default function Landing({ sesion }) {
             <a href="https://www.yachaydeep.com/labs" target="_blank" rel="noreferrer">
               <img src="/logo-hero-dark.svg" alt="Yachay Deep" height="34" />
             </a>
-            <span className="lp-foot-meta"><a href="/privacidad" style={{ color: "inherit", textDecoration: "underline" }}>Política de privacidad</a> · © {new Date().getFullYear()}</span>
+            <span className="lp-foot-meta"><a href="/privacidad" style={{ color: "inherit", textDecoration: "underline" }}>Privacidad</a> · <a href="/terminos" style={{ color: "inherit", textDecoration: "underline" }}>Términos</a> · © {new Date().getFullYear()}</span>
           </div>
         </div>
       </footer>

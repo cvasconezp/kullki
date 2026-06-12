@@ -4,6 +4,7 @@ import { applyTheme, resetTheme, logoDe } from "./lib/theme.js";
 import { useRuta, navigate } from "./lib/router.js";
 import Landing from "./pages/Landing.jsx";
 import Privacidad from "./pages/Privacidad.jsx";
+import Terminos from "./pages/Terminos.jsx";
 import Login from "./pages/Login.jsx";
 import Balances from "./pages/Balances.jsx";
 import Socios from "./pages/Socios.jsx";
@@ -67,7 +68,7 @@ export default function App() {
   useEffect(() => {
     if (!sesion || bloqueado) return;
     let t;
-    const reset = () => { clearTimeout(t); t = setTimeout(bloquear, 12 * 60 * 1000); };
+    const reset = () => { clearTimeout(t); t = setTimeout(bloquear, 5 * 60 * 1000); };
     const evs = ["mousemove", "keydown", "click", "scroll", "touchstart"];
     evs.forEach((e) => window.addEventListener(e, reset, { passive: true }));
     reset();
@@ -85,6 +86,7 @@ export default function App() {
   // ---------- Rutas públicas ----------
   if (ruta === "/") return <Landing sesion={sesion} />;
   if (ruta === "/privacidad") return <Privacidad />;
+  if (ruta === "/terminos") return <Terminos />;
   if (ruta === "/ingresar") {
     if (sesion) { navigate(rutaDe(sesion)); return null; }
     return <Login onLogin={entrar} />;

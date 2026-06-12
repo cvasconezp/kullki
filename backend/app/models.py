@@ -20,6 +20,8 @@ class Caja(Base):
     color_acento: Mapped[str] = mapped_column(String(9), default="#E8A838")    # dorado Yachay Deep
     logo: Mapped[str] = mapped_column(String(8), default="")  # emoji o 1-2 letras; vacío => inicial
     transparencia_total: Mapped[bool] = mapped_column(Boolean, default=False)  # socios ven toda la bitácora
+    credito_max: Mapped[float] = mapped_column(Float, default=0.0)     # monto máx. de crédito (0 = sin límite)
+    encaje_factor: Mapped[float] = mapped_column(Float, default=0.0)   # crédito máx = ahorro * factor (0 = sin regla)
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -40,6 +42,8 @@ class Usuario(Base):
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     debe_cambiar_password: Mapped[bool] = mapped_column(Boolean, default=False)
     ultimo_acceso: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    totp_secret: Mapped[str] = mapped_column(String(64), default="")
+    totp_activo: Mapped[bool] = mapped_column(Boolean, default=False)
 
     membresias: Mapped[list["Membresia"]] = relationship(back_populates="usuario")
 
@@ -115,6 +119,7 @@ class Credito(Base):
     plazo_meses: Mapped[int] = mapped_column(Integer)
     fecha_desembolso: Mapped[date] = mapped_column(Date, default=date.today)
     destino: Mapped[str] = mapped_column(String(200), default="")
+    garante: Mapped[str] = mapped_column(String(160), default="")
     estado: Mapped[str] = mapped_column(String(20), default="activo")  # activo | pagado
     registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -154,6 +159,20 @@ class Auditoria(Base):
     afecta_socio_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # socio involucrado
     detalle: Mapped[str] = mapped_column(Text, default="")
     fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Cierre(Base):
+    """Cierre de ejercicio: reparto o capitalización de utilidades (intereses)."""
+    __tablename__ = "cierres"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
+    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    modo: Mapped[str] = mapped_column(String(20))            # repartir | capitalizar
+    intereses: Mapped[float] = mapped_column(Float, default=0.0)
+    total_ahorro: Mapped[float] = mapped_column(Float, default=0.0)
+    num_socios: Mapped[int] = mapped_column(Integer, default=0)
+    creado_por: Mapped[str] = mapped_column(String(120), default="")
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class SolicitudCambio(Base):

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta } from "../lib/api.js";
 import { imprimirInformeAsamblea } from "../lib/exportar.js";
+import Seguridad2FA from "../components/Seguridad2FA.jsx";
 
 function GrupoDemo({ titulo, datos, total }) {
   const max = Math.max(1, ...datos.map((d) => d.valor));
@@ -23,12 +24,27 @@ export default function Informes() {
   const [cierre, setCierre] = useState(null);
   const [demo, setDemo] = useState(null);
   const [error, setError] = useState("");
+  const [okCierre, setOkCierre] = useState(""); const [cerrando, setCerrando] = useState(false);
 
-  useEffect(() => {
+  const recargar = () => {
     api("/informe-asamblea").then(setInforme).catch((e) => setError(e.message));
     api("/cierre/simulacion").then(setCierre).catch(() => {});
     api("/demografia").then(setDemo).catch(() => {});
-  }, []);
+  };
+  useEffect(() => { recargar(); }, []);
+  const ejecutarCierre = async (modo) => {
+    const txt = modo === "capitalizar"
+      ? "¿Capitalizar las utilidades? Se sumarán al ahorro de cada socio."
+      : "¿Repartir las utilidades? Se pagarán a cada socio (salen del fondo).";
+    if (!window.confirm(txt + " Esta acción queda registrada.")) return;
+    setError(""); setOkCierre(""); setCerrando(true);
+    try {
+      const r = await api("/cierre/ejecutar", { method: "POST", body: { modo } });
+      setOkCierre(`Cierre ${modo}: ${r.repartido.toLocaleString("es-EC", { style: "currency", currency: "USD" })} a ${r.socios} socios.`);
+      recargar();
+    } catch (e) { setError(e.message); }
+    finally { setCerrando(false); }
+  };
 
   if (error) return <div className="error">{error}</div>;
   if (!informe) return <div className="vacio">Preparando el informe…</div>;
@@ -99,6 +115,13 @@ export default function Informes() {
               <div className="cifra pos">{usd(f.utilidad)}</div>
             </div>
           ))}
+          {okCierre && <div className="exito" style={{ marginTop: 10 }}>{okCierre}</div>}
+          <div className="dos-col no-print" style={{ marginTop: 12 }}>
+            <button className="boton secundario" disabled={cerrando} onClick={() => ejecutarCierre("repartir")}>
+              Repartir (pagar a socios)</button>
+            <button className="boton" disabled={cerrando} onClick={() => ejecutarCierre("capitalizar")}>
+              Capitalizar (sumar al ahorro)</button>
+          </div>
         </div>
       )}
 
@@ -113,6 +136,8 @@ export default function Informes() {
           <GrupoDemo titulo="Nivel de instrucción" datos={demo.instruccion} total={demo.total} />
         </div>
       )}
+
+      <Seguridad2FA />
 
       <p className="no-print" style={{ color: "var(--tinta-suave)", fontSize: 12.5, textAlign: "center", marginTop: 14 }}>
         Usa "PDF con membrete" para llevar este informe a la asamblea.

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class LoginIn(BaseModel):
     cedula: str
     password: str
+    totp: str | None = None
 
 
 class TokenOut(BaseModel):
@@ -57,6 +58,14 @@ class VerificarIn(BaseModel):
     password: str
 
 
+class TotpCodigo(BaseModel):
+    codigo: str
+
+
+class CierreIn(BaseModel):
+    modo: str = "repartir"   # repartir | capitalizar
+
+
 class AsumirCaja(BaseModel):
     """El superadmin entra a una caja como tesorero o (opcionalmente) un socio."""
     caja_id: int
@@ -81,6 +90,8 @@ class CajaIn(BaseModel):
     color_acento: str = "#E8A838"
     logo: str = ""
     transparencia_total: bool = False
+    credito_max: float = 0.0
+    encaje_factor: float = 0.0
     tesorero_nombre: str
     tesorero_cedula: str
     tesorero_password: str = Field(min_length=6)
@@ -103,6 +114,8 @@ class CajaUpdate(BaseModel):
     color_acento: str | None = None
     logo: str | None = None
     transparencia_total: bool | None = None
+    credito_max: float | None = None
+    encaje_factor: float | None = None
     activa: bool | None = None
 
 
@@ -118,6 +131,8 @@ class CajaOut(BaseModel):
     color_acento: str = "#E8A838"
     logo: str = ""
     transparencia_total: bool = False
+    credito_max: float = 0.0
+    encaje_factor: float = 0.0
     activa: bool
 
     class Config:
@@ -228,6 +243,7 @@ class CreditoIn(BaseModel):
     plazo_meses: int = Field(gt=0, le=60)
     fecha_desembolso: date | None = None
     destino: str = ""
+    garante: str = ""
 
 
 class CuotaOut(BaseModel):
@@ -254,6 +270,7 @@ class CreditoOut(BaseModel):
     plazo_meses: int
     fecha_desembolso: date
     destino: str
+    garante: str = ""
     estado: str
     saldo_capital: float = 0
     cuotas_pagadas: int = 0
@@ -282,6 +299,7 @@ class DashboardOut(BaseModel):
     intereses_cobrados: float
     total_retiros: float = 0
     abonos_en_transito: float = 0
+    utilidades_capitalizadas: float = 0
     creditos_activos: int
     cuotas_en_mora: int
     monto_en_mora: float

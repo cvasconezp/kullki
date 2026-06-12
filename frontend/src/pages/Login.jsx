@@ -8,6 +8,7 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
   const [seleccion, setSeleccion] = useState(null);
+  const [totp, setTotp] = useState(""); const [pide2fa, setPide2fa] = useState(false);
 
   const Marca = () => (
     <button className="login-marca" onClick={() => navigate("/")} title="Volver al inicio">
@@ -19,10 +20,13 @@ export default function Login({ onLogin }) {
   const entrar = async () => {
     setError(""); setCargando(true);
     try {
-      const r = await api("/auth/login", { method: "POST", body: { cedula, password } });
+      const r = await api("/auth/login", { method: "POST", body: { cedula, password, totp: totp || undefined } });
       if (r.requiere_seleccion) setSeleccion({ token: r.access_token, nombre: r.nombre, cajas: r.cajas });
       else onLogin(r);
-    } catch (e) { setError(e.message); }
+    } catch (e) {
+      if (/2FA|verificaci/i.test(e.message)) setPide2fa(true);
+      setError(e.message);
+    }
     finally { setCargando(false); }
   };
 
@@ -76,15 +80,22 @@ export default function Login({ onLogin }) {
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && entrar()} />
         </div>
-        <button className="boton" onClick={entrar} disabled={cargando || !cedula || !password}>
-          {cargando ? "Entrando…" : "Entrar"}
+        {pide2fa && (
+          <div className="campo">
+            <label htmlFor="totp">Código de verificación (2FA)</label>
+            <input id="totp" inputMode="numeric" value={totp} autoFocus placeholder="123456"
+              onChange={(e) => setTotp(e.target.value.trim())} onKeyDown={(e) => e.key === "Enter" && entrar()} />
+          </div>
+        )}
+        <button className="boton" onClick={entrar} disabled={cargando || !cedula || !password || (pide2fa && !totp)}>
+          {cargando ? "Entrando…" : pide2fa ? "Verificar e ingresar" : "Entrar"}
         </button>
         <div className="login-hint">
           ¿Eres socio? Tu <strong>usuario</strong> y tu <strong>contraseña</strong> son tu número de cédula
           (sin espacios). Si ya la cambiaste, usa tu contraseña nueva.
         </div>
         <button className="login-volver" onClick={() => navigate("/")}>← Volver al inicio</button>
-        <p className="pie">Un producto de Yachay Deep Labs · <a href="/privacidad" style={{ color: "var(--kullki)" }}>Privacidad</a></p>
+        <p className="pie">Un producto de Yachay Deep Labs · <a href="/privacidad" style={{ color: "var(--kullki)" }}>Privacidad</a> · <a href="/terminos" style={{ color: "var(--kullki)" }}>Términos</a></p>
       </div>
     </div>
   );

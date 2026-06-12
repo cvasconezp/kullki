@@ -3,7 +3,7 @@ import { api, mascaraCedula } from "../lib/api.js";
 
 const FORM_INICIAL = {
   nombre: "", slug: "", comunidad: "",
-  tasa_interes_mensual: "1.5", aporte_ordinario: "10", multa_mora: "0",
+  tasa_interes_mensual: "1.5", aporte_ordinario: "10", multa_mora: "0", credito_max: "0", encaje_factor: "0",
   color_primario: "#1B3A6B", color_acento: "#E8A838", logo: "", transparencia_total: false,
   tesorero_nombre: "", tesorero_cedula: "", tesorero_password: "",
 };
@@ -27,6 +27,7 @@ function EditarCaja({ caja, onListo }) {
     tasa_interes_mensual: String(caja.tasa_interes_mensual),
     aporte_ordinario: String(caja.aporte_ordinario),
     multa_mora: String(caja.multa_mora ?? 0),
+    credito_max: String(caja.credito_max ?? 0), encaje_factor: String(caja.encaje_factor ?? 0),
     color_primario: caja.color_primario || "#1B3A6B",
     color_acento: caja.color_acento || "#E8A838",
     logo: caja.logo || "", transparencia_total: !!caja.transparencia_total, activa: caja.activa,
@@ -41,6 +42,7 @@ function EditarCaja({ caja, onListo }) {
         nombre: f.nombre, comunidad: f.comunidad,
         tasa_interes_mensual: +f.tasa_interes_mensual,
         aporte_ordinario: +f.aporte_ordinario, multa_mora: +f.multa_mora,
+        credito_max: +f.credito_max, encaje_factor: +f.encaje_factor,
         color_primario: f.color_primario, color_acento: f.color_acento,
         logo: f.logo, transparencia_total: f.transparencia_total, activa: f.activa,
       }});
@@ -64,6 +66,12 @@ function EditarCaja({ caja, onListo }) {
           <input inputMode="decimal" value={f.multa_mora} onChange={set("multa_mora")} /></div>
         <div className="campo"><label>Logo (emoji o letra)</label>
           <input maxLength={4} value={f.logo} onChange={set("logo")} placeholder="🌾" /></div>
+      </div>
+      <div className="dos-col">
+        <div className="campo"><label>Crédito máximo (0 = sin límite)</label>
+          <input inputMode="decimal" value={f.credito_max} onChange={set("credito_max")} /></div>
+        <div className="campo"><label>Encaje (crédito ≤ ahorro × factor)</label>
+          <input inputMode="decimal" value={f.encaje_factor} onChange={set("encaje_factor")} /></div>
       </div>
       <div className="dos-col">
         <CampoColor label="Color primario" value={f.color_primario} onChange={set("color_primario")} />
@@ -178,6 +186,7 @@ export default function Cajas({ onAsumir }) {
         ...form,
         tasa_interes_mensual: +form.tasa_interes_mensual,
         aporte_ordinario: +form.aporte_ordinario, multa_mora: +form.multa_mora,
+        credito_max: +form.credito_max, encaje_factor: +form.encaje_factor,
       }});
       setOk(`Caja "${c.nombre}" creada. El tesorero ya puede entrar con su cédula.`);
       setForm(FORM_INICIAL); setMostrarForm(false); cargar();
@@ -228,6 +237,12 @@ export default function Cajas({ onAsumir }) {
               <input inputMode="decimal" value={form.tasa_interes_mensual} onChange={set("tasa_interes_mensual")} /></div>
             <div className="campo"><label>Aporte ordinario (USD)</label>
               <input inputMode="decimal" value={form.aporte_ordinario} onChange={set("aporte_ordinario")} /></div>
+          </div>
+          <div className="dos-col">
+            <div className="campo"><label>Crédito máximo (USD, 0 = sin límite)</label>
+              <input inputMode="decimal" value={form.credito_max} onChange={set("credito_max")} /></div>
+            <div className="campo"><label>Encaje (crédito ≤ ahorro × factor, 0 = sin regla)</label>
+              <input inputMode="decimal" value={form.encaje_factor} onChange={set("encaje_factor")} placeholder="ej. 3" /></div>
           </div>
           <div className="dos-col">
             <div className="campo"><label>Multa por mora (USD)</label>

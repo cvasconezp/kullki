@@ -222,7 +222,7 @@ def test_dashboard_fondo_consistente(setup):
     d = client.get("/dashboard", headers=setup["ta"]).json()
     assert d["fondo_disponible"] == round(
         d["total_aportes"] + d["capital_recuperado"] + d["intereses_cobrados"]
-        + d["abonos_en_transito"] - d["total_retiros"]
+        + d["abonos_en_transito"] - d["total_retiros"] - d["utilidades_capitalizadas"]
         - (d["capital_prestado"] + d["capital_recuperado"]), 2)
 
 
@@ -714,3 +714,48 @@ def test_estado_seguridad(setup):
     assert client.get("/admin/seguridad", headers=setup["ta"]).status_code == 403
     r = client.get("/admin/seguridad", headers=setup["sa"])
     assert r.status_code == 200 and "checks" in r.json()
+
+
+def test_credito_limite_y_garante(setup):
+    sa, ta = setup["sa"], setup["ta"]
+    ca = next(c for c in client.get("/cajas", headers=sa).json() if c["slug"] == "caja-a")
+    client.patch(f"/cajas/{ca['id']}", headers=sa, json={"credito_max": 50})
+    r = client.post("/creditos", headers=ta, json={"socio_id": setup["socio_a"]["id"], "monto": 100, "plazo_meses": 3})
+    assert r.status_code == 400 and "máximo" in r.json()["detail"]
+    client.patch(f"/cajas/{ca['id']}", headers=sa, json={"credito_max": 0})
+    r = client.post("/creditos", headers=ta, json={"socio_id": setup["socio_a"]["id"], "monto": 100,
+                    "plazo_meses": 3, "garante": "José Farinango"})
+    assert r.status_code == 200 and r.json()["garante"] == "José Farinango"
+
+
+def test_cierre_capitalizar_mantiene_fondo(setup):
+    ta = setup["ta"]
+    antes = client.get("/dashboard", headers=ta).json()
+    r = client.post("/cierre/ejecutar?caja_id=" + str(antes["caja"]["id"]), headers=ta, json={"modo": "capitalizar"})
+    # caja-a tiene intereses por créditos pagados
+    assert r.status_code == 200, r.text
+    assert r.json()["repartido"] > 0
+    despues = client.get("/dashboard", headers=ta).json()
+    assert abs(despues["fondo_disponible"] - antes["fondo_disponible"]) < 1.0   # el fondo no cambia
+    assert despues["total_aportes"] > antes["total_aportes"]                    # el ahorro sube
+    assert despues["utilidades_capitalizadas"] > 0
+
+
+def test_2fa_flujo(setup):
+    """Activar 2FA y exigirlo en el login."""
+    import pyotp
+    ta = setup["ta"]
+    ini = client.post("/auth/2fa/iniciar", headers=ta).json()
+    secret = ini["secret"]; assert secret
+    codigo = pyotp.TOTP(secret).now()
+    assert client.post("/auth/2fa/activar", headers=ta, json={"codigo": codigo}).status_code == 200
+    # ahora el login sin código falla
+    r = client.post("/auth/login", json={"cedula": "1000000001", "password": "secreta123"})
+    assert r.status_code == 401 and "2FA" in r.json()["detail"]
+    # con código entra
+    r = client.post("/auth/login", json={"cedula": "1000000001", "password": "secreta123",
+                                         "totp": pyotp.TOTP(secret).now()})
+    assert r.status_code == 200
+    # desactivar
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.post("/auth/2fa/desactivar", headers=h, json={"codigo": pyotp.TOTP(secret).now()}).status_code == 200

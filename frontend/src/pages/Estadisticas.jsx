@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, mascaraCedula } from "../lib/api.js";
+import Seguridad2FA from "../components/Seguridad2FA.jsx";
 
 const fdt = (iso) => {
   if (!iso) return "—";
@@ -108,6 +109,8 @@ export default function Estadisticas() {
           ))}
         </div>
       )}
+
+      <Seguridad2FA />
 
       <p className="vacio" style={{ fontSize: 12.5 }}>
         Nota: se registran los ingresos (logins) y la última actividad. El “tiempo conectado”

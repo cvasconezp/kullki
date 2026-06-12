@@ -113,6 +113,12 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
         _registrar_fallo(data.cedula)
         raise HTTPException(401, "Cédula o contraseña incorrecta")
     _limpiar_fallos(data.cedula)
+    if user.totp_activo:
+        import pyotp
+        if not data.totp:
+            raise HTTPException(401, "Ingresa tu código de verificación (2FA).")
+        if not pyotp.TOTP(user.totp_secret).verify(data.totp, valid_window=1):
+            raise HTTPException(401, "Código de verificación (2FA) incorrecto.")
 
     # Superadmin: token directo, sin caja
     if user.es_superadmin:
@@ -219,6 +225,49 @@ def asumir_caja(data: schemas.AsumirCaja, db: Session = Depends(get_db),
         logo=caja.logo, es_impersonacion=True, requiere_seleccion=False, cajas=[])
 
 
+@auth_router.post("/2fa/iniciar")
+def totp_iniciar(db: Session = Depends(get_db), actor: Actor = Depends(get_identidad)):
+    import pyotp
+    secret = pyotp.random_base32()
+    actor.usuario.totp_secret = secret
+    actor.usuario.totp_activo = False
+    db.commit()
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=actor.usuario.cedula, issuer_name="Kullki")
+    return {"secret": secret, "otpauth": uri}
+
+
+@auth_router.post("/2fa/activar")
+def totp_activar(data: schemas.TotpCodigo, db: Session = Depends(get_db),
+                 actor: Actor = Depends(get_identidad)):
+    import pyotp
+    u = actor.usuario
+    if not u.totp_secret:
+        raise HTTPException(400, "Primero inicia la configuración de 2FA")
+    if not pyotp.TOTP(u.totp_secret).verify(data.codigo, valid_window=1):
+        raise HTTPException(400, "Código incorrecto")
+    u.totp_activo = True
+    db.commit()
+    return {"ok": True}
+
+
+@auth_router.post("/2fa/desactivar")
+def totp_desactivar(data: schemas.TotpCodigo, db: Session = Depends(get_db),
+                    actor: Actor = Depends(get_identidad)):
+    import pyotp
+    u = actor.usuario
+    if u.totp_activo and not pyotp.TOTP(u.totp_secret or "").verify(data.codigo, valid_window=1):
+        raise HTTPException(400, "Código incorrecto")
+    u.totp_activo = False
+    u.totp_secret = ""
+    db.commit()
+    return {"ok": True}
+
+
+@auth_router.get("/2fa/estado")
+def totp_estado(actor: Actor = Depends(get_identidad)):
+    return {"activo": actor.usuario.totp_activo}
+
+
 @auth_router.get("/mis-cajas", response_model=list[schemas.CajaMembresia])
 def mis_cajas(db: Session = Depends(get_db), actor: Actor = Depends(get_identidad)):
     """Lista las cajas a las que la persona pertenece (para el selector)."""
@@ -280,7 +329,8 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
                        color_primario=data.color_primario or "#1B3A6B",
                        color_acento=data.color_acento or "#E8A838",
                        logo=data.logo or "",
-                       transparencia_total=data.transparencia_total)
+                       transparencia_total=data.transparencia_total,
+                       credito_max=data.credito_max, encaje_factor=data.encaje_factor)
     db.add(caja)
     db.flush()
 
@@ -708,12 +758,20 @@ def crear_credito(data: schemas.CreditoIn, db: Session = Depends(get_db),
     if not socio.activo:
         raise HTTPException(400, "El socio está inactivo")
     caja = db.get(models.Caja, socio.caja_id)
+    if caja.credito_max and data.monto > caja.credito_max + 0.005:
+        raise HTTPException(400, f"El crédito supera el máximo permitido por la caja (${caja.credito_max:.2f})")
+    if caja.encaje_factor:
+        info = _socio_out(db, socio)
+        tope = round(info.total_aportes * caja.encaje_factor, 2)
+        if data.monto > tope + 0.005:
+            raise HTTPException(400, f"Por la regla de encaje, este socio puede recibir máximo "
+                                     f"${tope:.2f} (ahorro ${info.total_aportes:.2f} × {caja.encaje_factor})")
     tasa = data.tasa_mensual if data.tasa_mensual is not None else caja.tasa_interes_mensual
     inicio = data.fecha_desembolso or date.today()
 
     credito = models.Credito(caja_id=socio.caja_id, socio_id=socio.id, monto=data.monto,
                              tasa_mensual=tasa, plazo_meses=data.plazo_meses,
-                             fecha_desembolso=inicio, destino=data.destino,
+                             fecha_desembolso=inicio, destino=data.destino, garante=data.garante,
                              registrado_por=user.id)
     db.add(credito)
     db.flush()
@@ -932,6 +990,9 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
         select(func.coalesce(func.sum(models.Cuota.abonado), 0))
         .join(models.Credito)
         .where(models.Credito.caja_id == cid, models.Cuota.pagada.is_(False))) or 0)
+    capitalizado = float(db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
+                                   .where(models.Aporte.caja_id == cid, models.Aporte.tipo == "utilidad",
+                                          models.Aporte.anulado.is_(False))) or 0)
     hoy = date.today()
     mora = db.execute(
         select(func.count(models.Cuota.id),
@@ -949,13 +1010,14 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
         caja=schemas.CajaOut.model_validate(caja),
         socios_activos=socios_activos,
         fondo_disponible=round(total_aportes + cap_recuperado + intereses
-                               + abonos_transito - desembolsado - total_retiros, 2),
+                               + abonos_transito - desembolsado - total_retiros - capitalizado, 2),
         total_aportes=round(total_aportes, 2),
         capital_prestado=round(desembolsado - cap_recuperado, 2),
         capital_recuperado=round(cap_recuperado, 2),
         intereses_cobrados=round(intereses, 2),
         total_retiros=round(total_retiros, 2),
         abonos_en_transito=round(abonos_transito, 2),
+        utilidades_capitalizadas=round(capitalizado, 2),
         creditos_activos=creditos_activos,
         cuotas_en_mora=int(mora[0]),
         monto_en_mora=round(float(mora[1]), 2),
@@ -1441,3 +1503,45 @@ def estado_seguridad(db: Session = Depends(get_db),
     return {"checks": checks,
             "usuarios_con_clave_inicial_pendiente": pendientes,
             "puntaje": sum(1 for c in checks if c["ok"]), "total": len(checks)}
+
+
+@reportes_router.post("/cierre/ejecutar")
+def ejecutar_cierre(data: schemas.CierreIn, caja_id: int | None = None,
+                    db: Session = Depends(get_db),
+                    user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Cierre de ejercicio: reparte (paga) o capitaliza (al ahorro) los intereses
+    ganados, proporcional al ahorro neto de cada socio. Queda asentado y auditado."""
+    cid = caja_scope(user, caja_id)
+    if data.modo not in ("repartir", "capitalizar"):
+        raise HTTPException(400, "Modo inválido (repartir | capitalizar)")
+    dash = dashboard(caja_id=cid, db=db, user=user)
+    intereses = dash.intereses_cobrados
+    if intereses <= 0:
+        raise HTTPException(400, "No hay intereses ganados para distribuir en este ejercicio.")
+    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
+                                                   models.Socio.activo)).all()
+    infos = [(s, _socio_out(db, s)) for s in socios]
+    total_ahorro = sum(i.total_aportes for _, i in infos)
+    if total_ahorro <= 0:
+        raise HTTPException(400, "No hay ahorro para distribuir proporcionalmente.")
+    hoy = date.today(); anio = hoy.year; repartido = 0.0; n = 0
+    for s, info in infos:
+        u = round(intereses * info.total_aportes / total_ahorro, 2)
+        if u <= 0:
+            continue
+        # En ambos modos la utilidad se asienta como aporte tipo "utilidad" (sube el ahorro
+        # / no infla el fondo gracias al ajuste de capitalizado). En "repartir" además se
+        # paga: un retiro deja el ahorro igual y reduce el fondo (sale el efectivo).
+        db.add(models.Aporte(caja_id=cid, socio_id=s.id, monto=u, fecha=hoy, tipo="utilidad",
+                             nota=f"{'Capitalización' if data.modo=='capitalizar' else 'Utilidad'} ejercicio {anio}",
+                             registrado_por=user.id))
+        if data.modo == "repartir":
+            db.add(models.Retiro(caja_id=cid, socio_id=s.id, monto=u, fecha=hoy,
+                                 nota=f"Pago de utilidad ejercicio {anio}", registrado_por=user.id))
+        repartido += u; n += 1
+    db.add(models.Cierre(caja_id=cid, fecha=hoy, modo=data.modo, intereses=round(intereses, 2),
+                         total_ahorro=round(total_ahorro, 2), num_socios=n, creado_por=user.nombre))
+    log_audit(db, user, "crear", "cierre", 0,
+              f"Cierre de ejercicio ({data.modo}): ${repartido:.2f} en utilidades a {n} socios", caja_id=cid)
+    db.commit()
+    return {"ok": True, "modo": data.modo, "repartido": round(repartido, 2), "socios": n}

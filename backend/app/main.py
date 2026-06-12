@@ -113,6 +113,9 @@ def init_db():
         _add_cols("auditoria", {"afecta_socio_id": "INTEGER"})
         _add_cols("socios", {"consentimiento_datos": "BOOLEAN DEFAULT FALSE",
                              "consentimiento_fecha": "DATE"})
+        _add_cols("cajas", {"credito_max": "FLOAT DEFAULT 0", "encaje_factor": "FLOAT DEFAULT 0"})
+        _add_cols("creditos", {"garante": "VARCHAR(160) DEFAULT ''"})
+        _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE"})
 
         # Superadmin inicial desde variables de entorno
         # Chequeo de configuración de seguridad

@@ -96,7 +96,7 @@ export default function Creditos() {
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ socio_id: "", monto: "", plazo_meses: "6", destino: "" });
+  const [form, setForm] = useState({ socio_id: "", monto: "", plazo_meses: "6", destino: "", garante: "" });
   const [trabajando, setTrabajando] = useState(false);
 
   const cargar = () => {
@@ -117,11 +117,11 @@ export default function Creditos() {
       const c = await api("/creditos", {
         method: "POST",
         body: { socio_id: +form.socio_id, monto: +form.monto,
-                plazo_meses: +form.plazo_meses, destino: form.destino },
+                plazo_meses: +form.plazo_meses, destino: form.destino, garante: form.garante },
       });
       setOk(`Crédito de ${usd(c.monto)} entregado a ${c.socio_nombres}. Cuota mensual: ${usd(c.cuotas[0].total)}.`);
       setMostrarForm(false);
-      setForm({ socio_id: "", monto: "", plazo_meses: "6", destino: "" });
+      setForm({ socio_id: "", monto: "", plazo_meses: "6", destino: "", garante: "" });
       cargar();
     } catch (e) { setError(e.message); }
     finally { setTrabajando(false); }
@@ -189,6 +189,11 @@ export default function Creditos() {
             <input id="cd" value={form.destino} placeholder="Semillas, negocio, emergencia…"
               onChange={(e) => setForm({ ...form, destino: e.target.value })} />
           </div>
+          <div className="campo">
+            <label htmlFor="cg">Garante / aval (opcional)</label>
+            <input id="cg" value={form.garante} placeholder="Nombre del garante"
+              onChange={(e) => setForm({ ...form, garante: e.target.value })} />
+          </div>
           <p className="detalle" style={{ fontSize: 13, color: "var(--tinta-suave)" }}>
             Se aplica la tasa de la caja y se genera la tabla de cuotas automáticamente.
           </p>
@@ -212,7 +217,7 @@ export default function Creditos() {
                     : <span className="pill neutro">al día</span>}
                 </div>
                 <div className="detalle">
-                  {usd(c.monto)} · {c.plazo_meses} meses al {c.tasa_mensual}% · {c.destino || "sin destino"}
+                  {usd(c.monto)} · {c.plazo_meses} meses al {c.tasa_mensual}% · {c.destino || "sin destino"}{c.garante ? ` · garante: ${c.garante}` : ""}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
