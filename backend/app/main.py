@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from .database import Base, engine, SessionLocal
 from . import models
-from .auth import hash_password
+from .auth import hash_password, verify_password
 from .routers import (auth_router, cajas_router, socios_router, aportes_router,
                       creditos_router, retiros_router, reportes_router)
 
@@ -128,10 +128,23 @@ def init_db():
         pwd = os.getenv("SUPERADMIN_PASSWORD", "kullki2026")
         db = SessionLocal()
         try:
-            if not db.scalar(select(models.Usuario).where(models.Usuario.es_superadmin)):
+            sa = db.scalar(select(models.Usuario).where(models.Usuario.es_superadmin))
+            if not sa:
                 db.add(models.Usuario(nombre="Administrador Kullki", cedula=ced,
                                       password_hash=hash_password(pwd), es_superadmin=True))
                 db.commit()
+            else:
+                # Variables de entorno como fuente de verdad: si cambian, se actualiza el admin.
+                cambio = False
+                if os.getenv("SUPERADMIN_CEDULA") and sa.cedula != ced:
+                    sa.cedula = ced; cambio = True
+                if os.getenv("SUPERADMIN_PASSWORD") and not verify_password(pwd, sa.password_hash):
+                    sa.password_hash = hash_password(pwd); sa.debe_cambiar_password = False; cambio = True
+                if not sa.activo:
+                    sa.activo = True; cambio = True
+                if cambio:
+                    db.commit()
+                    log.warning("Credenciales del superadmin sincronizadas desde variables de entorno.")
             # Auto-siembra de datos demo SOLO si no hay ninguna caja (base vacía).
             # Nunca toca datos reales existentes. Desactivable con SEED_DEMO=0.
             if (os.getenv("SEED_DEMO", "1") != "0"
