@@ -141,3 +141,69 @@ export function imprimirEstadoCuenta(lib, periodo) {
   if (!w) { alert("Permite las ventanas emergentes para descargar el PDF."); return; }
   w.document.write(html); w.document.close();
 }
+
+// Enlace WhatsApp (click-to-chat, sin API). Normaliza números de Ecuador.
+export function waLink(numero, mensaje) {
+  let n = (numero || "").replace(/[^0-9]/g, "");
+  if (n.startsWith("00")) n = n.slice(2);
+  if (n.startsWith("0")) n = "593" + n.slice(1);
+  else if (n.length === 9) n = "593" + n;
+  return `https://wa.me/${n}?text=${encodeURIComponent(mensaje)}`;
+}
+
+// Informe de asamblea en PDF con membrete de la caja (ventana nueva).
+export function imprimirInformeAsamblea(informe, cierre) {
+  const ses = getSesion() || {};
+  const color = ses.color_primario || "#1B3A6B";
+  const acento = ses.color_acento || "#E8A838";
+  const logo = ses.logo || (informe.caja?.nombre || "K").replace(/^caja (de ahorro )?/i, "").trim()[0] || "K";
+  const d = informe.dashboard;
+  const hoy = new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" });
+  const fila = (l, v, cls = "") => `<tr><td>${l}</td><td class="num ${cls}">${v}</td></tr>`;
+  const socios = informe.filas.map((f) => `<tr>
+      <td>${f.socio}${f.en_mora ? ' <span class="mora">mora</span>' : ""}<div class="nota">CI ${f.cedula}${f.multas > 0 ? " · multas " + usd(f.multas) : ""}</div></td>
+      <td class="num pos">${usd(f.ahorro_neto)}</td>
+      <td class="num ${f.saldo_credito > 0 ? "neg" : ""}">${f.saldo_credito > 0 ? usd(f.saldo_credito) : "—"}</td>
+    </tr>`).join("");
+  const cierreHtml = (cierre && cierre.intereses_a_repartir > 0) ? `
+    <h3>Simulación de cierre — reparto de ${usd(cierre.intereses_a_repartir)} en intereses</h3>
+    <table><thead><tr><th>Socio</th><th class="num">% ahorro</th><th class="num">Utilidad</th></tr></thead><tbody>
+    ${cierre.filas.map((f) => `<tr><td>${f.socio}</td><td class="num">${f.porcentaje}%</td><td class="num pos">${usd(f.utilidad)}</td></tr>`).join("")}
+    </tbody></table>` : "";
+
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Informe de asamblea · ${informe.caja.nombre}</title>
+  <style>
+    *{box-sizing:border-box} body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;color:#1d2530;margin:0;padding:0 28px 40px}
+    .cab{display:flex;align-items:center;gap:16px;padding:22px 0;border-bottom:3px solid ${acento}}
+    .logo{width:56px;height:56px;border-radius:12px;background:${color};color:${acento};display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;flex:none}
+    .cab h1{font-size:20px;margin:0;color:${color}} .cab .sub{font-size:12.5px;color:#66707d;margin-top:2px}
+    .doc{margin-left:auto;text-align:right} .doc .t{font-size:15px;font-weight:700;color:${color}} .doc .d{font-size:11.5px;color:#66707d}
+    h3{color:${color};font-size:14px;margin:22px 0 8px}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:6px}
+    th{text-align:left;background:${color}11;color:${color};padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+    td{padding:7px 10px;border-bottom:1px solid #eef1f4} .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .pos{color:#0a7a4a}.neg{color:#b3372b}.nota{color:#8a929c;font-size:11px}.mora{color:#b3372b;font-weight:600;font-size:11px}
+    .pie{margin-top:26px;font-size:11px;color:#8a929c;text-align:center;border-top:1px solid #eef1f4;padding-top:12px}
+  </style></head><body>
+    <div class="cab"><div class="logo">${logo}</div>
+      <div><h1>${informe.caja.nombre}</h1><div class="sub">${informe.caja.comunidad || ""} · Kullki por Yachay Deep Labs</div></div>
+      <div class="doc"><div class="t">Informe de asamblea</div><div class="d">${hoy}</div></div></div>
+    <h3>Estado de la caja</h3>
+    <table>
+      ${fila("Fondo disponible", usd(d.fondo_disponible), "pos")}
+      ${fila("Aportes acumulados", usd(d.total_aportes))}
+      ${fila("Retiros entregados", usd(d.total_retiros), "neg")}
+      ${fila("Capital en la calle", usd(d.capital_prestado))}
+      ${fila("Intereses ganados", usd(d.intereses_cobrados), "pos")}
+      ${d.cuotas_en_mora > 0 ? fila(`En mora (${d.cuotas_en_mora} cuotas)`, usd(d.monto_en_mora), "neg") : ""}
+    </table>
+    <h3>Detalle por socio</h3>
+    <table><thead><tr><th>Socio</th><th class="num">Ahorro</th><th class="num">Debe</th></tr></thead><tbody>${socios}</tbody></table>
+    ${cierreHtml}
+    <div class="pie">Generado por Kullki · ${informe.caja.nombre} · ${hoy}. Respaldo: bitácora de la caja.</div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
+  </body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { alert("Permite las ventanas emergentes para descargar el PDF."); return; }
+  w.document.write(html); w.document.close();
+}

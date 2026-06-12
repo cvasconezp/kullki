@@ -37,6 +37,7 @@ class Usuario(Base):
     password_hash: Mapped[str] = mapped_column(String(256))
     es_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    debe_cambiar_password: Mapped[bool] = mapped_column(Boolean, default=False)
 
     membresias: Mapped[list["Membresia"]] = relationship(back_populates="usuario")
 

@@ -12,6 +12,7 @@ import Libreta from "./pages/Libreta.jsx";
 import Bitacora from "./pages/Bitacora.jsx";
 import Informes from "./pages/Informes.jsx";
 import Cajas from "./pages/Cajas.jsx";
+import CambiarPassword from "./components/CambiarPassword.jsx";
 
 // id interno · ruta (URL) · etiqueta · ícono
 const NAV_TESORERO = [
@@ -60,6 +61,11 @@ export default function App() {
 
   // ---------- Requiere sesión ----------
   if (!sesion) { navigate("/ingresar"); return null; }
+
+  // Cambio de contraseña obligatorio en el primer ingreso
+  if (sesion.debe_cambiar_password) {
+    return <CambiarPassword sesion={sesion} onListo={(s) => setS(s)} />;
+  }
 
   const partes = ruta.split("/").filter(Boolean);   // [slug, seccion?]
   const esTesorero = sesion.rol === "tesorero";

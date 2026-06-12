@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta } from "../lib/api.js";
+import { waLink } from "../lib/exportar.js";
 
 function TablaCuotas({ credito, onPagar, onAbonar, pagando }) {
   const [abonos, setAbonos] = useState({});
@@ -51,6 +52,39 @@ function TablaCuotas({ credito, onPagar, onAbonar, pagando }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function Recordatorios() {
+  const [items, setItems] = useState(null);
+  useEffect(() => { api("/recordatorios?dias=7").then(setItems).catch(() => setItems([])); }, []);
+  if (!items || items.length === 0) return null;
+  const msg = (r) => {
+    const f = fechaCorta(r.fecha_vencimiento);
+    return r.estado === "vencida"
+      ? `Hola ${r.socio.split(" ")[0]}, te saluda ${r.caja_nombre}. Tu cuota ${r.cuota} de ${usd(r.monto)} venció el ${f}. Por favor acércate a ponerte al día. ¡Gracias!`
+      : `Hola ${r.socio.split(" ")[0]}, te saluda ${r.caja_nombre}. Te recordamos que tu cuota ${r.cuota} de ${usd(r.monto)} vence el ${f}. ¡Gracias!`;
+  };
+  return (
+    <div className="tarjeta">
+      <h3>Recordatorios de cobro ({items.length})</h3>
+      <div className="detalle" style={{ color: "var(--tinta-suave)", fontSize: 13, margin: "0 0 6px" }}>
+        Cuotas vencidas o por vencer esta semana. Envía el recordatorio por WhatsApp con un toque.
+      </div>
+      {items.map((r) => (
+        <div className="fila" key={r.credito_id}>
+          <div>
+            <div className="principal">{r.socio} {r.estado === "vencida"
+              ? <span className="pill mora">vencida</span> : <span className="pill neutro">por vencer</span>}</div>
+            <div className="detalle">Cuota {r.cuota} · {usd(r.monto)} · vence {fechaCorta(r.fecha_vencimiento)}</div>
+          </div>
+          {r.whatsapp
+            ? <a className="boton mini" style={{ background: "#25D366", color: "#fff", textDecoration: "none" }}
+                href={waLink(r.whatsapp, msg(r))} target="_blank" rel="noreferrer">WhatsApp</a>
+            : <span className="pill neutro">sin WhatsApp</span>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -126,6 +160,8 @@ export default function Creditos() {
       </div>
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
+
+      <Recordatorios />
 
       {mostrarForm && (
         <div className="tarjeta">

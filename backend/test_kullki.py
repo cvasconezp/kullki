@@ -566,3 +566,42 @@ def test_export_solo_superadmin(setup):
     assert "cajas" in d and "aportes" in d and "auditoria" in d
     # nunca exporta contraseñas
     assert all("password_hash" not in u for u in d["usuarios"])
+
+
+# ---------------- cambio de clave obligatorio, demografía, recordatorios ----------------
+
+def test_socio_nuevo_debe_cambiar_password(setup):
+    ta = setup["ta"]
+    client.post("/socios", headers=ta, json={"nombres": "Nueva Clave", "cedula": "2000000601"})
+    data = login_full("2000000601", "2000000601")
+    assert data["debe_cambiar_password"] is True
+    # cambiarla limpia el flag
+    tok = data["access_token"]
+    r = client.post("/auth/cambiar-password", headers={"Authorization": f"Bearer {tok}"},
+                    json={"actual": "2000000601", "nueva": "claveNueva1"})
+    assert r.status_code == 200
+    data2 = login_full("2000000601", "claveNueva1")
+    assert data2["debe_cambiar_password"] is False
+
+
+def test_demografia(setup):
+    ta = setup["ta"]
+    client.post("/socios", headers=ta, json={"nombres": "Demo Uno", "cedula": "2000000611",
+        "genero": "F", "fecha_nacimiento": "1985-01-01", "nivel_instruccion": "Secundaria"})
+    r = client.get("/demografia", headers=ta)
+    assert r.status_code == 200
+    d = r.json()
+    assert "genero" in d and "edad" in d and d["total"] >= 1
+
+
+def test_recordatorios(setup):
+    ta = setup["ta"]
+    s = client.post("/socios", headers=ta, json={"nombres": "Recordar Yo", "cedula": "2000000612",
+        "whatsapp": "0991112222"}).json()
+    from datetime import date, timedelta
+    client.post("/creditos", headers=ta, json={"socio_id": s["id"], "monto": 120, "plazo_meses": 3,
+        "fecha_desembolso": (date.today() - timedelta(days=40)).isoformat()})
+    r = client.get("/recordatorios", headers=ta)
+    assert r.status_code == 200
+    items = r.json()
+    assert any(x["socio"] == "Recordar Yo" and x["whatsapp"] == "0991112222" for x in items)

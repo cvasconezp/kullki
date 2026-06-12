@@ -1,14 +1,33 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta } from "../lib/api.js";
+import { imprimirInformeAsamblea } from "../lib/exportar.js";
+
+function GrupoDemo({ titulo, datos, total }) {
+  const max = Math.max(1, ...datos.map((d) => d.valor));
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div className="detalle" style={{ fontWeight: 600, color: "var(--kullki-oscuro)", marginBottom: 4 }}>{titulo}</div>
+      {datos.filter((d) => d.valor > 0).map((d) => (
+        <div className="rk" key={d.etiqueta} style={{ marginBottom: 6 }}>
+          <div className="rk-top"><span>{d.etiqueta}</span>
+            <span className="cifra">{d.valor} · {Math.round((d.valor / total) * 100)}%</span></div>
+          <div className="rk-bar"><div style={{ width: `${(d.valor / max) * 100}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Informes() {
   const [informe, setInforme] = useState(null);
   const [cierre, setCierre] = useState(null);
+  const [demo, setDemo] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     api("/informe-asamblea").then(setInforme).catch((e) => setError(e.message));
     api("/cierre/simulacion").then(setCierre).catch(() => {});
+    api("/demografia").then(setDemo).catch(() => {});
   }, []);
 
   if (error) return <div className="error">{error}</div>;
@@ -20,8 +39,8 @@ export default function Informes() {
     <div id="informe">
       <div className="seccion-titulo no-print-margin">
         <h2>Informe de asamblea</h2>
-        <button className="boton mini no-print" onClick={() => window.print()}>
-          🖨 Imprimir / PDF
+        <button className="boton mini no-print" onClick={() => imprimirInformeAsamblea(informe, cierre)}>
+          🖨 PDF con membrete
         </button>
       </div>
 
@@ -83,8 +102,20 @@ export default function Informes() {
         </div>
       )}
 
+      {demo && demo.total > 0 && (
+        <div className="tarjeta no-print">
+          <h3>Perfil de socios</h3>
+          <div className="detalle" style={{ color: "var(--tinta-suave)", fontSize: 13, margin: "0 0 4px" }}>
+            {demo.total} socios activos · ficha completa: {demo.ficha_completa} de {demo.total}
+          </div>
+          <GrupoDemo titulo="Género" datos={demo.genero} total={demo.total} />
+          <GrupoDemo titulo="Rango de edad" datos={demo.edad} total={demo.total} />
+          <GrupoDemo titulo="Nivel de instrucción" datos={demo.instruccion} total={demo.total} />
+        </div>
+      )}
+
       <p className="no-print" style={{ color: "var(--tinta-suave)", fontSize: 12.5, textAlign: "center", marginTop: 14 }}>
-        Usa "Imprimir / PDF" para llevar este informe en papel a la asamblea.
+        Usa "PDF con membrete" para llevar este informe a la asamblea.
       </p>
     </div>
   );

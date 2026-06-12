@@ -90,6 +90,7 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
     if user.es_superadmin:
         return schemas.LoginOut(
             access_token=create_token(user), rol="superadmin", nombre=user.nombre,
+            debe_cambiar_password=user.debe_cambiar_password,
             requiere_seleccion=False, cajas=[])
 
     mems = membresias_activas(db, user)
@@ -117,11 +118,13 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
             rol=c.rol, nombre=user.nombre, caja_id=c.caja_id, caja_nombre=c.caja_nombre,
             caja_slug=c.caja_slug, socio_id=c.socio_id,
             color_primario=c.color_primario, color_acento=c.color_acento, logo=c.logo,
+            debe_cambiar_password=user.debe_cambiar_password,
             requiere_seleccion=False, cajas=cajas)
 
     # Varias cajas: token "sin anclar"; el front muestra el selector
     return schemas.LoginOut(
         access_token=create_token(user), rol=None, nombre=user.nombre,
+        debe_cambiar_password=user.debe_cambiar_password,
         requiere_seleccion=True, cajas=cajas)
 
 
@@ -147,6 +150,7 @@ def seleccionar_caja(data: schemas.SeleccionCaja, db: Session = Depends(get_db),
         color_primario=caja.color_primario if caja else None,
         color_acento=caja.color_acento if caja else None,
         logo=caja.logo if caja else None,
+        debe_cambiar_password=user.debe_cambiar_password,
         requiere_seleccion=False, cajas=[])
 
 
@@ -208,6 +212,7 @@ def cambiar_password(data: schemas.CambioPassword, db: Session = Depends(get_db)
     if not verify_password(data.actual, user.password_hash):
         raise HTTPException(400, "La contraseña actual no coincide")
     user.password_hash = hash_password(data.nueva)
+    user.debe_cambiar_password = False
     db.commit()
     return {"ok": True}
 
@@ -242,7 +247,8 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
                          .where(models.Usuario.cedula == data.tesorero_cedula))
     if not tesorero:
         tesorero = models.Usuario(nombre=data.tesorero_nombre, cedula=data.tesorero_cedula,
-                                  password_hash=hash_password(data.tesorero_password))
+                                  password_hash=hash_password(data.tesorero_password),
+                                  debe_cambiar_password=True)
         db.add(tesorero)
         db.flush()
     elif tesorero.es_superadmin:
@@ -311,7 +317,8 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
     usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
     if not usuario:
         usuario = models.Usuario(nombre=data.nombres, cedula=data.cedula,
-                                 password_hash=hash_password(data.cedula))
+                                 password_hash=hash_password(data.cedula),
+                                 debe_cambiar_password=True)
         db.add(usuario)
         db.flush()
     if not usuario.es_superadmin:
@@ -906,3 +913,68 @@ def exportar_respaldo(db: Session = Depends(get_db),
         "cuotas": filas(models.Cuota),
         "auditoria": filas(models.Auditoria),
     }
+
+
+@reportes_router.get("/demografia")
+def demografia(caja_id: int | None = None, db: Session = Depends(get_db),
+               user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Perfil de la base social para estudios (a partir de la ficha del socio)."""
+    cid = caja_scope(user, caja_id)
+    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
+                                                   models.Socio.activo)).all()
+    hoy = date.today()
+    def edad(f):
+        if not f:
+            return None
+        return hoy.year - f.year - ((hoy.month, hoy.day) < (f.month, f.day))
+    GEN = {"F": "Femenino", "M": "Masculino", "Otro": "Otro", "NS": "Prefiere no decir"}
+    genero, instruccion, civil, rangos = {}, {}, {}, {"18-29": 0, "30-44": 0, "45-59": 0, "60+": 0, "Sin dato": 0}
+    completa = 0
+    for s in socios:
+        g = GEN.get(s.genero, "Sin dato") if s.genero else "Sin dato"
+        genero[g] = genero.get(g, 0) + 1
+        ni = s.nivel_instruccion or "Sin dato"; instruccion[ni] = instruccion.get(ni, 0) + 1
+        ec = s.estado_civil or "Sin dato"; civil[ec] = civil.get(ec, 0) + 1
+        e = edad(s.fecha_nacimiento)
+        k = "Sin dato" if e is None else "18-29" if e < 30 else "30-44" if e < 45 else "45-59" if e < 60 else "60+"
+        rangos[k] += 1
+        if s.whatsapp and s.correo and s.fecha_nacimiento and s.genero:
+            completa += 1
+    def lista(d):
+        return [{"etiqueta": k, "valor": v} for k, v in sorted(d.items(), key=lambda x: -x[1])]
+    total = len(socios)
+    return {"total": total, "ficha_completa": completa,
+            "ficha_incompleta": total - completa,
+            "genero": lista(genero), "edad": [{"etiqueta": k, "valor": v} for k, v in rangos.items()],
+            "instruccion": lista(instruccion), "estado_civil": lista(civil)}
+
+
+@reportes_router.get("/recordatorios")
+def recordatorios(caja_id: int | None = None, dias: int = 7, db: Session = Depends(get_db),
+                  user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    """Socios con cuota vencida o por vencer en los próximos `dias`. Para enviar
+    recordatorios por WhatsApp (el front arma el enlace wa.me)."""
+    from datetime import timedelta
+    cid = caja_scope(user, caja_id)
+    caja = db.get(models.Caja, cid)
+    hoy = date.today(); limite = hoy + timedelta(days=dias)
+    out = []
+    creditos = db.scalars(select(models.Credito).where(models.Credito.caja_id == cid,
+                                                       models.Credito.estado == "activo")).all()
+    for c in creditos:
+        cuota = next((q for q in sorted(c.cuotas, key=lambda x: x.numero) if not q.pagada), None)
+        if not cuota:
+            continue
+        if cuota.fecha_vencimiento <= limite:
+            socio = c.socio
+            pendiente = round(cuota.total - (cuota.abonado or 0), 2)
+            out.append({
+                "socio": socio.nombres, "whatsapp": socio.whatsapp or socio.telefono or "",
+                "credito_id": c.id, "cuota": cuota.numero, "plazo": c.plazo_meses,
+                "fecha_vencimiento": cuota.fecha_vencimiento.isoformat(),
+                "monto": pendiente,
+                "estado": "vencida" if cuota.fecha_vencimiento < hoy else "proxima",
+                "caja_nombre": caja.nombre,
+            })
+    out.sort(key=lambda x: x["fecha_vencimiento"])
+    return out

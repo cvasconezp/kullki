@@ -44,6 +44,7 @@ class LoginOut(BaseModel):
     color_acento: str | None = None
     logo: str | None = None
     es_impersonacion: bool = False      # True si un superadmin entró como tesorero/socio
+    debe_cambiar_password: bool = False # True => el front obliga a cambiar la clave inicial
     requiere_seleccion: bool = False    # True => el front muestra el selector de caja
     cajas: list[CajaMembresia] = []
 
