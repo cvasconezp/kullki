@@ -81,6 +81,8 @@ class Socio(Base):
     nivel_instruccion: Mapped[str] = mapped_column(String(30), default="")
     num_cargas: Mapped[int] = mapped_column(Integer, default=0)          # cargas familiares
     contacto_emergencia: Mapped[str] = mapped_column(String(160), default="")
+    consentimiento_datos: Mapped[bool] = mapped_column(Boolean, default=False)  # LOPDP
+    consentimiento_fecha: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     caja: Mapped["Caja"] = relationship(back_populates="socios")
     aportes: Mapped[list["Aporte"]] = relationship(back_populates="socio")

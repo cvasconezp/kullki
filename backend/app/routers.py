@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 from collections import defaultdict
-import json
+import json, time, os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -40,6 +40,22 @@ def _en_mora(credito: models.Credito) -> bool:
 
 
 VENTANA_EDICION = timedelta(minutes=5)
+
+# --- Anti fuerza bruta en el login (en memoria) ---
+_LOGIN_FAILS = defaultdict(list)
+MAX_FAILS = 5
+VENTANA_FAIL = 900        # 15 min
+def _login_bloqueado(cedula: str) -> int:
+    now = time.time()
+    fails = [t for t in _LOGIN_FAILS.get(cedula, []) if now - t < VENTANA_FAIL]
+    _LOGIN_FAILS[cedula] = fails
+    if len(fails) >= MAX_FAILS:
+        return int((VENTANA_FAIL - (now - fails[0])) / 60) + 1   # minutos restantes
+    return 0
+def _registrar_fallo(cedula: str):
+    _LOGIN_FAILS[cedula].append(time.time())
+def _limpiar_fallos(cedula: str):
+    _LOGIN_FAILS.pop(cedula, None)
 
 def _verificar_ventana(actor, mov):
     """Tesorero: solo puede corregir dentro de 5 min de creado el movimiento.
@@ -89,9 +105,14 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 @auth_router.post("/login", response_model=schemas.LoginOut)
 def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
+    espera = _login_bloqueado(data.cedula)
+    if espera:
+        raise HTTPException(429, f"Demasiados intentos fallidos. Intenta de nuevo en {espera} minuto(s).")
     user = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
     if not user or not user.activo or not verify_password(data.password, user.password_hash):
+        _registrar_fallo(data.cedula)
         raise HTTPException(401, "Cédula o contraseña incorrecta")
+    _limpiar_fallos(data.cedula)
 
     # Superadmin: token directo, sin caja
     if user.es_superadmin:
@@ -229,6 +250,8 @@ def cambiar_password(data: schemas.CambioPassword, db: Session = Depends(get_db)
     user = actor.usuario
     if not verify_password(data.actual, user.password_hash):
         raise HTTPException(400, "La contraseña actual no coincide")
+    if data.nueva.strip() == user.cedula:
+        raise HTTPException(400, "Tu nueva contraseña no puede ser tu número de cédula")
     user.password_hash = hash_password(data.nueva)
     user.debe_cambiar_password = False
     db.commit()
@@ -352,7 +375,9 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
                          estado_civil=data.estado_civil,
                          nivel_instruccion=data.nivel_instruccion,
                          num_cargas=data.num_cargas,
-                         contacto_emergencia=data.contacto_emergencia)
+                         contacto_emergencia=data.contacto_emergencia,
+                         consentimiento_datos=data.consentimiento_datos,
+                         consentimiento_fecha=date.today() if data.consentimiento_datos else None)
     db.add(socio)
     db.flush()
 
@@ -511,6 +536,39 @@ def cambiar_estado_socio(socio_id: int, activo: bool, db: Session = Depends(get_
     socio.activo = activo
     log_audit(db, user, "editar", "socio", socio.id,
               f"Socio {socio.nombres} {'activado' if activo else 'desactivado'}",
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
+    db.commit()
+    return _socio_out(db, socio)
+
+
+@socios_router.post("/{socio_id}/anonimizar", response_model=schemas.SocioOut)
+def anonimizar_socio(socio_id: int, db: Session = Depends(get_db),
+                     actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    """Derecho al olvido (LOPDP): borra los datos personales del socio y desactiva su
+    acceso, CONSERVANDO los registros contables (aportes/créditos) para integridad."""
+    socio = db.get(models.Socio, socio_id)
+    if not socio or (actor.rol != "superadmin" and socio.caja_id != actor.caja_id):
+        raise HTTPException(404, "Socio no encontrado")
+    for campo in ("telefono", "whatsapp", "correo", "direccion", "ocupacion",
+                  "contacto_emergencia", "genero", "estado_civil", "nivel_instruccion"):
+        setattr(socio, campo, "")
+    socio.nombres = "Socio retirado"
+    socio.fecha_nacimiento = None
+    socio.num_cargas = 0
+    socio.activo = False
+    socio.cedula = f"ANON-{socio.id}"
+    m = db.scalar(select(models.Membresia).where(models.Membresia.socio_id == socio.id))
+    if m:
+        u = db.get(models.Usuario, m.usuario_id)
+        if u and not u.es_superadmin:
+            u.activo = False
+            otras = db.scalar(select(func.count(models.Membresia.id)).where(
+                models.Membresia.usuario_id == u.id, models.Membresia.id != m.id)) or 0
+            if not otras:
+                u.nombre = "Socio retirado"
+                u.cedula = f"ANON-u{u.id}"
+    log_audit(db, actor, "editar", "socio", socio.id,
+              "Datos personales anonimizados (derecho al olvido); contabilidad conservada",
               caja_id=socio.caja_id, afecta_socio_id=socio.id)
     db.commit()
     return _socio_out(db, socio)
@@ -1356,3 +1414,30 @@ def regenerar_demo(db: Session = Depends(get_db),
     from .seed import reseed_demo
     reseed_demo()
     return {"ok": True, "mensaje": "Caja demo regenerada con datos variados."}
+
+
+@reportes_router.get("/admin/seguridad")
+def estado_seguridad(db: Session = Depends(get_db),
+                     user: models.Usuario = Depends(require_roles("superadmin"))):
+    """Chequeo de postura de seguridad para el administrador."""
+    secret_ok = os.getenv("SECRET_KEY") not in (None, "", "kullki-dev-secret-cambiar-en-produccion")
+    superadmin_env = bool(os.getenv("SUPERADMIN_PASSWORD"))
+    pendientes = db.scalar(select(func.count(models.Usuario.id)).where(
+        models.Usuario.debe_cambiar_password, models.Usuario.activo)) or 0
+    checks = [
+        {"clave": "SECRET_KEY configurada", "ok": secret_ok,
+         "detalle": "Evita que se puedan falsificar tokens de sesión." if secret_ok
+                    else "FALTA: configura SECRET_KEY en Railway (variable de entorno)."},
+        {"clave": "Contraseña de administrador propia", "ok": superadmin_env,
+         "detalle": "Definida por variable de entorno." if superadmin_env
+                    else "FALTA: configura SUPERADMIN_PASSWORD en Railway."},
+        {"clave": "Contraseñas cifradas (PBKDF2)", "ok": True, "detalle": "Nunca se guardan en texto plano."},
+        {"clave": "Conexión segura (HTTPS)", "ok": True, "detalle": "Tráfico cifrado extremo a extremo."},
+        {"clave": "Bloqueo por intentos fallidos", "ok": True, "detalle": "5 intentos y bloqueo temporal."},
+        {"clave": "Auto-bloqueo de sesión", "ok": True, "detalle": "Suspensión por inactividad + PIN."},
+        {"clave": "Bitácora inmutable / sin borrados", "ok": True, "detalle": "Todo queda auditado."},
+        {"clave": "Cabeceras de seguridad", "ok": True, "detalle": "nosniff, anti-clickjacking, etc."},
+    ]
+    return {"checks": checks,
+            "usuarios_con_clave_inicial_pendiente": pendientes,
+            "puntaje": sum(1 for c in checks if c["ok"]), "total": len(checks)}

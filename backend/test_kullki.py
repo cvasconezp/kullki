@@ -683,3 +683,34 @@ def test_analitica_contenido(setup):
     d = r.json()
     for k in ("serie", "top_ingresos", "destinos", "distribucion_montos", "tipos_aporte", "resumen_creditos"):
         assert k in d
+
+
+def test_login_rate_limit():
+    for _ in range(5):
+        r = client.post("/auth/login", json={"cedula": "9999999999", "password": "mala"})
+        assert r.status_code == 401
+    r = client.post("/auth/login", json={"cedula": "9999999999", "password": "mala"})
+    assert r.status_code == 429
+
+
+def test_anonimizar_socio_conserva_contabilidad(setup):
+    ta = setup["ta"]
+    s = client.post("/socios", headers=ta, json={"nombres": "Borrar Me", "cedula": "2000000910",
+                    "whatsapp": "0991231231", "consentimiento_datos": True}).json()
+    assert s["consentimiento_datos"] is True
+    client.post("/aportes", headers=ta, json={"socio_id": s["id"], "monto": 40})
+    r = client.post(f"/socios/{s['id']}/anonimizar", headers=ta)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["nombres"] == "Socio retirado" and d["whatsapp"] == "" and d["activo"] is False
+    assert d["cedula"].startswith("ANON-")
+    # la contabilidad se conserva (su ahorro sigue ahí)
+    assert d["total_aportes"] == 40
+    # ya no puede iniciar sesión
+    assert client.post("/auth/login", json={"cedula": "2000000910", "password": "2000000910"}).status_code == 401
+
+
+def test_estado_seguridad(setup):
+    assert client.get("/admin/seguridad", headers=setup["ta"]).status_code == 403
+    r = client.get("/admin/seguridad", headers=setup["sa"])
+    assert r.status_code == 200 and "checks" in r.json()

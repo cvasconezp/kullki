@@ -94,6 +94,11 @@ function Expediente({ socioId, onCerrar }) {
     try { await api(`/socios/solicitudes/${sol.id}/${accion}`, { method: "POST" }); setSol(null); cargar(); }
     catch (e) { setError(e.message); }
   };
+  const anonimizar = async () => {
+    if (!window.confirm("¿Dar de baja y anonimizar a este socio? Se borran sus datos personales y no podrá ingresar. La contabilidad se conserva. Esta acción no se puede deshacer.")) return;
+    try { await api(`/socios/${socioId}/anonimizar`, { method: "POST" }); onCerrar(); }
+    catch (e) { setError(e.message); }
+  };
 
   if (error) return <div className="error">{error}</div>;
   if (!lib) return <div className="vacio">Cargando expediente…</div>;
@@ -166,6 +171,8 @@ function Expediente({ socioId, onCerrar }) {
             {dato("Contacto emergencia", socio.contacto_emergencia)}
             {!socio.telefono && !socio.correo && !socio.ocupacion &&
               <div className="vacio">Ficha incompleta. Usa “Editar ficha” para completarla.</div>}
+            {!soloLectura && socio.activo &&
+              <button className="boton-baja" onClick={anonimizar}>Dar de baja y anonimizar (derecho al olvido)</button>}
           </>
         )}
       </div>
@@ -271,7 +278,7 @@ function Solicitudes({ onCambio }) {
 
 const FORM0 = { nombres: "", cedula: "", whatsapp: "", correo: "", telefono: "",
   fecha_nacimiento: "", genero: "", direccion: "", ocupacion: "",
-  estado_civil: "", nivel_instruccion: "", num_cargas: "", contacto_emergencia: "" };
+  estado_civil: "", nivel_instruccion: "", num_cargas: "", contacto_emergencia: "", consentimiento_datos: false };
 
 export default function Socios() {
   const [socios, setSocios] = useState(null);
@@ -342,7 +349,14 @@ export default function Socios() {
               <CampoFicha def={["contacto_emergencia", "Contacto de emergencia", "text"]} value={form.contacto_emergencia} onChange={set("contacto_emergencia")} />
             </div>
           )}
-          <button className="boton" onClick={crear} disabled={creando || !form.nombres || !form.cedula}>
+          <label className="check-consent">
+            <input type="checkbox" checked={form.consentimiento_datos}
+              onChange={(e) => setForm({ ...form, consentimiento_datos: e.target.checked })} />
+            <span>El socio autoriza el tratamiento de sus datos personales conforme a la{" "}
+              <a href="/privacidad" target="_blank" rel="noreferrer">política de privacidad</a>.</span>
+          </label>
+          <button className="boton" onClick={crear}
+            disabled={creando || !form.nombres || !form.cedula || !form.consentimiento_datos}>
             {creando ? "Guardando…" : "Guardar socio"}
           </button>
         </div>

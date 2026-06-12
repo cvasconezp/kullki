@@ -3,6 +3,7 @@ import { getSesion, setSesion, getAdminSesion, setAdminSesion } from "./lib/api.
 import { applyTheme, resetTheme, logoDe } from "./lib/theme.js";
 import { useRuta, navigate } from "./lib/router.js";
 import Landing from "./pages/Landing.jsx";
+import Privacidad from "./pages/Privacidad.jsx";
 import Login from "./pages/Login.jsx";
 import Balances from "./pages/Balances.jsx";
 import Socios from "./pages/Socios.jsx";
@@ -83,6 +84,7 @@ export default function App() {
 
   // ---------- Rutas públicas ----------
   if (ruta === "/") return <Landing sesion={sesion} />;
+  if (ruta === "/privacidad") return <Privacidad />;
   if (ruta === "/ingresar") {
     if (sesion) { navigate(rutaDe(sesion)); return null; }
     return <Login onLogin={entrar} />;

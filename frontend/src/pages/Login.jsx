@@ -84,7 +84,7 @@ export default function Login({ onLogin }) {
           (sin espacios). Si ya la cambiaste, usa tu contraseña nueva.
         </div>
         <button className="login-volver" onClick={() => navigate("/")}>← Volver al inicio</button>
-        <p className="pie">Un producto de Yachay Deep Labs</p>
+        <p className="pie">Un producto de Yachay Deep Labs · <a href="/privacidad" style={{ color: "var(--kullki)" }}>Privacidad</a></p>
       </div>
     </div>
   );

@@ -20,6 +20,16 @@ origins = [o.strip() for o in os.getenv(
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
+
+@app.middleware("http")
+async def cabeceras_seguridad(request, call_next):
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return resp
+
 for r in (auth_router, cajas_router, socios_router, aportes_router,
           creditos_router, retiros_router, reportes_router):
     app.include_router(r)
@@ -101,8 +111,16 @@ def init_db():
                                "ultimo_acceso": "TIMESTAMP"})
         _add_cols("cajas", {"transparencia_total": "BOOLEAN DEFAULT FALSE"})
         _add_cols("auditoria", {"afecta_socio_id": "INTEGER"})
+        _add_cols("socios", {"consentimiento_datos": "BOOLEAN DEFAULT FALSE",
+                             "consentimiento_fecha": "DATE"})
 
         # Superadmin inicial desde variables de entorno
+        # Chequeo de configuración de seguridad
+        if os.getenv("SECRET_KEY") in (None, "", "kullki-dev-secret-cambiar-en-produccion"):
+            log.critical("SEGURIDAD: SECRET_KEY no está configurada (usando default). "
+                         "Configura SECRET_KEY en producción para evitar falsificación de tokens.")
+        if not os.getenv("SUPERADMIN_PASSWORD"):
+            log.critical("SEGURIDAD: SUPERADMIN_PASSWORD no está configurada (usando default).")
         ced = os.getenv("SUPERADMIN_CEDULA", "admin")
         pwd = os.getenv("SUPERADMIN_PASSWORD", "kullki2026")
         db = SessionLocal()

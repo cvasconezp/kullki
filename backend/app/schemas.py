@@ -142,6 +142,7 @@ class SocioIn(BaseModel):
     nivel_instruccion: str = ""
     num_cargas: int = 0
     contacto_emergencia: str = ""
+    consentimiento_datos: bool = False
 
 
 class SocioUpdate(BaseModel):
@@ -179,6 +180,7 @@ class SocioOut(BaseModel):
     nivel_instruccion: str = ""
     num_cargas: int = 0
     contacto_emergencia: str = ""
+    consentimiento_datos: bool = False
     total_aportes: float = 0      # ahorro neto: aportes (sin multas) - retiros
     total_multas: float = 0
     saldo_credito: float = 0

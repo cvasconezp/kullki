@@ -471,3 +471,21 @@ details[open] summary::before { content: "▾ "; }
   color: #fff; font-size: 10px; font-weight: 700; min-width: 17px; height: 17px;
   border-radius: 99px; display: flex; align-items: center; justify-content: center;
   padding: 0 4px; border: 2px solid var(--carta); }
+
+/* ---------- Consentimiento de datos / baja ---------- */
+.check-consent { display: flex; gap: 9px; align-items: flex-start; font-size: 12.8px;
+  color: var(--tinta-suave); margin: 6px 0 14px; line-height: 1.4; }
+.check-consent input { margin-top: 2px; width: 17px; height: 17px; flex: none; }
+.check-consent a { color: var(--kullki); }
+.boton-baja { display: block; width: 100%; margin-top: 12px; background: none;
+  border: 1px solid var(--cochinilla); color: var(--cochinilla); border-radius: 10px;
+  padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.boton-baja:hover { background: var(--cochinilla-tinte); }
+
+/* ---------- Documento legal (privacidad) ---------- */
+.doc-legal { max-width: 760px; margin: 0 auto; padding: 32px 22px 48px; }
+.doc-legal h1 { font-family: var(--display); font-size: 28px; color: var(--kullki-oscuro); margin: 0 0 6px; }
+.doc-legal h2 { font-size: 17px; color: var(--kullki-oscuro); margin: 22px 0 6px; }
+.doc-legal p { font-size: 14.5px; line-height: 1.6; color: var(--tinta); margin: 0 0 8px; }
+.doc-legal .doc-meta { font-size: 12.5px; color: var(--tinta-suave); }
+.doc-legal a { color: var(--kullki); }

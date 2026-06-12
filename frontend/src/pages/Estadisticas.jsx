@@ -40,7 +40,11 @@ function BarrasAcceso({ serie }) {
 
 export default function Estadisticas() {
   const [d, setD] = useState(null); const [error, setError] = useState("");
-  useEffect(() => { api("/admin/estadisticas").then(setD).catch((e) => setError(e.message)); }, []);
+  const [seg, setSeg] = useState(null);
+  useEffect(() => {
+    api("/admin/estadisticas").then(setD).catch((e) => setError(e.message));
+    api("/admin/seguridad").then(setSeg).catch(() => {});
+  }, []);
   if (error) return <div className="error">{error}</div>;
   if (!d) return <div className="vacio">Cargando estadísticas…</div>;
   const r = d.resumen;
@@ -89,6 +93,21 @@ export default function Estadisticas() {
           </div>
         ))}
       </div>
+
+      {seg && (
+        <div className="tarjeta">
+          <h3>Estado de seguridad ({seg.puntaje}/{seg.total})</h3>
+          {seg.usuarios_con_clave_inicial_pendiente > 0 &&
+            <div className="detalle" style={{ color: "var(--cochinilla)", margin: "0 0 6px" }}>
+              {seg.usuarios_con_clave_inicial_pendiente} usuario(s) aún no cambian su contraseña inicial.</div>}
+          {seg.checks.map((c, i) => (
+            <div className="fila" key={i}>
+              <div><div className="principal" style={{ fontSize: 14 }}>{c.ok ? "✅" : "⚠️"} {c.clave}</div>
+                <div className="detalle">{c.detalle}</div></div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <p className="vacio" style={{ fontSize: 12.5 }}>
         Nota: se registran los ingresos (logins) y la última actividad. El “tiempo conectado”
