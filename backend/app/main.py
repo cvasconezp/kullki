@@ -169,3 +169,8 @@ def init_db():
         # Nunca tumbar el arranque por un error de init: la app debe responder
         # al healthcheck. El error queda en logs para diagnóstico.
         log.exception("Fallo en init_db (la app arranca igual)")
+    try:
+        from .backup import iniciar_scheduler
+        iniciar_scheduler()
+    except Exception:
+        log.exception("No se pudo iniciar el scheduler de respaldos")

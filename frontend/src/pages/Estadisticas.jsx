@@ -42,10 +42,26 @@ function BarrasAcceso({ serie }) {
 export default function Estadisticas() {
   const [d, setD] = useState(null); const [error, setError] = useState("");
   const [seg, setSeg] = useState(null);
+  const [bk, setBk] = useState(null); const [bkMsg, setBkMsg] = useState("");
+  const cargarBk = () => api("/admin/backups").then(setBk).catch(() => {});
   useEffect(() => {
     api("/admin/estadisticas").then(setD).catch((e) => setError(e.message));
     api("/admin/seguridad").then(setSeg).catch(() => {});
+    cargarBk();
   }, []);
+  const crearBackup = async () => {
+    setBkMsg("");
+    try { const r = await api("/admin/backups/crear", { method: "POST" }); setBkMsg("Respaldo creado: " + r.archivo); cargarBk(); }
+    catch (e) { setBkMsg(e.message); }
+  };
+  const descargarExport = async () => {
+    try {
+      const data = await api("/export");
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = `kullki-respaldo-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href);
+    } catch (e) { setBkMsg(e.message); }
+  };
   if (error) return <div className="error">{error}</div>;
   if (!d) return <div className="vacio">Cargando estadísticas…</div>;
   const r = d.resumen;
@@ -107,6 +123,30 @@ export default function Estadisticas() {
                 <div className="detalle">{c.detalle}</div></div>
             </div>
           ))}
+        </div>
+      )}
+
+      {bk && (
+        <div className="tarjeta">
+          <h3>Respaldos automáticos</h3>
+          <div className="detalle" style={{ color: "var(--tinta-suave)", margin: "0 0 8px" }}>
+            {bk.habilitado ? `Automático cada ${bk.intervalo_horas} h` : "Automático desactivado"} · se conservan {bk.conserva} ·
+            {" "}{bk.respaldos.length} respaldo(s) guardado(s).
+          </div>
+          {bkMsg && <div className="exito" style={{ marginBottom: 8 }}>{bkMsg}</div>}
+          <div className="dos-col">
+            <button className="boton secundario" onClick={descargarExport}>⬇ Descargar respaldo (JSON)</button>
+            <button className="boton" onClick={crearBackup}>Crear respaldo ahora</button>
+          </div>
+          {bk.respaldos.slice(0, 5).map((r) => (
+            <div className="fila" key={r.archivo}>
+              <div className="detalle">{r.archivo}</div>
+              <div className="detalle">{Math.round(r.bytes / 1024)} KB</div>
+            </div>
+          ))}
+          <div className="detalle" style={{ color: "var(--tinta-suave)", fontSize: 12, marginTop: 6 }}>
+            Para que los respaldos sobrevivan reinicios, monta un Volumen en Railway y apunta BACKUP_DIR a él.
+          </div>
         </div>
       )}
 

@@ -4,6 +4,7 @@ os.environ["DATABASE_URL"] = "sqlite:///./test_kullki.db"
 os.environ["SUPERADMIN_CEDULA"] = "admin"
 os.environ["SUPERADMIN_PASSWORD"] = "test-admin-123"
 os.environ["SEED_DEMO"] = "0"  # tests deterministas: sin auto-seed demo
+os.environ["BACKUP_ENABLED"] = "0"
 
 import pathlib
 for f in ("test_kullki.db",):

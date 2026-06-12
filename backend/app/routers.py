@@ -1545,3 +1545,20 @@ def ejecutar_cierre(data: schemas.CierreIn, caja_id: int | None = None,
               f"Cierre de ejercicio ({data.modo}): ${repartido:.2f} en utilidades a {n} socios", caja_id=cid)
     db.commit()
     return {"ok": True, "modo": data.modo, "repartido": round(repartido, 2), "socios": n}
+
+
+@reportes_router.get("/admin/backups")
+def listar_backups(user: models.Usuario = Depends(require_roles("superadmin"))):
+    from .backup import listar_respaldos, BACKUP_DIR, BACKUP_KEEP
+    return {"directorio": BACKUP_DIR, "conserva": BACKUP_KEEP,
+            "habilitado": os.getenv("BACKUP_ENABLED", "1") != "0",
+            "intervalo_horas": float(os.getenv("BACKUP_INTERVAL_HORAS", "24")),
+            "respaldos": listar_respaldos()}
+
+
+@reportes_router.post("/admin/backups/crear")
+def crear_backup(user: models.Usuario = Depends(require_roles("superadmin"))):
+    from .backup import crear_respaldo
+    import os as _os
+    ruta = crear_respaldo()
+    return {"ok": True, "archivo": _os.path.basename(ruta)}
