@@ -33,6 +33,23 @@ export default function Libreta() {
         </div>
       </div>
 
+      {(() => {
+        const depositado = aportes.filter((a) => a.tipo !== "multa").reduce((t, a) => t + a.monto, 0);
+        const totalRetiros = (lib.retiros || []).reduce((t, r) => t + r.monto, 0);
+        const interesesPagados = creditos.reduce((t, c) =>
+          t + c.cuotas.filter((q) => q.pagada).reduce((u, q) => u + q.interes, 0), 0);
+        return (
+          <div className="kpis">
+            <div className="kpi"><div className="v pos">{usd(depositado)}</div><div className="l">Depositado</div></div>
+            <div className="kpi"><div className="v neg">{usd(totalRetiros)}</div><div className="l">Retirado</div></div>
+            <div className="kpi"><div className="v">{usd(socio.total_aportes)}</div><div className="l">Ahorro neto</div></div>
+            <div className="kpi"><div className="v">{usd(socio.saldo_credito)}</div><div className="l">Debes (crédito)</div></div>
+            <div className="kpi"><div className="v">{usd(interesesPagados)}</div><div className="l">Intereses pagados</div></div>
+            <div className="kpi"><div className="v">{usd(socio.total_multas)}</div><div className="l">Multas</div></div>
+          </div>
+        );
+      })()}
+
       <ExportarEstado lib={lib} />
 
       <MisDatos socio={socio} onActualizado={cargar} />
