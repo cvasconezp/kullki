@@ -456,3 +456,9 @@ details[open] summary::before { content: "▾ "; }
 /* ---------- Títulos de bloque en dashboards de análisis ---------- */
 .bloque-titulo { font-family: var(--display); font-size: 18px; color: var(--kullki-oscuro);
   margin: 24px 0 6px; padding-bottom: 4px; border-bottom: 2px solid var(--kullki-tinte); }
+
+/* ---------- Suspender sesión ---------- */
+.topbar-acc { display: flex; align-items: center; gap: 8px; }
+.suspender { background: var(--papel); border: 1px solid var(--regla); border-radius: 9px;
+  font-size: 15px; line-height: 1; padding: 7px 9px; cursor: pointer; }
+.suspender:hover { border-color: var(--kullki); }

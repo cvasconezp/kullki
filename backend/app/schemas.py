@@ -53,6 +53,10 @@ class SeleccionCaja(BaseModel):
     caja_id: int
 
 
+class VerificarIn(BaseModel):
+    password: str
+
+
 class AsumirCaja(BaseModel):
     """El superadmin entra a una caja como tesorero o (opcionalmente) un socio."""
     caja_id: int

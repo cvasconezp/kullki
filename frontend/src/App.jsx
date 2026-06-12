@@ -15,6 +15,7 @@ import Cajas from "./pages/Cajas.jsx";
 import Estadisticas from "./pages/Estadisticas.jsx";
 import AnalisisAdmin from "./components/AnalisisAdmin.jsx";
 import CambiarPassword from "./components/CambiarPassword.jsx";
+import Lock from "./components/Lock.jsx";
 
 // id interno · ruta (URL) · etiqueta · ícono
 const NAV_TESORERO = [
@@ -51,14 +52,28 @@ function rutaDe(s) {
 export default function App() {
   const ruta = useRuta();
   const [sesion, setS] = useState(getSesion());
+  const [bloqueado, setBloqueado] = useState(() => localStorage.getItem("kullki_lock") === "1");
+  const bloquear = () => { localStorage.setItem("kullki_lock", "1"); setBloqueado(true); };
+  const desbloquear = () => { localStorage.removeItem("kullki_lock"); setBloqueado(false); };
 
   useEffect(() => {
     if (sesion && sesion.rol !== "superadmin") applyTheme(sesion);
     else resetTheme();
   }, [sesion, ruta]);
 
+  // Auto-bloqueo por inactividad (12 minutos)
+  useEffect(() => {
+    if (!sesion || bloqueado) return;
+    let t;
+    const reset = () => { clearTimeout(t); t = setTimeout(bloquear, 12 * 60 * 1000); };
+    const evs = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    evs.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => { clearTimeout(t); evs.forEach((e) => window.removeEventListener(e, reset)); };
+  }, [sesion, bloqueado]);
+
   const entrar = (s) => { setAdminSesion(null); setSesion(s); setS(s); navigate(rutaDe(s)); };
-  const salir = () => { setAdminSesion(null); setSesion(null); setS(null); navigate("/"); };
+  const salir = () => { setAdminSesion(null); setSesion(null); setS(null); desbloquear(); navigate("/"); };
   const asumir = (s) => { setAdminSesion(getSesion()); setSesion(s); setS(s); navigate(rutaDe(s)); };
   const volverAdmin = () => {
     const admin = getAdminSesion(); setAdminSesion(null);
@@ -78,6 +93,11 @@ export default function App() {
   // Cambio de contraseña obligatorio en el primer ingreso
   if (sesion.debe_cambiar_password) {
     return <CambiarPassword sesion={sesion} onListo={(s) => setS(s)} />;
+  }
+
+  // Sesión suspendida (bloqueo de pantalla): se reanuda con contraseña/PIN
+  if (bloqueado) {
+    return <Lock sesion={sesion} onUnlock={desbloquear} onLogout={salir} />;
   }
 
   const partes = ruta.split("/").filter(Boolean);   // [slug, seccion?]
@@ -110,9 +130,12 @@ export default function App() {
             <span className="labs">{esSuper ? "Panel de administración" : "Kullki · Yachay Deep Labs"}</span>
           </div>
         </div>
-        <button className="salir" onClick={impersonando ? volverAdmin : salir}>
-          {impersonando ? "↩ Admin" : "Salir"}
-        </button>
+        <div className="topbar-acc">
+          <button className="suspender" onClick={bloquear} title="Suspender sesión" aria-label="Suspender">🔒</button>
+          <button className="salir" onClick={impersonando ? volverAdmin : salir}>
+            {impersonando ? "↩ Admin" : "Salir"}
+          </button>
+        </div>
       </header>
 
       {impersonando && (

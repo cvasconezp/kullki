@@ -37,7 +37,8 @@ export async function api(path, { method = "GET", body, token } = {}) {
     // petición autenticada). En el login/selección de caja mostramos el error
     // real del servidor (p. ej. "Cédula o contraseña incorrecta").
     const sesionPrevia = !!sesion?.access_token;
-    if (sesionPrevia && !token) {
+    const esAuth = path.startsWith("/auth/");
+    if (sesionPrevia && !token && !esAuth) {
       setSesion(null);
       setAdminSesion(null);
       window.location.href = "/ingresar";

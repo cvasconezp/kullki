@@ -215,6 +215,14 @@ def mis_cajas(db: Session = Depends(get_db), actor: Actor = Depends(get_identida
     return out
 
 
+@auth_router.post("/verificar")
+def verificar(data: schemas.VerificarIn, actor: Actor = Depends(get_identidad)):
+    """Verifica la contraseña/PIN del usuario actual para reanudar una sesión bloqueada."""
+    if not verify_password(data.password, actor.usuario.password_hash):
+        raise HTTPException(401, "Contraseña incorrecta")
+    return {"ok": True}
+
+
 @auth_router.post("/cambiar-password")
 def cambiar_password(data: schemas.CambioPassword, db: Session = Depends(get_db),
                      actor: Actor = Depends(get_identidad)):
