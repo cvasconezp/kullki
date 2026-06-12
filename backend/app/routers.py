@@ -330,6 +330,28 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
     return _socio_out(db, socio)
 
 
+@socios_router.patch("/mi-ficha", response_model=schemas.SocioOut)
+def actualizar_mi_ficha(data: schemas.SocioUpdate, db: Session = Depends(get_db),
+                        actor: Actor = Depends(get_current_user)):
+    """El socio actualiza sus propios datos de contacto/demográficos.
+    No puede cambiar su nombre ni su cédula (identidad la controla el tesorero)."""
+    if actor.rol != "socio" or not actor.socio_id:
+        raise HTTPException(403, "Solo un socio puede actualizar su propia ficha")
+    socio = db.get(models.Socio, actor.socio_id)
+    if not socio:
+        raise HTTPException(404, "Socio no encontrado")
+    permitidos = {"telefono", "whatsapp", "correo", "direccion", "ocupacion",
+                  "estado_civil", "nivel_instruccion", "num_cargas",
+                  "contacto_emergencia", "fecha_nacimiento", "genero"}
+    cambios = {k: v for k, v in data.model_dump(exclude_unset=True).items() if k in permitidos}
+    for k, v in cambios.items():
+        setattr(socio, k, v)
+    log_audit(db, actor, "editar", "socio", socio.id,
+              f"{socio.nombres} actualizó sus datos de contacto", caja_id=socio.caja_id)
+    db.commit()
+    return _socio_out(db, socio)
+
+
 @socios_router.patch("/{socio_id}", response_model=schemas.SocioOut)
 def editar_socio(socio_id: int, data: schemas.SocioUpdate, db: Session = Depends(get_db),
                  actor: Actor = Depends(require_roles("tesorero", "superadmin"))):

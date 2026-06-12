@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { api, usd, fechaCorta } from "../lib/api.js";
+import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
 import ExportarEstado from "../components/ExportarEstado.jsx";
+import MisDatos from "../components/MisDatos.jsx";
 
 export default function Libreta() {
   const [lib, setLib] = useState(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    api("/mi-libreta").then(setLib).catch((e) => setError(e.message));
-  }, []);
+  const cargar = () => api("/mi-libreta").then(setLib).catch((e) => setError(e.message));
+  useEffect(() => { cargar(); }, []);
 
   if (error) return <div className="error">{error}</div>;
   if (!lib) return <div className="vacio">Cargando tu libreta…</div>;
@@ -21,7 +21,7 @@ export default function Libreta() {
       <div className="libreta">
         <div className="eyebrow">{caja_nombre}</div>
         <div className="lib-titular">
-          {socio.nombres}<span className="lib-ci">CI {socio.cedula}</span>
+          {socio.nombres}<span className="lib-ci">CI {mascaraCedula(socio.cedula)}</span>
         </div>
         <div className="saldo">
           <span className="moneda">$</span>
@@ -34,6 +34,8 @@ export default function Libreta() {
       </div>
 
       <ExportarEstado lib={lib} />
+
+      <MisDatos socio={socio} onActualizado={cargar} />
 
       {activos.map((c) => {
         const siguiente = c.cuotas.find((q) => !q.pagada);

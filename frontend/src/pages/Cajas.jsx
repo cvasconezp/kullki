@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../lib/api.js";
+import { api, mascaraCedula } from "../lib/api.js";
 
 const FORM_INICIAL = {
   nombre: "", slug: "", comunidad: "",
@@ -100,7 +100,7 @@ function ElegirSocio({ caja, onElegir, onCancel }) {
       <h4>Ver la libreta de…</h4>
       {socios.map((s) => (
         <button key={s.id} className="selector-caja" onClick={() => onElegir(s.id)}>
-          <div><div className="nombre">{s.nombres}</div><div className="meta">CI {s.cedula}</div></div>
+          <div><div className="nombre">{s.nombres}</div><div className="meta">CI {mascaraCedula(s.cedula)}</div></div>
           <span className="chevron">›</span>
         </button>
       ))}

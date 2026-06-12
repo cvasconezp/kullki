@@ -605,3 +605,15 @@ def test_recordatorios(setup):
     assert r.status_code == 200
     items = r.json()
     assert any(x["socio"] == "Recordar Yo" and x["whatsapp"] == "0991112222" for x in items)
+
+
+def test_socio_actualiza_su_ficha(setup):
+    ta = setup["ta"]
+    s = client.post("/socios", headers=ta, json={"nombres": "Auto Edita", "cedula": "2000000701"}).json()
+    socio = login("2000000701", "2000000701")
+    r = client.patch("/socios/mi-ficha", headers=socio, json={"whatsapp": "0987654321", "correo": "a@b.com", "nombres": "HACK"})
+    assert r.status_code == 200
+    assert r.json()["whatsapp"] == "0987654321" and r.json()["correo"] == "a@b.com"
+    assert r.json()["nombres"] == "Auto Edita"   # no puede cambiar su nombre
+    # el tesorero no puede usar mi-ficha
+    assert client.patch("/socios/mi-ficha", headers=ta, json={"whatsapp": "x"}).status_code == 403

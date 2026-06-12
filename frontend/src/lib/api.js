@@ -49,6 +49,12 @@ export async function api(path, { method = "GET", body, token } = {}) {
   return data;
 }
 
+export const mascaraCedula = (c) => {
+  const s = String(c || "");
+  if (s.length <= 4) return s;
+  return s.slice(0, 2) + "•".repeat(Math.max(2, s.length - 4)) + s.slice(-2);
+};
+
 export const usd = (n) =>
   "$" + Number(n || 0).toLocaleString("es-EC", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

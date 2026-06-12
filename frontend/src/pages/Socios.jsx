@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, usd, fechaCorta } from "../lib/api.js";
+import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
 import ExportarEstado from "../components/ExportarEstado.jsx";
 
 const GENEROS = [["", "—"], ["F", "Femenino"], ["M", "Masculino"], ["Otro", "Otro"], ["NS", "Prefiere no decir"]];
@@ -98,9 +98,26 @@ function Expediente({ socioId, onCerrar }) {
         <div className="eyebrow">Expediente · {socio.nombres}</div>
         <div className="saldo"><span className="moneda">$</span>
           {socio.total_aportes.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</div>
-        <div className="sub">Aportes desde {fechaCorta(socio.fecha_ingreso)} · CI {socio.cedula}
+        <div className="sub">Aportes desde {fechaCorta(socio.fecha_ingreso)} · CI {mascaraCedula(socio.cedula)}
           {socio.saldo_credito > 0 && <> · debe <strong className="cifra">{usd(socio.saldo_credito)}</strong></>}</div>
       </div>
+
+      {(() => {
+        const aportesBrutos = aportes.filter((a) => a.tipo !== "multa").reduce((t, a) => t + a.monto, 0);
+        const totalRetiros = (lib.retiros || []).reduce((t, r) => t + r.monto, 0);
+        const interesesPagados = creditos.reduce((t, c) =>
+          t + c.cuotas.filter((q) => q.pagada).reduce((u, q) => u + q.interes, 0), 0);
+        return (
+          <div className="kpis">
+            <div className="kpi"><div className="v">{usd(socio.total_aportes)}</div><div className="l">Ahorro neto</div></div>
+            <div className="kpi"><div className="v pos">{usd(aportesBrutos)}</div><div className="l">Aportes</div></div>
+            <div className="kpi"><div className="v neg">{usd(totalRetiros)}</div><div className="l">Retiros</div></div>
+            <div className="kpi"><div className="v pos">{usd(interesesPagados)}</div><div className="l">Intereses pagados</div></div>
+            <div className="kpi"><div className="v">{usd(socio.saldo_credito)}</div><div className="l">Saldo de crédito</div></div>
+            <div className="kpi"><div className="v">{usd(socio.total_multas)}</div><div className="l">Multas</div></div>
+          </div>
+        );
+      })()}
 
       <div className="tarjeta no-print">
         <div className="seccion-titulo" style={{ margin: "0 0 8px" }}>
@@ -159,6 +176,19 @@ function Expediente({ socioId, onCerrar }) {
                   </div>
                 ))}
               </details>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(lib.retiros && lib.retiros.length > 0) && (
+        <div className="tarjeta">
+          <h3>Retiros ({lib.retiros.length})</h3>
+          {lib.retiros.map((r) => (
+            <div className="fila" key={r.id}>
+              <div><div className="principal">Retiro</div>
+                <div className="detalle">{fechaCorta(r.fecha)}{r.nota ? ` · ${r.nota}` : ""}</div></div>
+              <div className="cifra neg">−{usd(r.monto)}</div>
             </div>
           ))}
         </div>
@@ -262,7 +292,7 @@ export default function Socios() {
           <div className="fila tocable" key={s.id} role="button" tabIndex={0}
             onClick={() => setAbierto(s.id)} onKeyDown={(e) => e.key === "Enter" && setAbierto(s.id)}>
             <div><div className="principal">{s.nombres} {!s.activo && <span className="pill neutro">inactivo</span>}</div>
-              <div className="detalle">CI {s.cedula}{s.whatsapp ? ` · ${s.whatsapp}` : s.telefono ? ` · ${s.telefono}` : ""}</div></div>
+              <div className="detalle">CI {mascaraCedula(s.cedula)}{s.whatsapp ? ` · ${s.whatsapp}` : s.telefono ? ` · ${s.telefono}` : ""}</div></div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <div style={{ textAlign: "right" }}>
                 <div className="cifra pos">{usd(s.total_aportes)}</div>
