@@ -158,8 +158,16 @@ export default function Cajas({ onAsumir }) {
   const [editando, setEditando] = useState(null);   // caja.id en edición
   const [eligiendo, setEligiendo] = useState(null); // caja.id para "ver como socio"
   const [dirigiendo, setDirigiendo] = useState(null); // caja.id para alta de directiva
+  const [regenerando, setRegenerando] = useState(false);
 
   const cargar = () => api("/cajas").then(setCajas).catch((e) => setError(e.message));
+  const regenerarDemo = async () => {
+    if (!window.confirm("Regenerar la caja demo (Ñukanchik) con datos variados? Solo afecta la caja demo.")) return;
+    setError(""); setOk(""); setRegenerando(true);
+    try { const r = await api("/admin/reseed-demo", { method: "POST" }); setOk(r.mensaje || "Demo regenerado."); cargar(); }
+    catch (e) { setError(e.message); }
+    finally { setRegenerando(false); }
+  };
   useEffect(() => { cargar(); }, []);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -192,9 +200,14 @@ export default function Cajas({ onAsumir }) {
     <>
       <div className="seccion-titulo">
         <h2>Cajas registradas</h2>
-        <button className="boton mini" onClick={() => setMostrarForm(!mostrarForm)}>
-          {mostrarForm ? "Cancelar" : "+ Nueva caja"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="boton mini secundario" onClick={regenerarDemo} disabled={regenerando}>
+            {regenerando ? "Regenerando…" : "↻ Regenerar demo"}
+          </button>
+          <button className="boton mini" onClick={() => setMostrarForm(!mostrarForm)}>
+            {mostrarForm ? "Cancelar" : "+ Nueva caja"}
+          </button>
+        </div>
       </div>
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}

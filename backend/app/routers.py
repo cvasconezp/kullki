@@ -1296,3 +1296,12 @@ def analitica(caja_id: int | None = None, db: Session = Depends(get_db),
         "resumen_creditos": resumen_cred,
         "dashboard": bal.dashboard.model_dump(),
     }
+
+
+@reportes_router.post("/admin/reseed-demo")
+def regenerar_demo(db: Session = Depends(get_db),
+                   user: models.Usuario = Depends(require_roles("superadmin"))):
+    """Regenera SOLO la caja demo (nukanchik) con datos variados. No toca cajas reales."""
+    from .seed import reseed_demo
+    reseed_demo()
+    return {"ok": True, "mensaje": "Caja demo regenerada con datos variados."}

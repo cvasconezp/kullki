@@ -81,10 +81,19 @@ function Expediente({ socioId, onCerrar }) {
   const [lib, setLib] = useState(null);
   const [error, setError] = useState("");
   const [editando, setEditando] = useState(false);
+  const [sol, setSol] = useState(null);
   const soloLectura = (getSesion() || {}).rol === "directiva";
 
-  const cargar = () => api(`/mi-libreta?socio_id=${socioId}`).then(setLib).catch((e) => setError(e.message));
+  const cargar = () => {
+    api(`/mi-libreta?socio_id=${socioId}`).then(setLib).catch((e) => setError(e.message));
+    if (!soloLectura)
+      api("/socios/solicitudes").then((l) => setSol(l.find((x) => x.socio_id === socioId) || null)).catch(() => {});
+  };
   useEffect(() => { cargar(); }, [socioId]);
+  const resolver = async (accion) => {
+    try { await api(`/socios/solicitudes/${sol.id}/${accion}`, { method: "POST" }); setSol(null); cargar(); }
+    catch (e) { setError(e.message); }
+  };
 
   if (error) return <div className="error">{error}</div>;
   if (!lib) return <div className="vacio">Cargando expediente…</div>;
@@ -102,6 +111,21 @@ function Expediente({ socioId, onCerrar }) {
         <div className="sub">Aportes desde {fechaCorta(socio.fecha_ingreso)} · CI {mascaraCedula(socio.cedula)}
           {socio.saldo_credito > 0 && <> · debe <strong className="cifra">{usd(socio.saldo_credito)}</strong></>}</div>
       </div>
+
+      {sol && (
+        <div className="tarjeta" style={{ borderColor: "var(--sara)" }}>
+          <h3>Solicitud de actualización pendiente</h3>
+          <div className="detalle" style={{ margin: "0 0 10px" }}>
+            El socio pidió cambiar: {Object.entries(sol.campos).map(([k, v]) => `${ETIQ[k] || k}: ${v}`).join(" · ")}
+          </div>
+          {!soloLectura && (
+            <div className="dos-col">
+              <button className="boton secundario" onClick={() => resolver("rechazar")}>✗ Rechazar</button>
+              <button className="boton" onClick={() => resolver("aprobar")}>✓ Aceptar cambios</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {(() => {
         const aportesBrutos = aportes.filter((a) => a.tipo !== "multa").reduce((t, a) => t + a.monto, 0);
