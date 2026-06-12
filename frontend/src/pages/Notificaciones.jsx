@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, fechaCorta, getSesion } from "../lib/api.js";
 import { navigate } from "../lib/router.js";
 import SolicitudesCredito from "../components/SolicitudesCredito.jsx";
+import HistorialSolicitudes from "../components/HistorialSolicitudes.jsx";
 
 export default function Notificaciones() {
   const [datos, setDatos] = useState([]);

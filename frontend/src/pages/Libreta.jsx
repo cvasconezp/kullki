@@ -5,6 +5,7 @@ import MisDatos from "../components/MisDatos.jsx";
 import Seguridad2FA from "../components/Seguridad2FA.jsx";
 import CreditoSocio from "../components/CreditoSocio.jsx";
 import GarantiasPendientes from "../components/GarantiasPendientes.jsx";
+import HistorialSolicitudes from "../components/HistorialSolicitudes.jsx";
 
 // vista: "libreta" (Mi libreta) | "credito" (Crédito) | "perfil" (Perfil)
 export default function Libreta({ vista = "libreta" }) {
@@ -28,6 +29,8 @@ export default function Libreta({ vista = "libreta" }) {
         <div className="seccion-titulo"><h2>Crédito</h2></div>
         <GarantiasPendientes onCambio={cargar} />
         <CreditoSocio lib={lib} />
+        <HistorialSolicitudes url="/creditos/mis-solicitudes" titulo="Historial de mis solicitudes" modo="socio" />
+        <HistorialSolicitudes url="/creditos/mis-garantias" titulo="Mi historial como garante" modo="garante" />
         {activos.map((c) => {
           const siguiente = c.cuotas.find((q) => !q.pagada);
           return (

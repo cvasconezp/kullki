@@ -860,6 +860,26 @@ def _solcred_out(x):
     return o
 
 
+def _garantias_vigentes(db: Session, gid: int, excluir_socio: int | None = None) -> int:
+    """Cuántos socios distintos respalda esta persona con una garantía vigente
+    (en trámite o crédito aprobado todavía activo). No cuenta las rechazadas."""
+    sols = db.scalars(select(models.SolicitudCredito).where(
+        ((models.SolicitudCredito.garante_id == gid) & (models.SolicitudCredito.garante_estado != "rechazado")) |
+        ((models.SolicitudCredito.garante2_id == gid) & (models.SolicitudCredito.garante2_estado != "rechazado"))
+    )).all()
+    vivos = set()
+    for x in sols:
+        if excluir_socio and x.socio_id == excluir_socio:
+            continue
+        if x.estado in ("garantes", "pendiente", "en_aprobacion"):
+            vivos.add(x.socio_id)
+        elif x.estado == "aprobada" and x.credito_id:
+            c = db.get(models.Credito, x.credito_id)
+            if c and c.estado == "activo":
+                vivos.add(x.socio_id)
+    return len(vivos)
+
+
 @creditos_router.post("/solicitud", response_model=schemas.SolicitudCreditoOut)
 def crear_solicitud_credito(data: schemas.SolicitudCreditoIn, db: Session = Depends(get_db),
                             actor: Actor = Depends(get_current_user)):
@@ -882,6 +902,8 @@ def crear_solicitud_credito(data: schemas.SolicitudCreditoIn, db: Session = Depe
             raise HTTPException(400, "El garante debe ser un socio activo de tu caja")
         if g.id == socio.id:
             raise HTTPException(400, "No puedes ser tu propio garante")
+        if _garantias_vigentes(db, g.id, excluir_socio=socio.id) >= 2:
+            raise HTTPException(400, f"{g.nombres} ya es garante de 2 socios y no puede asumir otra garantía")
         return g
     g1 = _validar_garante(data.garante_id)
     g2 = _validar_garante(data.garante2_id)
@@ -927,10 +949,15 @@ def listar_solicitudes_credito(caja_id: int | None = None, estado: str | None = 
                                user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
     # Por defecto: el tesorero revisa las "pendiente"; la directiva, las que ya pasaron el filtro.
-    estados = [estado] if estado else (["en_aprobacion"] if user.rol == "directiva" else ["pendiente"])
-    sols = db.scalars(select(models.SolicitudCredito).where(
-        models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado.in_(estados))
-        .order_by(models.SolicitudCredito.creado_en.desc())).all()
+    if estado == "todas":
+        sols = db.scalars(select(models.SolicitudCredito).where(
+            models.SolicitudCredito.caja_id == cid)
+            .order_by(models.SolicitudCredito.creado_en.desc())).all()
+    else:
+        estados = [estado] if estado else (["en_aprobacion"] if user.rol == "directiva" else ["pendiente"])
+        sols = db.scalars(select(models.SolicitudCredito).where(
+            models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado.in_(estados))
+            .order_by(models.SolicitudCredito.creado_en.desc())).all()
     out = []
     for x in sols:
         o = _solcred_out(x)
@@ -940,6 +967,36 @@ def listar_solicitudes_credito(caja_id: int | None = None, estado: str | None = 
                 models.Credito.socio_id == socio.id, models.Credito.estado == "activo")) or 0
             o.ahorro = _socio_out(db, socio).total_aportes
         out.append(o)
+    return out
+
+
+@creditos_router.get("/mis-solicitudes", response_model=list[schemas.SolicitudCreditoOut])
+def mis_solicitudes_credito(db: Session = Depends(get_db), actor: Actor = Depends(get_current_user)):
+    """Historial de todas las solicitudes de crédito del socio, con su estado."""
+    if actor.rol != "socio" or not actor.socio_id:
+        return []
+    sols = db.scalars(select(models.SolicitudCredito).where(
+        models.SolicitudCredito.socio_id == actor.socio_id)
+        .order_by(models.SolicitudCredito.creado_en.desc())).all()
+    return [_solcred_out(x) for x in sols]
+
+
+@creditos_router.get("/mis-garantias")
+def mis_garantias_historial(db: Session = Depends(get_db), actor: Actor = Depends(get_current_user)):
+    """Historial del socio como garante (todas, con su respuesta y el estado de la solicitud)."""
+    if actor.rol != "socio" or not actor.socio_id:
+        return []
+    sid = actor.socio_id
+    sols = db.scalars(select(models.SolicitudCredito).where(
+        (models.SolicitudCredito.garante_id == sid) | (models.SolicitudCredito.garante2_id == sid))
+        .order_by(models.SolicitudCredito.creado_en.desc())).all()
+    out = []
+    for x in sols:
+        mi = x.garante_estado if x.garante_id == sid else x.garante2_estado
+        out.append({"id": x.id, "solicitante": x.socio_nombre, "monto": x.monto,
+                    "plazo_meses": x.plazo_meses, "tipo": x.tipo, "destino": x.destino,
+                    "estado": x.estado, "mi_respuesta": mi or "pendiente",
+                    "creado_en": x.creado_en.isoformat()})
     return out
 
 

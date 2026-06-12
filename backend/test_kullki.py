@@ -868,3 +868,25 @@ def test_garante_rechaza_vuelve_al_socio(setup):
     client.post(f"/creditos/solicitudes/{sid}/garantia?accion=rechazar", headers=socioB)
     mi = client.get("/creditos/solicitud", headers=socioA).json()
     assert mi["estado"] == "correccion" and "garante" in mi["motivo"].lower()
+
+
+def test_limite_dos_garantias(setup):
+    ta = setup["ta"]
+    g = client.post("/socios", headers=ta, json={"nombres": "Garante Top", "cedula": "2000001050"}).json()
+    pedidores = []
+    for i in range(3):
+        ced = f"200000106{i}"
+        client.post("/socios", headers=ta, json={"nombres": f"Pide {i}", "cedula": ced})
+        pedidores.append(login(ced, ced))
+    body = lambda: {"monto": 100, "plazo_meses": 3, "tipo": "ordinario", "destino": "Salud",
+                    "garante_id": g["id"], "documentos": "x"}
+    assert client.post("/creditos/solicitud", headers=pedidores[0], json=body()).status_code == 200
+    assert client.post("/creditos/solicitud", headers=pedidores[1], json=body()).status_code == 200
+    # el tercero debe fallar: el garante ya respalda a 2
+    r = client.post("/creditos/solicitud", headers=pedidores[2], json=body())
+    assert r.status_code == 400 and "2 socios" in r.json()["detail"]
+    # el garante ve su historial con 2 registros
+    gar = login("2000001050", "2000001050")
+    assert len(client.get("/creditos/mis-garantias", headers=gar).json()) == 2
+    # el solicitante ve su historial
+    assert len(client.get("/creditos/mis-solicitudes", headers=pedidores[0]).json()) >= 1
