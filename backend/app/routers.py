@@ -1261,15 +1261,25 @@ def mi_libreta(socio_id: int | None = None, db: Session = Depends(get_db),
     if user.rol in ("tesorero", "directiva") and socio.caja_id != user.caja_id:
         raise HTTPException(404, "Socio no encontrado")
     caja = db.get(models.Caja, socio.caja_id)
+    info_socio = _socio_out(db, socio)
+    # Techo de crédito del socio: el menor entre el máximo de la caja y el encaje (encaje x ahorro)
+    topes = []
+    if caja.credito_max:
+        topes.append(round(caja.credito_max, 2))
+    if caja.encaje_factor:
+        topes.append(round(info_socio.total_aportes * caja.encaje_factor, 2))
+    techo = round(min(topes), 2) if topes else 0.0
     aportes = sorted([a for a in socio.aportes if not a.anulado],
                      key=lambda a: (a.fecha, a.id), reverse=True)
     retiros = db.scalars(select(models.Retiro).where(models.Retiro.socio_id == sid,
                                                      models.Retiro.anulado.is_(False))
                          .order_by(models.Retiro.fecha.desc())).all()
     return schemas.LibretaOut(
-        socio=_socio_out(db, socio),
+        socio=info_socio,
         caja_nombre=caja.nombre,
         caja_tasa=caja.tasa_interes_mensual, permite_retiros=caja.permite_retiros,
+        caja_credito_max=caja.credito_max or 0, caja_encaje_factor=caja.encaje_factor or 0,
+        credito_techo=techo,
         aportes=[schemas.AporteOut.model_validate(a) for a in aportes],
         retiros=[schemas.RetiroOut.model_validate(x) for x in retiros],
         creditos=[_credito_out(c, detalle=True) for c in

@@ -359,6 +359,9 @@ class LibretaOut(BaseModel):
     caja_nombre: str
     caja_tasa: float = 0
     permite_retiros: bool = True
+    caja_credito_max: float = 0
+    caja_encaje_factor: float = 0
+    credito_techo: float = 0
     aportes: list[AporteOut]
     retiros: list["RetiroOut"] = []
     creditos: list[CreditoDetalle]
