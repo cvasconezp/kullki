@@ -1284,9 +1284,52 @@ def analitica(caja_id: int | None = None, db: Session = Depends(get_db),
         "en_mora": sum(1 for c in activos if _en_mora(c)),
     }
 
+    # --- Perfil de socios (demografía) ---
+    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
+                                                   models.Socio.activo)).all()
+    GEN = {"F": "Femenino", "M": "Masculino", "Otro": "Otro", "NS": "Prefiere no decir"}
+    def edad(f):
+        if not f: return None
+        return hoy_d.year - f.year - ((hoy_d.month, hoy_d.day) < (f.month, f.day))
+    from datetime import date as _date
+    hoy_d = _date.today()
+    genero, instr, civil, ocup = {}, {}, {}, {}
+    rangos = {"18-29": 0, "30-44": 0, "45-59": 0, "60+": 0, "Sin dato": 0}
+    edades = []
+    for s in socios:
+        g = GEN.get(s.genero, "Sin dato") if s.genero else "Sin dato"; genero[g] = genero.get(g, 0) + 1
+        instr[s.nivel_instruccion or "Sin dato"] = instr.get(s.nivel_instruccion or "Sin dato", 0) + 1
+        civil[s.estado_civil or "Sin dato"] = civil.get(s.estado_civil or "Sin dato", 0) + 1
+        if s.ocupacion: ocup[s.ocupacion] = ocup.get(s.ocupacion, 0) + 1
+        e = edad(s.fecha_nacimiento)
+        if e is not None: edades.append(e)
+        k = "Sin dato" if e is None else "18-29" if e < 30 else "30-44" if e < 45 else "45-59" if e < 60 else "60+"
+        rangos[k] += 1
+    def lst(d): return [{"etiqueta": k, "valor": v} for k, v in sorted(d.items(), key=lambda x: -x[1])]
+    # distribución de ahorro por socio
+    ahorros = [_socio_out(db, s).total_aportes for s in socios]
+    abk = [("< $50", 0, 50), ("$50–150", 50, 150), ("$150–300", 150, 300),
+           ("$300–500", 300, 500), ("> $500", 500, 10**9)]
+    adist = [{"etiqueta": b[0], "valor": 0} for b in abk]
+    for a in ahorros:
+        for i, b in enumerate(abk):
+            if b[1] <= a < b[2]: adist[i]["valor"] += 1; break
+
+    demografia = {
+        "total": len(socios),
+        "edad_promedio": round(sum(edades) / len(edades), 1) if edades else 0,
+        "genero": lst(genero),
+        "edad": [{"etiqueta": k, "valor": v} for k, v in rangos.items() if v > 0],
+        "instruccion": lst(instr), "estado_civil": lst(civil),
+        "ocupacion": lst(ocup)[:6],
+    }
+
     return {
         "caja": bal.dashboard.caja.nombre,
         "serie": [p.model_dump() for p in serie],
+        "demografia": demografia,
+        "ahorro_distribucion": adist,
+        "top_ahorristas": [t.model_dump() for t in bal.top_socios],
         "top_ingresos": top("aportes"),
         "top_retiros": top("retiros"),
         "top_desembolsos": top("desembolsos"),

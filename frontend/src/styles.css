@@ -452,3 +452,7 @@ details[open] summary::before { content: "▾ "; }
 .ojo { background: rgba(255,255,255,.15); border: none; border-radius: 6px; cursor: pointer;
   font-size: 12px; line-height: 1; padding: 2px 5px; margin-left: 4px; vertical-align: middle; }
 .ojo:hover { background: rgba(255,255,255,.28); }
+
+/* ---------- Títulos de bloque en dashboards de análisis ---------- */
+.bloque-titulo { font-family: var(--display); font-size: 18px; color: var(--kullki-oscuro);
+  margin: 24px 0 6px; padding-bottom: 4px; border-bottom: 2px solid var(--kullki-tinte); }

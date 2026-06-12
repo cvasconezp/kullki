@@ -99,57 +99,67 @@ export default function Analitica({ cajaId }) {
   if (error) return <div className="error">{error}</div>;
   if (!d) return <div className="vacio">Analizando datos…</div>;
   const rc = d.resumen_creditos;
+  const demo = d.demografia || { genero: [], edad: [], instruccion: [], estado_civil: [], ocupacion: [], total: 0, edad_promedio: 0 };
+  const tasaMora = rc.activos ? Math.round((rc.en_mora / rc.activos) * 100) : 0;
+  const mujeres = demo.genero.find((g) => g.etiqueta === "Femenino");
+  const pctMujeres = demo.total ? Math.round(((mujeres ? mujeres.valor : 0) / demo.total) * 100) : 0;
 
   return (
     <>
       <div className="kpis">
-        <div className="kpi"><div className="v">{rc.total}</div><div className="l">Créditos otorgados</div></div>
-        <div className="kpi k-in"><div className="v">{usd(rc.monto_total)}</div><div className="l">Monto colocado</div></div>
-        <div className="kpi"><div className="v">{usd(rc.monto_promedio)}</div><div className="l">Crédito promedio</div></div>
-        <div className="kpi"><div className="v">{rc.plazo_promedio} m</div><div className="l">Plazo promedio</div></div>
-        <div className={"kpi" + (rc.en_mora > 0 ? " alerta" : "")}><div className="v">{rc.en_mora}</div><div className="l">Créditos en mora</div></div>
+        <div className="kpi"><div className="v">{demo.total}</div><div className="l">Socios activos</div></div>
+        <div className="kpi k-in"><div className="v">{usd(d.dashboard.total_aportes)}</div><div className="l">Ahorro acumulado</div></div>
+        <div className="kpi k-out"><div className="v">{usd(rc.monto_total)}</div><div className="l">Cartera colocada</div></div>
+        <div className="kpi k-in"><div className="v">{usd(d.dashboard.intereses_cobrados)}</div><div className="l">Intereses ganados</div></div>
+        <div className={"kpi" + (tasaMora > 0 ? " alerta" : "")}><div className="v">{tasaMora}%</div><div className="l">Morosidad ({rc.en_mora}/{rc.activos})</div></div>
       </div>
 
+      <h2 className="bloque-titulo">Tendencias del mes</h2>
+      <div className="tarjeta g-card">
+        <div className="g-head"><h3>Ingresos vs. egresos por mes</h3></div>
+        <LineasMulti serie={d.serie} series={[
+          { key: "aportes", label: "Aportes", color: "#0a7a4a" },
+          { key: "recuperado", label: "Recuperado", color: "#2B5AA0" },
+          { key: "desembolsos", label: "Préstamos", color: "#E8A838" },
+          { key: "retiros", label: "Retiros", color: "#b3372b" },
+        ]} />
+      </div>
+
+      <h2 className="bloque-titulo">Cartera de crédito</h2>
       <div className="balances-grid">
-        <div className="tarjeta g-card ancho">
-          <div className="g-head"><h3>Ingresos vs. egresos por mes</h3></div>
-          <LineasMulti serie={d.serie} series={[
-            { key: "aportes", label: "Aportes", color: "#0a7a4a" },
-            { key: "recuperado", label: "Recuperado", color: "#2B5AA0" },
-            { key: "desembolsos", label: "Préstamos", color: "#E8A838" },
-            { key: "retiros", label: "Retiros", color: "#b3372b" },
-          ]} />
+        <div className="tarjeta g-card"><div className="g-head"><h3>¿A qué se destinan los créditos?</h3></div><Dona items={d.destinos} /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Tamaño de los créditos</h3></div><BarrasH items={d.distribucion_montos} money={false} color="#2B5AA0" /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Meses de más préstamos</h3></div><BarrasH items={d.top_desembolsos} color="#E8A838" /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Resumen de cartera</h3></div>
+          <div className="ranking">
+            <div className="fila"><span>Créditos otorgados</span><span className="cifra">{rc.total}</span></div>
+            <div className="fila"><span>Crédito promedio</span><span className="cifra">{usd(rc.monto_promedio)}</span></div>
+            <div className="fila"><span>Plazo promedio</span><span className="cifra">{rc.plazo_promedio} meses</span></div>
+            <div className="fila"><span>Activos / Pagados</span><span className="cifra">{rc.activos} / {rc.pagados}</span></div>
+            <div className="fila"><span>En mora</span><span className="cifra neg">{rc.en_mora}</span></div>
+          </div>
         </div>
+      </div>
 
-        <div className="tarjeta g-card">
-          <div className="g-head"><h3>¿A qué se destinan los créditos?</h3></div>
-          <Dona items={d.destinos} />
-        </div>
+      <h2 className="bloque-titulo">Comportamiento de ahorro</h2>
+      <div className="balances-grid">
+        <div className="tarjeta g-card"><div className="g-head"><h3>Distribución del ahorro por socio</h3></div><BarrasH items={d.ahorro_distribucion} money={false} color="#0a7a4a" /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Mayores ahorristas</h3></div>
+          <BarrasH items={(d.top_ahorristas || []).map((t) => ({ etiqueta: t.socio, valor: t.ahorro_neto }))} /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Composición de aportes</h3></div><Dona items={d.tipos_aporte} /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Meses de mayor ingreso</h3></div><BarrasH items={d.top_ingresos} color="#0a7a4a" /></div>
+      </div>
 
-        <div className="tarjeta g-card">
-          <div className="g-head"><h3>Composición de aportes</h3></div>
-          <Dona items={d.tipos_aporte} />
-        </div>
-
-        <div className="tarjeta g-card">
-          <div className="g-head"><h3>Meses de mayor ingreso</h3></div>
-          <BarrasH items={d.top_ingresos} color="#0a7a4a" />
-        </div>
-
-        <div className="tarjeta g-card">
-          <div className="g-head"><h3>Meses de más préstamos</h3></div>
-          <BarrasH items={d.top_desembolsos} color="#E8A838" />
-        </div>
-
-        <div className="tarjeta g-card">
-          <div className="g-head"><h3>Meses de más retiros</h3></div>
-          <BarrasH items={d.top_retiros} color="#b3372b" />
-        </div>
-
-        <div className="tarjeta g-card">
-          <div className="g-head"><h3>Tamaño de los créditos</h3></div>
-          <BarrasH items={d.distribucion_montos} money={false} color="var(--kullki)" />
-        </div>
+      <h2 className="bloque-titulo">Perfil de socios</h2>
+      <p className="detalle" style={{ color: "var(--tinta-suave)", margin: "0 0 8px" }}>
+        {demo.total} socios · edad promedio {demo.edad_promedio} años · {pctMujeres}% mujeres
+      </p>
+      <div className="balances-grid">
+        <div className="tarjeta g-card"><div className="g-head"><h3>Género</h3></div><Dona items={demo.genero} money={false} /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Rango de edad</h3></div><BarrasH items={demo.edad} money={false} color="#2B5AA0" /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Nivel de instrucción</h3></div><Dona items={demo.instruccion} money={false} /></div>
+        <div className="tarjeta g-card"><div className="g-head"><h3>Estado civil</h3></div><Dona items={demo.estado_civil} money={false} /></div>
+        <div className="tarjeta g-card ancho"><div className="g-head"><h3>Ocupaciones más comunes</h3></div><BarrasH items={demo.ocupacion} money={false} color="#7A4FA3" /></div>
       </div>
     </>
   );
