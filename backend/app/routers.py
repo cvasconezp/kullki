@@ -52,6 +52,12 @@ def _verificar_ventana(actor, mov):
             "que autorice la corrección de este movimiento.")
 
 
+def _registrar_acceso(db: Session, user: models.Usuario, rol: str, caja_id: int | None):
+    user.ultimo_acceso = datetime.utcnow()
+    db.add(models.Acceso(usuario_id=user.id, usuario_nombre=user.nombre,
+                         caja_id=caja_id, rol=rol or ""))
+
+
 def _socio_out(db: Session, s: models.Socio) -> schemas.SocioOut:
     """Ahorro neto del socio = aportes (sin multas) - retiros. Las multas van al fondo."""
     ahorros = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
@@ -88,6 +94,7 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
 
     # Superadmin: token directo, sin caja
     if user.es_superadmin:
+        _registrar_acceso(db, user, "superadmin", None); db.commit()
         return schemas.LoginOut(
             access_token=create_token(user), rol="superadmin", nombre=user.nombre,
             debe_cambiar_password=user.debe_cambiar_password,
@@ -113,6 +120,7 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
     # Una sola caja: token ya anclado, entra directo
     if len(cajas) == 1:
         c = cajas[0]
+        _registrar_acceso(db, user, c.rol, c.caja_id); db.commit()
         return schemas.LoginOut(
             access_token=create_token(user, caja_id=c.caja_id, rol=c.rol, socio_id=c.socio_id),
             rol=c.rol, nombre=user.nombre, caja_id=c.caja_id, caja_nombre=c.caja_nombre,
@@ -142,6 +150,7 @@ def seleccionar_caja(data: schemas.SeleccionCaja, db: Session = Depends(get_db),
     if not m:
         raise HTTPException(403, "No perteneces a esa caja")
     caja = db.get(models.Caja, m.caja_id)
+    _registrar_acceso(db, user, m.rol, m.caja_id); db.commit()
     return schemas.LoginOut(
         access_token=create_token(user, caja_id=m.caja_id, rol=m.rol, socio_id=m.socio_id),
         rol=m.rol, nombre=user.nombre, caja_id=m.caja_id,
@@ -238,7 +247,8 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
                        multa_mora=data.multa_mora,
                        color_primario=data.color_primario or "#1B3A6B",
                        color_acento=data.color_acento or "#E8A838",
-                       logo=data.logo or "")
+                       logo=data.logo or "",
+                       transparencia_total=data.transparencia_total)
     db.add(caja)
     db.flush()
 
@@ -325,7 +335,8 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
         db.add(models.Membresia(usuario_id=usuario.id, caja_id=cid,
                                 socio_id=socio.id, rol="socio"))
     log_audit(db, actor, "crear", "socio", socio.id,
-              f"Socio {socio.nombres} ({socio.cedula}) registrado", caja_id=cid)
+              f"Socio {socio.nombres} ({socio.cedula}) registrado", caja_id=cid,
+              afecta_socio_id=socio.id)
     db.commit()
     return _socio_out(db, socio)
 
@@ -347,7 +358,8 @@ def actualizar_mi_ficha(data: schemas.SocioUpdate, db: Session = Depends(get_db)
     for k, v in cambios.items():
         setattr(socio, k, v)
     log_audit(db, actor, "editar", "socio", socio.id,
-              f"{socio.nombres} actualizó sus datos de contacto", caja_id=socio.caja_id)
+              f"{socio.nombres} actualizó sus datos de contacto", caja_id=socio.caja_id,
+              afecta_socio_id=socio.id)
     db.commit()
     return _socio_out(db, socio)
 
@@ -363,7 +375,7 @@ def editar_socio(socio_id: int, data: schemas.SocioUpdate, db: Session = Depends
         setattr(socio, k, v)
     log_audit(db, actor, "editar", "socio", socio.id,
               f"Ficha de {socio.nombres} actualizada: {', '.join(cambios) or 'sin cambios'}",
-              caja_id=socio.caja_id)
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
     db.commit()
     return _socio_out(db, socio)
 
@@ -377,7 +389,7 @@ def cambiar_estado_socio(socio_id: int, activo: bool, db: Session = Depends(get_
     socio.activo = activo
     log_audit(db, user, "editar", "socio", socio.id,
               f"Socio {socio.nombres} {'activado' if activo else 'desactivado'}",
-              caja_id=socio.caja_id)
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
     db.commit()
     return _socio_out(db, socio)
 
@@ -419,7 +431,7 @@ def registrar_aporte(data: schemas.AporteIn, db: Session = Depends(get_db),
     db.flush()
     log_audit(db, user, "crear", "aporte", aporte.id,
               f"Aporte {data.tipo} de ${data.monto:.2f} de {socio.nombres}",
-              caja_id=socio.caja_id)
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
     db.commit()
     item = schemas.AporteOut.model_validate(aporte)
     item.socio_nombres = socio.nombres
@@ -440,7 +452,7 @@ def editar_aporte(aporte_id: int, data: schemas.AporteUpdate, db: Session = Depe
         setattr(ap, k, v)
     log_audit(db, user, "editar", "aporte", ap.id,
               f"Aporte de {ap.socio.nombres} corregido: {', '.join(cambios) or 'sin cambios'}",
-              caja_id=ap.caja_id)
+              caja_id=ap.caja_id, afecta_socio_id=ap.socio_id)
     db.commit()
     item = schemas.AporteOut.model_validate(ap)
     item.socio_nombres = ap.socio.nombres
@@ -458,7 +470,8 @@ def anular_aporte(aporte_id: int, db: Session = Depends(get_db),
     _verificar_ventana(user, ap)
     ap.anulado = True
     log_audit(db, user, "anular", "aporte", ap.id,
-              f"Aporte de ${ap.monto:.2f} de {ap.socio.nombres} anulado", caja_id=ap.caja_id)
+              f"Aporte de ${ap.monto:.2f} de {ap.socio.nombres} anulado", caja_id=ap.caja_id,
+              afecta_socio_id=ap.socio_id)
     db.commit()
     item = schemas.AporteOut.model_validate(ap)
     item.socio_nombres = ap.socio.nombres
@@ -545,7 +558,7 @@ def crear_credito(data: schemas.CreditoIn, db: Session = Depends(get_db),
                             capital=capital, interes=interes, total=total))
     log_audit(db, user, "crear", "credito", credito.id,
               f"Crédito de ${data.monto:.2f} a {socio.nombres}, {n} meses al {tasa}% mensual",
-              caja_id=socio.caja_id)
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
     db.commit()
     db.refresh(credito)
     return _credito_out(credito, detalle=True)
@@ -572,7 +585,8 @@ def _aplicar_abono(db, user, cuota: models.Cuota, monto: float, fecha) -> models
                              registrado_por=user.id))
         log_audit(db, user, "crear", "aporte", 0,
                   f"Multa por mora de ${caja.multa_mora:.2f} a {credito.socio.nombres} "
-                  f"(cuota {cuota.numero} vencida)", caja_id=credito.caja_id)
+                  f"(cuota {cuota.numero} vencida)", caja_id=credito.caja_id,
+                  afecta_socio_id=credito.socio_id)
 
     cuota.abonado = round((cuota.abonado or 0) + monto, 2)
     if cuota.abonado >= cuota.total - 0.005:
@@ -588,7 +602,8 @@ def _aplicar_abono(db, user, cuota: models.Cuota, monto: float, fecha) -> models
                    f"— crédito #{credito.id} de {credito.socio.nombres}")
     if all(q.pagada for q in credito.cuotas):
         credito.estado = "pagado"
-    log_audit(db, user, "pagar", "cuota", cuota.id, detalle, caja_id=credito.caja_id)
+    log_audit(db, user, "pagar", "cuota", cuota.id, detalle, caja_id=credito.caja_id,
+              afecta_socio_id=credito.socio_id)
     db.commit()
     db.refresh(credito)
     return credito
@@ -660,7 +675,8 @@ def registrar_retiro(data: schemas.RetiroIn, db: Session = Depends(get_db),
     db.add(retiro)
     db.flush()
     log_audit(db, user, "crear", "retiro", retiro.id,
-              f"Retiro de ${data.monto:.2f} de {socio.nombres}", caja_id=socio.caja_id)
+              f"Retiro de ${data.monto:.2f} de {socio.nombres}", caja_id=socio.caja_id,
+              afecta_socio_id=socio.id)
     db.commit()
     item = schemas.RetiroOut.model_validate(retiro)
     item.socio_nombres = socio.nombres
@@ -681,7 +697,7 @@ def editar_retiro(retiro_id: int, data: schemas.RetiroUpdate, db: Session = Depe
         setattr(r, k, v)
     log_audit(db, user, "editar", "retiro", r.id,
               f"Retiro de {r.socio.nombres} corregido: {', '.join(cambios) or 'sin cambios'}",
-              caja_id=r.caja_id)
+              caja_id=r.caja_id, afecta_socio_id=r.socio_id)
     db.commit()
     item = schemas.RetiroOut.model_validate(r)
     item.socio_nombres = r.socio.nombres
@@ -699,7 +715,8 @@ def anular_retiro(retiro_id: int, db: Session = Depends(get_db),
     _verificar_ventana(user, r)
     r.anulado = True
     log_audit(db, user, "anular", "retiro", r.id,
-              f"Retiro de ${r.monto:.2f} de {r.socio.nombres} anulado", caja_id=r.caja_id)
+              f"Retiro de ${r.monto:.2f} de {r.socio.nombres} anulado", caja_id=r.caja_id,
+              afecta_socio_id=r.socio_id)
     db.commit()
     item = schemas.RetiroOut.model_validate(r)
     item.socio_nombres = r.socio.nombres
@@ -799,10 +816,20 @@ def mi_libreta(socio_id: int | None = None, db: Session = Depends(get_db),
 @reportes_router.get("/auditoria", response_model=list[schemas.AuditoriaOut])
 def auditoria(caja_id: int | None = None, limit: int = 200, db: Session = Depends(get_db),
               user: models.Usuario = Depends(get_current_user)):
-    """Bitácora visible para todos los roles de la caja: transparencia total."""
+    """Bitácora de la caja. El tesorero/superadmin ven todo. El socio, por
+    privacidad, ve solo lo que le concierne y los eventos generales de la caja,
+    salvo que la caja active 'transparencia_total' (modo asamblea: todos ven todo)."""
     cid = caja_scope(user, caja_id)
-    return db.scalars(select(models.Auditoria).where(models.Auditoria.caja_id == cid)
-                      .order_by(models.Auditoria.fecha.desc()).limit(limit)).all()
+    q = select(models.Auditoria).where(models.Auditoria.caja_id == cid)
+    if user.rol == "socio":
+        caja = db.get(models.Caja, cid)
+        if not (caja and caja.transparencia_total):
+            from sqlalchemy import or_, and_
+            q = q.where(or_(
+                models.Auditoria.afecta_socio_id == user.socio_id,
+                and_(models.Auditoria.afecta_socio_id.is_(None),
+                     models.Auditoria.entidad.in_(["caja", "informe"]))))
+    return db.scalars(q.order_by(models.Auditoria.fecha.desc()).limit(limit)).all()
 
 
 @reportes_router.get("/informe-asamblea", response_model=schemas.InformeAsamblea)
@@ -1000,3 +1027,91 @@ def recordatorios(caja_id: int | None = None, dias: int = 7, db: Session = Depen
             })
     out.sort(key=lambda x: x["fecha_vencimiento"])
     return out
+
+
+@reportes_router.get("/admin/estadisticas")
+def estadisticas_uso(db: Session = Depends(get_db),
+                     user: models.Usuario = Depends(require_roles("superadmin"))):
+    """Panel de uso para el super admin: accesos, actividad y usuarios.
+    Nota: el 'tiempo de conexión' exacto no se mide (sesión sin estado/JWT);
+    se reportan ingresos (logins), último acceso y actividad (acciones)."""
+    ahora = datetime.utcnow()
+    h30 = ahora - timedelta(days=30); h7 = ahora - timedelta(days=7)
+    MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+    accesos = db.scalars(select(models.Acceso).where(models.Acceso.fecha >= h30)).all()
+    por_dia = {}
+    for a in accesos:
+        k = a.fecha.date().isoformat()
+        por_dia[k] = por_dia.get(k, 0) + 1
+    serie = []
+    for i in range(29, -1, -1):
+        d = (ahora - timedelta(days=i)).date()
+        serie.append({"periodo": d.isoformat(),
+                      "etiqueta": f"{d.day} {MES[d.month-1]}",
+                      "accesos": por_dia.get(d.isoformat(), 0)})
+
+    activos_7 = len({a.usuario_id for a in accesos if a.fecha >= h7})
+
+    # actividad (acciones de bitácora) por usuario y por caja
+    auds = db.scalars(select(models.Auditoria)).all()
+    acciones_por_user, ultima_user = {}, {}
+    acciones_por_caja, ultima_caja = {}, {}
+    for a in auds:
+        acciones_por_user[a.usuario_id] = acciones_por_user.get(a.usuario_id, 0) + 1
+        if a.usuario_id not in ultima_user or a.fecha > ultima_user[a.usuario_id]:
+            ultima_user[a.usuario_id] = a.fecha
+        if a.caja_id is not None:
+            acciones_por_caja[a.caja_id] = acciones_por_caja.get(a.caja_id, 0) + 1
+            if a.caja_id not in ultima_caja or a.fecha > ultima_caja[a.caja_id]:
+                ultima_caja[a.caja_id] = a.fecha
+    accesos_user_30 = {}
+    for a in accesos:
+        accesos_user_30[a.usuario_id] = accesos_user_30.get(a.usuario_id, 0) + 1
+
+    # por caja
+    cajas = db.scalars(select(models.Caja).order_by(models.Caja.nombre)).all()
+    accesos_caja_30 = {}
+    for a in accesos:
+        if a.caja_id is not None:
+            accesos_caja_30[a.caja_id] = accesos_caja_30.get(a.caja_id, 0) + 1
+    por_caja = []
+    for c in cajas:
+        n_socios = db.scalar(select(func.count(models.Socio.id))
+                             .where(models.Socio.caja_id == c.id, models.Socio.activo)) or 0
+        ua = ultima_caja.get(c.id)
+        por_caja.append({"caja": c.nombre, "slug": c.slug, "activa": c.activa,
+                         "socios": n_socios, "accesos_30d": accesos_caja_30.get(c.id, 0),
+                         "acciones": acciones_por_caja.get(c.id, 0),
+                         "ultima_actividad": ua.isoformat() if ua else None})
+
+    # usuarios
+    usuarios = db.scalars(select(models.Usuario).where(models.Usuario.activo)).all()
+    lista_u = []
+    for u in usuarios:
+        if u.es_superadmin:
+            roles = ["superadmin"]
+        else:
+            roles = sorted({m.rol for m in membresias_activas(db, u)})
+        lista_u.append({
+            "nombre": u.nombre, "cedula": u.cedula, "roles": roles or ["—"],
+            "ultimo_acceso": u.ultimo_acceso.isoformat() if u.ultimo_acceso else None,
+            "accesos_30d": accesos_user_30.get(u.id, 0),
+            "acciones": acciones_por_user.get(u.id, 0),
+            "ultima_actividad": ultima_user[u.id].isoformat() if u.id in ultima_user else None,
+        })
+    lista_u.sort(key=lambda x: (x["ultimo_acceso"] or ""), reverse=True)
+
+    return {
+        "resumen": {
+            "cajas": len(cajas),
+            "cajas_activas": sum(1 for c in cajas if c.activa),
+            "usuarios": len(usuarios),
+            "socios": db.scalar(select(func.count(models.Socio.id)).where(models.Socio.activo)) or 0,
+            "accesos_30d": len(accesos),
+            "usuarios_activos_7d": activos_7,
+        },
+        "accesos_por_dia": serie,
+        "por_caja": por_caja,
+        "usuarios": lista_u,
+    }

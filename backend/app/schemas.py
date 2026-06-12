@@ -76,6 +76,7 @@ class CajaIn(BaseModel):
     color_primario: str = "#1B3A6B"
     color_acento: str = "#E8A838"
     logo: str = ""
+    transparencia_total: bool = False
     tesorero_nombre: str
     tesorero_cedula: str
     tesorero_password: str = Field(min_length=6)
@@ -91,6 +92,7 @@ class CajaUpdate(BaseModel):
     color_primario: str | None = None
     color_acento: str | None = None
     logo: str | None = None
+    transparencia_total: bool | None = None
     activa: bool | None = None
 
 
@@ -105,6 +107,7 @@ class CajaOut(BaseModel):
     color_primario: str = "#1B3A6B"
     color_acento: str = "#E8A838"
     logo: str = ""
+    transparencia_total: bool = False
     activa: bool
 
     class Config:

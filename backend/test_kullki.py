@@ -617,3 +617,35 @@ def test_socio_actualiza_su_ficha(setup):
     assert r.json()["nombres"] == "Auto Edita"   # no puede cambiar su nombre
     # el tesorero no puede usar mi-ficha
     assert client.patch("/socios/mi-ficha", headers=ta, json={"whatsapp": "x"}).status_code == 403
+
+
+def test_estadisticas_uso_superadmin(setup):
+    # genera algún acceso
+    login("admin", "test-admin-123"); login("1000000001", "secreta123")
+    assert client.get("/admin/estadisticas", headers=setup["ta"]).status_code == 403
+    r = client.get("/admin/estadisticas", headers=setup["sa"])
+    assert r.status_code == 200
+    d = r.json()
+    assert "resumen" in d and "accesos_por_dia" in d and "usuarios" in d
+    assert d["resumen"]["accesos_30d"] >= 1
+    assert len(d["accesos_por_dia"]) == 30
+
+
+def test_bitacora_socio_no_ve_a_otros_socios(setup):
+    """El socio no ve en la bitácora los movimientos (monto/nombre) de otros socios,
+    salvo que la caja active transparencia_total."""
+    sa, ta = setup["sa"], setup["ta"]
+    ca = next(c for c in client.get("/cajas", headers=sa).json() if c["slug"] == "caja-a")
+    # asegurar transparencia_total = False
+    client.patch(f"/cajas/{ca['id']}", headers=sa, json={"transparencia_total": False})
+    otro = client.post("/socios", headers=ta, json={"nombres": "Privado Otro", "cedula": "2000000801"}).json()
+    client.post("/aportes", headers=ta, json={"socio_id": otro["id"], "monto": 33})
+    socio_a = login("2000000001", "2000000001")
+    items = client.get("/auditoria", headers=socio_a).json()
+    detalles = " ".join(i["detalle"] for i in items)
+    assert "Privado Otro" not in detalles    # no ve al otro socio
+    # con transparencia total, sí lo ve
+    client.patch(f"/cajas/{ca['id']}", headers=sa, json={"transparencia_total": True})
+    items2 = client.get("/auditoria", headers=socio_a).json()
+    assert "Privado Otro" in " ".join(i["detalle"] for i in items2)
+    client.patch(f"/cajas/{ca['id']}", headers=sa, json={"transparencia_total": False})

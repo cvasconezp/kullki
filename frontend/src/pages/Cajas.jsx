@@ -4,7 +4,7 @@ import { api, mascaraCedula } from "../lib/api.js";
 const FORM_INICIAL = {
   nombre: "", slug: "", comunidad: "",
   tasa_interes_mensual: "1.5", aporte_ordinario: "10", multa_mora: "0",
-  color_primario: "#1B3A6B", color_acento: "#E8A838", logo: "",
+  color_primario: "#1B3A6B", color_acento: "#E8A838", logo: "", transparencia_total: false,
   tesorero_nombre: "", tesorero_cedula: "", tesorero_password: "",
 };
 
@@ -29,7 +29,7 @@ function EditarCaja({ caja, onListo }) {
     multa_mora: String(caja.multa_mora ?? 0),
     color_primario: caja.color_primario || "#1B3A6B",
     color_acento: caja.color_acento || "#E8A838",
-    logo: caja.logo || "", activa: caja.activa,
+    logo: caja.logo || "", transparencia_total: !!caja.transparencia_total, activa: caja.activa,
   });
   const [error, setError] = useState(""); const [guardando, setGuardando] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -42,7 +42,7 @@ function EditarCaja({ caja, onListo }) {
         tasa_interes_mensual: +f.tasa_interes_mensual,
         aporte_ordinario: +f.aporte_ordinario, multa_mora: +f.multa_mora,
         color_primario: f.color_primario, color_acento: f.color_acento,
-        logo: f.logo, activa: f.activa,
+        logo: f.logo, transparencia_total: f.transparencia_total, activa: f.activa,
       }});
       onListo(true);
     } catch (e) { setError(e.message); setGuardando(false); }
@@ -68,6 +68,14 @@ function EditarCaja({ caja, onListo }) {
       <div className="dos-col">
         <CampoColor label="Color primario" value={f.color_primario} onChange={set("color_primario")} />
         <CampoColor label="Color de acento" value={f.color_acento} onChange={set("color_acento")} />
+      </div>
+      <div className="campo">
+        <label>Bitácora para socios</label>
+        <select value={f.transparencia_total ? "1" : "0"}
+          onChange={(e) => setF({ ...f, transparencia_total: e.target.value === "1" })}>
+          <option value="0">Privada — cada socio ve solo lo suyo (recomendado)</option>
+          <option value="1">Transparencia total — todos ven todo (modo asamblea)</option>
+        </select>
       </div>
       <div className="campo">
         <label>Estado</label>
@@ -185,6 +193,12 @@ export default function Cajas({ onAsumir }) {
             <CampoColor label="Color primario" value={form.color_primario} onChange={set("color_primario")} />
             <CampoColor label="Color de acento" value={form.color_acento} onChange={set("color_acento")} />
           </div>
+          <div className="campo"><label>Bitácora para socios</label>
+            <select value={form.transparencia_total ? "1" : "0"}
+              onChange={(e) => setForm({ ...form, transparencia_total: e.target.value === "1" })}>
+              <option value="0">Privada — cada socio ve solo lo suyo (recomendado)</option>
+              <option value="1">Transparencia total — todos ven todo (modo asamblea)</option>
+            </select></div>
           <div className="vista-previa" style={{ background: form.color_primario }}>
             <span className="vp-logo" style={{ color: form.color_acento }}>{form.logo || (form.nombre[0] || "K").toUpperCase()}</span>
             <span className="vp-txt">{form.nombre || "Nombre de la caja"}</span>

@@ -19,6 +19,7 @@ class Caja(Base):
     color_primario: Mapped[str] = mapped_column(String(9), default="#1B3A6B")  # navy Yachay Deep
     color_acento: Mapped[str] = mapped_column(String(9), default="#E8A838")    # dorado Yachay Deep
     logo: Mapped[str] = mapped_column(String(8), default="")  # emoji o 1-2 letras; vacío => inicial
+    transparencia_total: Mapped[bool] = mapped_column(Boolean, default=False)  # socios ven toda la bitácora
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -38,6 +39,7 @@ class Usuario(Base):
     es_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     debe_cambiar_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    ultimo_acceso: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     membresias: Mapped[list["Membresia"]] = relationship(back_populates="usuario")
 
@@ -147,8 +149,20 @@ class Auditoria(Base):
     accion: Mapped[str] = mapped_column(String(40))      # crear | pagar | editar | desactivar
     entidad: Mapped[str] = mapped_column(String(40))     # socio | aporte | credito | cuota | caja
     entidad_id: Mapped[int] = mapped_column(Integer)
+    afecta_socio_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # socio involucrado
     detalle: Mapped[str] = mapped_column(Text, default="")
     fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Acceso(Base):
+    """Registro de ingresos (logins) para estadísticas de uso."""
+    __tablename__ = "accesos"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    usuario_nombre: Mapped[str] = mapped_column(String(120))
+    caja_id: Mapped[int | None] = mapped_column(ForeignKey("cajas.id"), nullable=True, index=True)
+    rol: Mapped[str] = mapped_column(String(20), default="")
+    fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
 class Retiro(Base):

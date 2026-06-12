@@ -150,9 +150,11 @@ def caja_scope(actor: Actor, caja_id: int | None = None) -> int:
 
 
 def log_audit(db: Session, actor: Actor, accion: str, entidad: str,
-              entidad_id: int, detalle: str, caja_id: int | None = None):
+              entidad_id: int, detalle: str, caja_id: int | None = None,
+              afecta_socio_id: int | None = None):
     db.add(models.Auditoria(
         caja_id=caja_id if caja_id is not None else actor.caja_id,
         usuario_id=actor.id, usuario_nombre=actor.nombre,
         accion=accion, entidad=entidad, entidad_id=entidad_id, detalle=detalle,
+        afecta_socio_id=afecta_socio_id,
     ))

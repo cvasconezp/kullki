@@ -12,6 +12,7 @@ import Libreta from "./pages/Libreta.jsx";
 import Bitacora from "./pages/Bitacora.jsx";
 import Informes from "./pages/Informes.jsx";
 import Cajas from "./pages/Cajas.jsx";
+import Estadisticas from "./pages/Estadisticas.jsx";
 import CambiarPassword from "./components/CambiarPassword.jsx";
 
 // id interno · ruta (URL) · etiqueta · ícono
@@ -26,6 +27,10 @@ const NAV_TESORERO = [
 const NAV_SOCIO = [
   { id: "libreta", ruta: "libreta", label: "Mi libreta", ico: "▤" },
   { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "≡" },
+];
+const NAV_SUPER = [
+  { id: "cajas", ruta: "", label: "Cajas", ico: "🏛" },
+  { id: "uso", ruta: "uso", label: "Uso", ico: "▦" },
 ];
 const SECCION_DEF = { tesorero: "balances", socio: "libreta" };
 
@@ -79,12 +84,12 @@ export default function App() {
     navigate(rutaDe(sesion)); return null;
   }
 
-  const nav = esTesorero ? NAV_TESORERO : esSocio ? NAV_SOCIO : [];
+  const nav = esTesorero ? NAV_TESORERO : esSocio ? NAV_SOCIO : esSuper ? NAV_SUPER : [];
   const seccionUrl = partes[1];
   const item = nav.find((n) => n.ruta === seccionUrl);
   const activa = item ? item.id : (esTesorero ? "inicio" : esSocio ? "libreta" : "cajas");
   const impersonando = !!sesion.es_impersonacion && !!getAdminSesion();
-  const irA = (n) => navigate(`/${sesion.caja_slug}/${n.ruta}`);
+  const irA = (n) => navigate(esSuper ? (n.ruta ? `/admin/${n.ruta}` : "/admin") : `/${sesion.caja_slug}/${n.ruta}`);
 
   return (
     <div className="app">
@@ -121,7 +126,8 @@ export default function App() {
         )}
 
         <main className="contenido">
-          {esSuper && <Cajas onAsumir={asumir} />}
+          {esSuper && activa === "uso" && <Estadisticas />}
+          {esSuper && activa !== "uso" && <Cajas onAsumir={asumir} />}
           {esTesorero && activa === "inicio" && <Balances />}
           {esTesorero && activa === "socios" && <Socios />}
           {esTesorero && activa === "aportes" && <Aportes />}

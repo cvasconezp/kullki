@@ -97,7 +97,10 @@ def init_db():
         })
         _add_cols("aportes", {"anulado": "BOOLEAN DEFAULT FALSE"})
         _add_cols("retiros", {"anulado": "BOOLEAN DEFAULT FALSE"})
-        _add_cols("usuarios", {"debe_cambiar_password": "BOOLEAN DEFAULT FALSE"})
+        _add_cols("usuarios", {"debe_cambiar_password": "BOOLEAN DEFAULT FALSE",
+                               "ultimo_acceso": "TIMESTAMP"})
+        _add_cols("cajas", {"transparencia_total": "BOOLEAN DEFAULT FALSE"})
+        _add_cols("auditoria", {"afecta_socio_id": "INTEGER"})
 
         # Superadmin inicial desde variables de entorno
         ced = os.getenv("SUPERADMIN_CEDULA", "admin")
