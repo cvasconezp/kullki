@@ -19,7 +19,10 @@ export default function Libreta() {
   return (
     <>
       <div className="libreta">
-        <div className="eyebrow">{caja_nombre} · {socio.nombres}</div>
+        <div className="eyebrow">{caja_nombre}</div>
+        <div className="lib-titular">
+          {socio.nombres}<span className="lib-ci">CI {socio.cedula}</span>
+        </div>
         <div className="saldo">
           <span className="moneda">$</span>
           {socio.total_aportes.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
@@ -29,6 +32,8 @@ export default function Libreta() {
           {socio.saldo_credito > 0 && <> · debes <strong className="cifra">{usd(socio.saldo_credito)}</strong></>}
         </div>
       </div>
+
+      <ExportarEstado lib={lib} />
 
       {activos.map((c) => {
         const siguiente = c.cuotas.find((q) => !q.pagada);

@@ -13,66 +13,46 @@ import Bitacora from "./pages/Bitacora.jsx";
 import Informes from "./pages/Informes.jsx";
 import Cajas from "./pages/Cajas.jsx";
 
+// id interno · ruta (URL) · etiqueta · ícono
 const NAV_TESORERO = [
-  { id: "inicio", label: "Balances", ico: "▦" },
-  { id: "socios", label: "Socios", ico: "👥" },
-  { id: "aportes", label: "Movim.", ico: "⊕" },
-  { id: "creditos", label: "Créditos", ico: "⇄" },
-  { id: "informes", label: "Informe", ico: "🗎" },
-  { id: "bitacora", label: "Bitácora", ico: "≡" },
+  { id: "inicio", ruta: "balances", label: "Balances", ico: "▦" },
+  { id: "socios", ruta: "socios", label: "Socios", ico: "👥" },
+  { id: "aportes", ruta: "movimientos", label: "Movim.", ico: "⊕" },
+  { id: "creditos", ruta: "creditos", label: "Créditos", ico: "⇄" },
+  { id: "informes", ruta: "informe", label: "Informe", ico: "🗎" },
+  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "≡" },
 ];
 const NAV_SOCIO = [
-  { id: "libreta", label: "Mi libreta", ico: "▤" },
-  { id: "bitacora", label: "Bitácora", ico: "≡" },
+  { id: "libreta", ruta: "libreta", label: "Mi libreta", ico: "▤" },
+  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "≡" },
 ];
+const SECCION_DEF = { tesorero: "balances", socio: "libreta" };
 
 function rutaDe(s) {
   if (!s) return "/ingresar";
   if (s.rol === "superadmin") return "/admin";
-  return "/" + (s.caja_slug || "");
+  return `/${s.caja_slug}/${SECCION_DEF[s.rol] || ""}`;
 }
 
 export default function App() {
   const ruta = useRuta();
   const [sesion, setS] = useState(getSesion());
-  const [vista, setVista] = useState(null);
 
-  // Acopla el tema a la caja activa (o marca Yachay Deep si no hay caja)
   useEffect(() => {
     if (sesion && sesion.rol !== "superadmin") applyTheme(sesion);
     else resetTheme();
   }, [sesion, ruta]);
 
-  const entrar = (s) => {
-    setAdminSesion(null);
-    setSesion(s); setS(s); setVista(null);
-    navigate(rutaDe(s));
-  };
-
-  const salir = () => {
-    setAdminSesion(null);
-    setSesion(null); setS(null); setVista(null);
-    navigate("/");
-  };
-
-  // El superadmin entra a una caja como tesorero/socio sin cerrar su sesión
-  const asumir = (s) => {
-    setAdminSesion(getSesion());     // guarda la sesión del admin
-    setSesion(s); setS(s); setVista(null);
-    navigate("/" + (s.caja_slug || ""));
-  };
-
-  // El superadmin vuelve de "actuar como" a su panel
+  const entrar = (s) => { setAdminSesion(null); setSesion(s); setS(s); navigate(rutaDe(s)); };
+  const salir = () => { setAdminSesion(null); setSesion(null); setS(null); navigate("/"); };
+  const asumir = (s) => { setAdminSesion(getSesion()); setSesion(s); setS(s); navigate(rutaDe(s)); };
   const volverAdmin = () => {
-    const admin = getAdminSesion();
-    setAdminSesion(null);
-    setSesion(admin); setS(admin); setVista(null);
-    navigate("/admin");
+    const admin = getAdminSesion(); setAdminSesion(null);
+    setSesion(admin); setS(admin); navigate("/admin");
   };
 
   // ---------- Rutas públicas ----------
-  if (ruta === "/" ) return <Landing sesion={sesion} />;
-
+  if (ruta === "/") return <Landing sesion={sesion} />;
   if (ruta === "/ingresar") {
     if (sesion) { navigate(rutaDe(sesion)); return null; }
     return <Login onLogin={entrar} />;
@@ -81,20 +61,24 @@ export default function App() {
   // ---------- Requiere sesión ----------
   if (!sesion) { navigate("/ingresar"); return null; }
 
+  const partes = ruta.split("/").filter(Boolean);   // [slug, seccion?]
   const esTesorero = sesion.rol === "tesorero";
   const esSocio = sesion.rol === "socio";
   const esSuper = sesion.rol === "superadmin";
 
   // Coherencia ruta ↔ sesión
-  if (esSuper && ruta !== "/admin") { navigate("/admin"); return null; }
-  if (!esSuper && ruta === "/admin") { navigate(rutaDe(sesion)); return null; }
-  if (!esSuper && sesion.caja_slug && ruta !== "/" + sesion.caja_slug) {
-    navigate("/" + sesion.caja_slug); return null;
+  if (esSuper && partes[0] !== "admin") { navigate("/admin"); return null; }
+  if (!esSuper && partes[0] === "admin") { navigate(rutaDe(sesion)); return null; }
+  if (!esSuper && sesion.caja_slug && partes[0] !== sesion.caja_slug) {
+    navigate(rutaDe(sesion)); return null;
   }
 
   const nav = esTesorero ? NAV_TESORERO : esSocio ? NAV_SOCIO : [];
-  const activa = vista || (esTesorero ? "inicio" : esSocio ? "libreta" : "cajas");
+  const seccionUrl = partes[1];
+  const item = nav.find((n) => n.ruta === seccionUrl);
+  const activa = item ? item.id : (esTesorero ? "inicio" : esSocio ? "libreta" : "cajas");
   const impersonando = !!sesion.es_impersonacion && !!getAdminSesion();
+  const irA = (n) => navigate(`/${sesion.caja_slug}/${n.ruta}`);
 
   return (
     <div className="app">
@@ -123,8 +107,7 @@ export default function App() {
         {nav.length > 0 && (
           <nav className="nav" aria-label="Navegación principal">
             {nav.map((n) => (
-              <button key={n.id} className={activa === n.id ? "activo" : ""}
-                      onClick={() => setVista(n.id)}>
+              <button key={n.id} className={activa === n.id ? "activo" : ""} onClick={() => irA(n)}>
                 <span className="ico" aria-hidden="true">{n.ico}</span>{n.label}
               </button>
             ))}
