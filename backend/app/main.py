@@ -117,6 +117,10 @@ def init_db():
         _add_cols("creditos", {"garante": "VARCHAR(160) DEFAULT ''"})
         _add_cols("cajas", {"permite_retiros": "BOOLEAN DEFAULT TRUE", "dia_corte": "INTEGER DEFAULT 0",
                             "multa_atraso": "FLOAT DEFAULT 0"})
+        _add_cols("creditos", {"tipo": "VARCHAR(20) DEFAULT 'ordinario'"})
+        _add_cols("solicitudes_credito", {"garante2": "VARCHAR(160) DEFAULT ''",
+                            "tipo": "VARCHAR(20) DEFAULT 'ordinario'",
+                            "documento_nombre": "VARCHAR(160) DEFAULT ''", "documento_b64": "TEXT"})
         _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE"})
 
         # Superadmin inicial desde variables de entorno

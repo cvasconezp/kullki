@@ -93,6 +93,7 @@ export default function Aportes() {
             <select id="at" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
               <option value="ordinario">Ordinario</option>
               <option value="extraordinario">Extraordinario</option>
+              <option value="ingreso">Cuota de ingreso (membresía, no es ahorro)</option>
               <option value="multa">Multa (va al fondo, no al ahorro)</option>
             </select></div>
         ) : (

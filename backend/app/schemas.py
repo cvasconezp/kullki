@@ -69,9 +69,13 @@ class CierreIn(BaseModel):
 class SolicitudCreditoIn(BaseModel):
     monto: float = Field(gt=0)
     plazo_meses: int = Field(gt=0, le=60)
+    tipo: str = "ordinario"
     destino: str = ""
     garante: str = ""
+    garante2: str = ""
     documentos: str = ""
+    documento_nombre: str = ""
+    documento_b64: str = ""
 
 
 class SolicitudCreditoOut(BaseModel):
@@ -82,7 +86,10 @@ class SolicitudCreditoOut(BaseModel):
     plazo_meses: int
     destino: str = ""
     garante: str = ""
+    garante2: str = ""
+    tipo: str = "ordinario"
     documentos: str = ""
+    documento_nombre: str = ""
     estado: str
     motivo: str = ""
     creado_en: datetime
@@ -278,6 +285,7 @@ class CreditoIn(BaseModel):
     fecha_desembolso: date | None = None
     destino: str = ""
     garante: str = ""
+    tipo: str = "ordinario"
 
 
 class CuotaOut(BaseModel):
@@ -305,6 +313,7 @@ class CreditoOut(BaseModel):
     fecha_desembolso: date
     destino: str
     garante: str = ""
+    tipo: str = "ordinario"
     estado: str
     saldo_capital: float = 0
     cuotas_pagadas: int = 0

@@ -79,7 +79,7 @@ def _socio_out(db: Session, s: models.Socio) -> schemas.SocioOut:
     """Ahorro neto del socio = aportes (sin multas) - retiros. Las multas van al fondo."""
     ahorros = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
                         .where(models.Aporte.socio_id == s.id,
-                               models.Aporte.tipo != "multa",
+                               models.Aporte.tipo.notin_(["multa", "ingreso"]),
                                models.Aporte.anulado.is_(False))) or 0
     multas = db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
                        .where(models.Aporte.socio_id == s.id,
@@ -749,7 +749,7 @@ def listar_creditos(caja_id: int | None = None, estado: str | None = None,
     return [_credito_out(c) for c in creditos]
 
 
-@creditos_router.get("/{credito_id}", response_model=schemas.CreditoDetalle)
+@creditos_router.get("/{credito_id:int}", response_model=schemas.CreditoDetalle)
 def detalle_credito(credito_id: int, db: Session = Depends(get_db),
                     user: models.Usuario = Depends(get_current_user)):
     c = db.get(models.Credito, credito_id)
@@ -762,7 +762,7 @@ def detalle_credito(credito_id: int, db: Session = Depends(get_db),
     return _credito_out(c, detalle=True)
 
 
-def _otorgar_credito(db, actor, socio, monto, plazo, tasa_mensual, inicio, destino, garante):
+def _otorgar_credito(db, actor, socio, monto, plazo, tasa_mensual, inicio, destino, garante, tipo="ordinario"):
     """Valida reglas de la caja y construye el crédito con su tabla de amortización
     (no hace commit). Reutilizado por la creación directa y por la aprobación de solicitudes."""
     if not socio.activo:
@@ -780,7 +780,7 @@ def _otorgar_credito(db, actor, socio, monto, plazo, tasa_mensual, inicio, desti
     inicio = inicio or date.today()
     credito = models.Credito(caja_id=socio.caja_id, socio_id=socio.id, monto=monto,
                              tasa_mensual=tasa, plazo_meses=plazo, fecha_desembolso=inicio,
-                             destino=destino, garante=garante, registrado_por=actor.id)
+                             destino=destino, garante=garante, tipo=tipo, registrado_por=actor.id)
     db.add(credito); db.flush()
     i = tasa / 100.0; n = plazo; saldo = monto
     cuota_fija = monto * (i * (1 + i) ** n) / ((1 + i) ** n - 1) if i > 0 else monto / n
@@ -803,7 +803,7 @@ def crear_credito(data: schemas.CreditoIn, db: Session = Depends(get_db),
     if not socio or (user.rol != "superadmin" and socio.caja_id != user.caja_id):
         raise HTTPException(404, "Socio no encontrado")
     credito = _otorgar_credito(db, user, socio, data.monto, data.plazo_meses,
-                               data.tasa_mensual, data.fecha_desembolso, data.destino, data.garante)
+                               data.tasa_mensual, data.fecha_desembolso, data.destino, data.garante, data.tipo)
     db.commit(); db.refresh(credito)
     return _credito_out(credito, detalle=True)
 
@@ -829,7 +829,9 @@ def crear_solicitud_credito(data: schemas.SolicitudCreditoIn, db: Session = Depe
         raise HTTPException(400, "Ya tienes una solicitud de crédito pendiente")
     sol = models.SolicitudCredito(caja_id=socio.caja_id, socio_id=socio.id, socio_nombre=socio.nombres,
                                   monto=data.monto, plazo_meses=data.plazo_meses, destino=data.destino,
-                                  garante=data.garante, documentos=data.documentos)
+                                  garante=data.garante, garante2=data.garante2, tipo=data.tipo,
+                                  documentos=data.documentos, documento_nombre=data.documento_nombre,
+                                  documento_b64=data.documento_b64)
     db.add(sol)
     log_audit(db, actor, "crear", "solicitud", socio.id,
               f"{socio.nombres} solicitó un crédito de ${data.monto:.2f} a {data.plazo_meses} meses",
@@ -850,7 +852,7 @@ def mi_solicitud_credito(db: Session = Depends(get_db), actor: Actor = Depends(g
 
 @creditos_router.get("/solicitudes", response_model=list[schemas.SolicitudCreditoOut])
 def listar_solicitudes_credito(caja_id: int | None = None, db: Session = Depends(get_db),
-                               user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                               user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
     sols = db.scalars(select(models.SolicitudCredito).where(
         models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado == "pendiente")
@@ -858,17 +860,39 @@ def listar_solicitudes_credito(caja_id: int | None = None, db: Session = Depends
     return [_solcred_out(x) for x in sols]
 
 
+@creditos_router.get("/garantes")
+def listar_garantes(db: Session = Depends(get_db), actor: Actor = Depends(get_current_user)):
+    """Lista de socios activos de la caja (id y nombre) para elegir garante(s)."""
+    if not actor.caja_id and actor.rol != "superadmin":
+        return []
+    cid = actor.caja_id
+    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
+                        models.Socio.activo).order_by(models.Socio.nombres)).all()
+    yo = actor.socio_id
+    return [{"id": x.id, "nombre": x.nombres} for x in socios if x.id != yo]
+
+
+@creditos_router.get("/solicitudes/{sol_id}/documento")
+def documento_solicitud(sol_id: int, db: Session = Depends(get_db),
+                        user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
+    sol = db.get(models.SolicitudCredito, sol_id)
+    if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
+        raise HTTPException(404, "Solicitud no encontrada")
+    return {"nombre": sol.documento_nombre, "b64": sol.documento_b64}
+
+
 @creditos_router.post("/solicitudes/{sol_id}/aprobar", response_model=schemas.CreditoDetalle)
 def aprobar_solicitud_credito(sol_id: int, db: Session = Depends(get_db),
-                              user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                              user: models.Usuario = Depends(require_roles("directiva", "superadmin"))):
     sol = db.get(models.SolicitudCredito, sol_id)
     if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
         raise HTTPException(404, "Solicitud no encontrada")
     if sol.estado != "pendiente":
         raise HTTPException(400, "La solicitud ya fue resuelta")
     socio = db.get(models.Socio, sol.socio_id)
+    garante_txt = sol.garante + (" / " + sol.garante2 if sol.garante2 else "")
     credito = _otorgar_credito(db, user, socio, sol.monto, sol.plazo_meses, None,
-                               date.today(), sol.destino, sol.garante)
+                               date.today(), sol.destino, garante_txt, sol.tipo)
     sol.estado = "aprobada"; sol.resuelto_por = user.nombre; sol.resuelto_en = datetime.utcnow()
     db.flush(); sol.credito_id = credito.id
     db.commit(); db.refresh(credito)
@@ -877,7 +901,7 @@ def aprobar_solicitud_credito(sol_id: int, db: Session = Depends(get_db),
 
 @creditos_router.post("/solicitudes/{sol_id}/rechazar", response_model=schemas.SolicitudCreditoOut)
 def rechazar_solicitud_credito(sol_id: int, motivo: str = "", db: Session = Depends(get_db),
-                               user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+                               user: models.Usuario = Depends(require_roles("directiva", "superadmin"))):
     sol = db.get(models.SolicitudCredito, sol_id)
     if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
         raise HTTPException(404, "Solicitud no encontrada")

@@ -123,6 +123,7 @@ class Credito(Base):
     fecha_desembolso: Mapped[date] = mapped_column(Date, default=date.today)
     destino: Mapped[str] = mapped_column(String(200), default="")
     garante: Mapped[str] = mapped_column(String(160), default="")
+    tipo: Mapped[str] = mapped_column(String(20), default="ordinario")  # ordinario | emergente
     estado: Mapped[str] = mapped_column(String(20), default="activo")  # activo | pagado
     registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -203,7 +204,11 @@ class SolicitudCredito(Base):
     plazo_meses: Mapped[int] = mapped_column(Integer)
     destino: Mapped[str] = mapped_column(String(200), default="")
     garante: Mapped[str] = mapped_column(String(160), default="")
+    garante2: Mapped[str] = mapped_column(String(160), default="")
+    tipo: Mapped[str] = mapped_column(String(20), default="ordinario")  # ordinario | emergente
     documentos: Mapped[str] = mapped_column(Text, default="")
+    documento_nombre: Mapped[str] = mapped_column(String(160), default="")
+    documento_b64: Mapped[str] = mapped_column(Text, default="")
     estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # pendiente|aprobada|rechazada
     motivo: Mapped[str] = mapped_column(String(200), default="")
     credito_id: Mapped[int | None] = mapped_column(ForeignKey("creditos.id"), nullable=True)

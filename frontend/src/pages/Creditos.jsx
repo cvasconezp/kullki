@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta } from "../lib/api.js";
 import { waLink } from "../lib/exportar.js";
+import SolicitudesCredito from "../components/SolicitudesCredito.jsx";
 
 function TablaCuotas({ credito, onPagar, onAbonar, pagando }) {
   const [abonos, setAbonos] = useState({});
@@ -89,42 +90,6 @@ function Recordatorios() {
   );
 }
 
-function SolicitudesCredito({ onCambio }) {
-  const [sols, setSols] = useState([]); const [error, setError] = useState("");
-  const cargar = () => api("/creditos/solicitudes").then(setSols).catch(() => setSols([]));
-  useEffect(() => { cargar(); }, []);
-  const aprobar = async (id) => {
-    setError("");
-    try { await api(`/creditos/solicitudes/${id}/aprobar`, { method: "POST" }); cargar(); onCambio && onCambio(); }
-    catch (e) { setError(e.message); }
-  };
-  const rechazar = async (id) => {
-    const m = window.prompt("Motivo del rechazo (opcional):") || "";
-    setError("");
-    try { await api(`/creditos/solicitudes/${id}/rechazar?motivo=${encodeURIComponent(m)}`, { method: "POST" }); cargar(); }
-    catch (e) { setError(e.message); }
-  };
-  if (!sols.length) return null;
-  return (
-    <div className="tarjeta" style={{ borderColor: "var(--sara)" }}>
-      <h3>Solicitudes de crédito ({sols.length})</h3>
-      {error && <div className="error">{error}</div>}
-      {sols.map((s) => (
-        <div key={s.id} style={{ borderBottom: "1px dashed var(--regla)", padding: "8px 0" }}>
-          <div className="principal">{s.socio_nombre} · {usd(s.monto)} · {s.plazo_meses} meses</div>
-          <div className="detalle" style={{ margin: "2px 0 8px" }}>
-            {s.destino || "Sin destino"}{s.garante ? ` · garante: ${s.garante}` : ""}{s.documentos ? ` · docs: ${s.documentos}` : ""}
-          </div>
-          <div className="dos-col">
-            <button className="boton secundario" onClick={() => rechazar(s.id)}>Rechazar</button>
-            <button className="boton" onClick={() => aprobar(s.id)}>Aprobar y otorgar</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function Creditos() {
   const [creditos, setCreditos] = useState(null);
   const [socios, setSocios] = useState([]);
@@ -132,7 +97,7 @@ export default function Creditos() {
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ socio_id: "", monto: "", plazo_meses: "6", destino: "", garante: "" });
+  const [form, setForm] = useState({ socio_id: "", monto: "", plazo_meses: "6", tipo: "ordinario", destino: "", garante: "" });
   const [trabajando, setTrabajando] = useState(false);
 
   const cargar = () => {
@@ -153,11 +118,11 @@ export default function Creditos() {
       const c = await api("/creditos", {
         method: "POST",
         body: { socio_id: +form.socio_id, monto: +form.monto,
-                plazo_meses: +form.plazo_meses, destino: form.destino, garante: form.garante },
+                plazo_meses: +form.plazo_meses, tipo: form.tipo, destino: form.destino, garante: form.garante },
       });
       setOk(`Crédito de ${usd(c.monto)} entregado a ${c.socio_nombres}. Cuota mensual: ${usd(c.cuotas[0].total)}.`);
       setMostrarForm(false);
-      setForm({ socio_id: "", monto: "", plazo_meses: "6", destino: "", garante: "" });
+      setForm({ socio_id: "", monto: "", plazo_meses: "6", tipo: "ordinario", destino: "", garante: "" });
       cargar();
     } catch (e) { setError(e.message); }
     finally { setTrabajando(false); }
@@ -197,7 +162,7 @@ export default function Creditos() {
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
 
-      <SolicitudesCredito onCambio={cargar} />
+      <SolicitudesCredito onCambio={cargar} puedeAprobar={false} />
       <Recordatorios />
 
       {mostrarForm && (
@@ -220,6 +185,13 @@ export default function Creditos() {
             <label htmlFor="cp">Plazo (meses)</label>
             <input id="cp" inputMode="numeric" value={form.plazo_meses}
               onChange={(e) => setForm({ ...form, plazo_meses: e.target.value })} />
+          </div>
+          <div className="campo">
+            <label htmlFor="ct">Tipo de crédito</label>
+            <select id="ct" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+              <option value="ordinario">Ordinario</option>
+              <option value="emergente">Emergente (extraordinario)</option>
+            </select>
           </div>
           <div className="campo">
             <label htmlFor="cd">Destino del crédito</label>
@@ -254,7 +226,7 @@ export default function Creditos() {
                     : <span className="pill neutro">al día</span>}
                 </div>
                 <div className="detalle">
-                  {usd(c.monto)} · {c.plazo_meses} meses al {c.tasa_mensual}% · {c.destino || "sin destino"}{c.garante ? ` · garante: ${c.garante}` : ""}
+                  {usd(c.monto)} · {c.plazo_meses} meses al {c.tasa_mensual}% · {c.tipo === "emergente" ? "emergente · " : ""}{c.destino || "sin destino"}{c.garante ? ` · garante: ${c.garante}` : ""}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>

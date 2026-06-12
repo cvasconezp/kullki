@@ -10,6 +10,8 @@ import Balances from "./pages/Balances.jsx";
 import Socios from "./pages/Socios.jsx";
 import Aportes from "./pages/Aportes.jsx";
 import Creditos from "./pages/Creditos.jsx";
+import AprobacionCreditos from "./pages/AprobacionCreditos.jsx";
+import Notificaciones from "./pages/Notificaciones.jsx";
 import Libreta from "./pages/Libreta.jsx";
 import Bitacora from "./pages/Bitacora.jsx";
 import Informes from "./pages/Informes.jsx";
@@ -19,30 +21,35 @@ import AnalisisAdmin from "./components/AnalisisAdmin.jsx";
 import CambiarPassword from "./components/CambiarPassword.jsx";
 import Lock from "./components/Lock.jsx";
 import Campana from "./components/Campana.jsx";
+import Tutorial from "./components/Tutorial.jsx";
 
-// id interno · ruta (URL) · etiqueta · ícono
+// id interno · ruta (URL) · etiqueta · ícono · color del ícono
 const NAV_TESORERO = [
-  { id: "inicio", ruta: "balances", label: "Balances", ico: "▦" },
-  { id: "socios", ruta: "socios", label: "Socios", ico: "👥" },
-  { id: "aportes", ruta: "movimientos", label: "Movim.", ico: "⊕" },
-  { id: "creditos", ruta: "creditos", label: "Créditos", ico: "⇄" },
-  { id: "informes", ruta: "informe", label: "Informe", ico: "🗎" },
-  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "≡" },
+  { id: "inicio", ruta: "balances", label: "Balances", ico: "📊", c: "#0E7A5C" },
+  { id: "socios", ruta: "socios", label: "Socios", ico: "👥", c: "#2563EB" },
+  { id: "aportes", ruta: "movimientos", label: "Movim.", ico: "💸", c: "#D9A116" },
+  { id: "creditos", ruta: "creditos", label: "Créditos", ico: "🏦", c: "#7C3AED" },
+  { id: "notif", ruta: "notificaciones", label: "Notif.", ico: "🔔", c: "#DC2626" },
+  { id: "informes", ruta: "informe", label: "Informe", ico: "📄", c: "#0891B2" },
+  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "📜", c: "#6B7280" },
 ];
 const NAV_SOCIO = [
-  { id: "libreta", ruta: "libreta", label: "Mi libreta", ico: "▤" },
-  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "≡" },
+  { id: "libreta", ruta: "libreta", label: "Mi libreta", ico: "📒", c: "#0E7A5C" },
+  { id: "credito", ruta: "credito", label: "Crédito", ico: "💰", c: "#D9A116" },
+  { id: "perfil", ruta: "perfil", label: "Perfil", ico: "👤", c: "#2563EB" },
+  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "📜", c: "#6B7280" },
 ];
 const NAV_SUPER = [
-  { id: "cajas", ruta: "", label: "Cajas", ico: "🏛" },
-  { id: "analisis", ruta: "analisis", label: "Análisis", ico: "📈" },
-  { id: "uso", ruta: "uso", label: "Uso", ico: "▦" },
+  { id: "cajas", ruta: "", label: "Cajas", ico: "🏛", c: "#0E7A5C" },
+  { id: "analisis", ruta: "analisis", label: "Análisis", ico: "📈", c: "#7C3AED" },
+  { id: "uso", ruta: "uso", label: "Uso", ico: "📊", c: "#2563EB" },
 ];
 const NAV_DIRECTIVA = [
-  { id: "inicio", ruta: "balances", label: "Resumen", ico: "▦" },
-  { id: "socios", ruta: "socios", label: "Socios", ico: "👥" },
-  { id: "informes", ruta: "informe", label: "Informe", ico: "🗎" },
-  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "≡" },
+  { id: "inicio", ruta: "balances", label: "Resumen", ico: "📊", c: "#0E7A5C" },
+  { id: "socios", ruta: "socios", label: "Socios", ico: "👥", c: "#2563EB" },
+  { id: "creditos", ruta: "creditos", label: "Créditos", ico: "🏦", c: "#7C3AED" },
+  { id: "informes", ruta: "informe", label: "Informe", ico: "📄", c: "#0891B2" },
+  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "📜", c: "#6B7280" },
 ];
 const SECCION_DEF = { tesorero: "balances", socio: "libreta", directiva: "balances" };
 
@@ -56,6 +63,7 @@ export default function App() {
   const ruta = useRuta();
   const [sesion, setS] = useState(getSesion());
   const [bloqueado, setBloqueado] = useState(() => localStorage.getItem("kullki_lock") === "1");
+  const [verTut, setVerTut] = useState(false);
   const bloquear = () => { localStorage.setItem("kullki_lock", "1"); setBloqueado(true); };
   const desbloquear = () => { localStorage.removeItem("kullki_lock"); setBloqueado(false); };
 
@@ -64,7 +72,15 @@ export default function App() {
     else resetTheme();
   }, [sesion, ruta]);
 
-  // Auto-bloqueo por inactividad (12 minutos)
+  // Tutorial del socio: se abre solo la primera vez
+  useEffect(() => {
+    if (sesion && sesion.rol === "socio" && localStorage.getItem("kullki_tut_socio") !== "1") {
+      setVerTut(true);
+    }
+  }, [sesion]);
+  const cerrarTut = () => { localStorage.setItem("kullki_tut_socio", "1"); setVerTut(false); };
+
+  // Auto-bloqueo por inactividad (5 minutos)
   useEffect(() => {
     if (!sesion || bloqueado) return;
     let t;
@@ -121,22 +137,27 @@ export default function App() {
   const nav = esTesorero ? NAV_TESORERO : esSocio ? NAV_SOCIO : esDirectiva ? NAV_DIRECTIVA : esSuper ? NAV_SUPER : [];
   const seccionUrl = partes[1];
   const item = nav.find((n) => n.ruta === seccionUrl);
-  const activa = item ? item.id : (esTesorero ? "inicio" : esSocio ? "libreta" : "cajas");
+  const activa = item ? item.id : (esTesorero ? "inicio" : esSocio ? "libreta" : esDirectiva ? "inicio" : "cajas");
   const impersonando = !!sesion.es_impersonacion && !!getAdminSesion();
   const irA = (n) => navigate(esSuper ? (n.ruta ? `/admin/${n.ruta}` : "/admin") : `/${sesion.caja_slug}/${n.ruta}`);
 
   return (
     <div className="app">
+      {esSocio && verTut && <Tutorial onCerrar={cerrarTut} />}
       <header className="topbar">
         <div className="marca">
           {!esSuper && <span className="caja-logo" aria-hidden="true">{logoDe(sesion)}</span>}
           <div className="marca-txt">
-            <span className="logo">{esSuper ? "Kullki" : (sesion.caja_nombre || "Kullki")}</span>
+            <span className="logo" title={esSuper ? "Kullki" : (sesion.caja_nombre || "Kullki")}>
+              {esSuper ? "Kullki" : (sesion.caja_nombre || "Kullki")}</span>
             <span className="labs">{esSuper ? "Panel de administración" : "Kullki · Yachay Deep Labs"}</span>
           </div>
         </div>
         <div className="topbar-acc">
           {esTesorero && <Campana slug={sesion.caja_slug} />}
+          {esSocio && (
+            <button className="suspender" onClick={() => setVerTut(true)} title="Ver tutorial" aria-label="Tutorial">❔</button>
+          )}
           <button className="suspender" onClick={bloquear} title="Suspender sesión" aria-label="Suspender">🔒</button>
           <button className="salir" onClick={impersonando ? volverAdmin : salir}>
             {impersonando ? "↩ Admin" : "Salir"}
@@ -146,7 +167,7 @@ export default function App() {
 
       {impersonando && (
         <div className="imp-banner no-print">
-          Estás viendo como <b>{sesion.rol === "tesorero" ? "tesorero/a" : "socio/a"}</b> de{" "}
+          Estás viendo como <b>{sesion.rol === "tesorero" ? "tesorero/a" : sesion.rol === "directiva" ? "directiva" : "socio/a"}</b> de{" "}
           <b>{sesion.caja_nombre}</b>. Las acciones quedan en la bitácora a tu nombre.
           <button onClick={volverAdmin}>Volver a administrador</button>
         </div>
@@ -157,7 +178,7 @@ export default function App() {
           <nav className="nav" aria-label="Navegación principal">
             {nav.map((n) => (
               <button key={n.id} className={activa === n.id ? "activo" : ""} onClick={() => irA(n)}>
-                <span className="ico" aria-hidden="true">{n.ico}</span>{n.label}
+                <span className="ico" aria-hidden="true" style={{ "--c": n.c }}>{n.ico}</span>{n.label}
               </button>
             ))}
           </nav>
@@ -172,7 +193,11 @@ export default function App() {
           {(esTesorero || esDirectiva) && activa === "informes" && <Informes />}
           {esTesorero && activa === "aportes" && <Aportes />}
           {esTesorero && activa === "creditos" && <Creditos />}
-          {esSocio && activa === "libreta" && <Libreta sesion={sesion} />}
+          {esTesorero && activa === "notif" && <Notificaciones />}
+          {esDirectiva && activa === "creditos" && <AprobacionCreditos />}
+          {esSocio && activa === "libreta" && <Libreta vista="libreta" />}
+          {esSocio && activa === "credito" && <Libreta vista="credito" />}
+          {esSocio && activa === "perfil" && <Libreta vista="perfil" />}
           {activa === "bitacora" && !esSuper && <Bitacora />}
         </main>
       </div>

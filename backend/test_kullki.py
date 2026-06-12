@@ -760,3 +760,25 @@ def test_2fa_flujo(setup):
     # desactivar
     h = {"Authorization": f"Bearer {r.json()['access_token']}"}
     assert client.post("/auth/2fa/desactivar", headers=h, json={"codigo": pyotp.TOTP(secret).now()}).status_code == 200
+
+
+def test_solicitud_credito_aprueba_directiva(setup):
+    sa, ta = setup["sa"], setup["ta"]
+    ca = next(c for c in client.get("/cajas", headers=sa).json() if c["slug"] == "caja-a")
+    client.post(f"/cajas/{ca['id']}/directiva", headers=sa,
+                json={"nombre": "Dire Cred", "cedula": "1000000950", "password": "clave123"})
+    dire = login("1000000950", "clave123")
+    s = client.post("/socios", headers=ta, json={"nombres": "Pide Credito", "cedula": "2000000970"}).json()
+    socio = login("2000000970", "2000000970")
+    r = client.post("/creditos/solicitud", headers=socio, json={
+        "monto": 300, "plazo_meses": 6, "tipo": "emergente", "destino": "Salud",
+        "garante": "Ana A", "garante2": "Beto B", "documentos": "letra de cambio"})
+    assert r.status_code == 200, r.text
+    sid = r.json()["id"]
+    # tesorero NO puede aprobar
+    assert client.post(f"/creditos/solicitudes/{sid}/aprobar", headers=ta).status_code == 403
+    # la directiva sí
+    ap = client.post(f"/creditos/solicitudes/{sid}/aprobar", headers=dire)
+    assert ap.status_code == 200 and ap.json()["tipo"] == "emergente" and ap.json()["monto"] == 300
+    # el socio ya no tiene solicitud pendiente
+    assert client.get("/creditos/solicitud", headers=socio).json() is None
