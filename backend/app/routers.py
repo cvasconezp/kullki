@@ -330,7 +330,9 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
                        color_acento=data.color_acento or "#E8A838",
                        logo=data.logo or "",
                        transparencia_total=data.transparencia_total,
-                       credito_max=data.credito_max, encaje_factor=data.encaje_factor)
+                       credito_max=data.credito_max, encaje_factor=data.encaje_factor,
+                       permite_retiros=data.permite_retiros, dia_corte=data.dia_corte,
+                       multa_atraso=data.multa_atraso)
     db.add(caja)
     db.flush()
 
@@ -654,14 +656,25 @@ def registrar_aporte(data: schemas.AporteIn, db: Session = Depends(get_db),
         raise HTTPException(404, "Socio no encontrado")
     if not socio.activo:
         raise HTTPException(400, "El socio está inactivo")
+    fecha = data.fecha or date.today()
     aporte = models.Aporte(caja_id=socio.caja_id, socio_id=socio.id, monto=data.monto,
-                           fecha=data.fecha or date.today(), tipo=data.tipo,
-                           nota=data.nota, registrado_por=user.id)
+                           fecha=fecha, tipo=data.tipo, nota=data.nota, registrado_por=user.id)
     db.add(aporte)
     db.flush()
     log_audit(db, user, "crear", "aporte", aporte.id,
               f"Aporte {data.tipo} de ${data.monto:.2f} de {socio.nombres}",
               caja_id=socio.caja_id, afecta_socio_id=socio.id)
+    # Multa por atraso: aporte ordinario registrado pasado el día de corte de la caja.
+    caja = db.get(models.Caja, socio.caja_id)
+    if (data.tipo == "ordinario" and caja.dia_corte and caja.multa_atraso
+            and fecha.day > caja.dia_corte):
+        db.add(models.Aporte(caja_id=socio.caja_id, socio_id=socio.id, monto=caja.multa_atraso,
+                             fecha=fecha, tipo="multa",
+                             nota=f"Atraso de aporte (pasó el día {caja.dia_corte})",
+                             registrado_por=user.id))
+        log_audit(db, user, "crear", "aporte", 0,
+                  f"Multa por atraso de ${caja.multa_atraso:.2f} a {socio.nombres}",
+                  caja_id=socio.caja_id, afecta_socio_id=socio.id)
     db.commit()
     item = schemas.AporteOut.model_validate(aporte)
     item.socio_nombres = socio.nombres
@@ -749,57 +762,134 @@ def detalle_credito(credito_id: int, db: Session = Depends(get_db),
     return _credito_out(c, detalle=True)
 
 
+def _otorgar_credito(db, actor, socio, monto, plazo, tasa_mensual, inicio, destino, garante):
+    """Valida reglas de la caja y construye el crédito con su tabla de amortización
+    (no hace commit). Reutilizado por la creación directa y por la aprobación de solicitudes."""
+    if not socio.activo:
+        raise HTTPException(400, "El socio está inactivo")
+    caja = db.get(models.Caja, socio.caja_id)
+    if caja.credito_max and monto > caja.credito_max + 0.005:
+        raise HTTPException(400, f"El crédito supera el máximo permitido por la caja (${caja.credito_max:.2f})")
+    if caja.encaje_factor:
+        info = _socio_out(db, socio)
+        tope = round(info.total_aportes * caja.encaje_factor, 2)
+        if monto > tope + 0.005:
+            raise HTTPException(400, f"Por la regla de encaje, este socio puede recibir máximo "
+                                     f"${tope:.2f} (ahorro ${info.total_aportes:.2f} × {caja.encaje_factor})")
+    tasa = tasa_mensual if tasa_mensual is not None else caja.tasa_interes_mensual
+    inicio = inicio or date.today()
+    credito = models.Credito(caja_id=socio.caja_id, socio_id=socio.id, monto=monto,
+                             tasa_mensual=tasa, plazo_meses=plazo, fecha_desembolso=inicio,
+                             destino=destino, garante=garante, registrado_por=actor.id)
+    db.add(credito); db.flush()
+    i = tasa / 100.0; n = plazo; saldo = monto
+    cuota_fija = monto * (i * (1 + i) ** n) / ((1 + i) ** n - 1) if i > 0 else monto / n
+    for k in range(1, n + 1):
+        interes = round(saldo * i, 2)
+        capital = round(cuota_fija - interes, 2) if k < n else round(saldo, 2)
+        total = round(capital + interes, 2); saldo = round(saldo - capital, 2)
+        db.add(models.Cuota(credito_id=credito.id, numero=k, fecha_vencimiento=_add_months(inicio, k),
+                            capital=capital, interes=interes, total=total))
+    log_audit(db, actor, "crear", "credito", credito.id,
+              f"Crédito de ${monto:.2f} a {socio.nombres}, {n} meses al {tasa}% mensual",
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
+    return credito
+
+
 @creditos_router.post("", response_model=schemas.CreditoDetalle)
 def crear_credito(data: schemas.CreditoIn, db: Session = Depends(get_db),
                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
     socio = db.get(models.Socio, data.socio_id)
     if not socio or (user.rol != "superadmin" and socio.caja_id != user.caja_id):
         raise HTTPException(404, "Socio no encontrado")
-    if not socio.activo:
-        raise HTTPException(400, "El socio está inactivo")
-    caja = db.get(models.Caja, socio.caja_id)
-    if caja.credito_max and data.monto > caja.credito_max + 0.005:
-        raise HTTPException(400, f"El crédito supera el máximo permitido por la caja (${caja.credito_max:.2f})")
-    if caja.encaje_factor:
-        info = _socio_out(db, socio)
-        tope = round(info.total_aportes * caja.encaje_factor, 2)
-        if data.monto > tope + 0.005:
-            raise HTTPException(400, f"Por la regla de encaje, este socio puede recibir máximo "
-                                     f"${tope:.2f} (ahorro ${info.total_aportes:.2f} × {caja.encaje_factor})")
-    tasa = data.tasa_mensual if data.tasa_mensual is not None else caja.tasa_interes_mensual
-    inicio = data.fecha_desembolso or date.today()
-
-    credito = models.Credito(caja_id=socio.caja_id, socio_id=socio.id, monto=data.monto,
-                             tasa_mensual=tasa, plazo_meses=data.plazo_meses,
-                             fecha_desembolso=inicio, destino=data.destino, garante=data.garante,
-                             registrado_por=user.id)
-    db.add(credito)
-    db.flush()
-
-    # Amortización francesa (cuota fija). Si tasa = 0, capital fijo.
-    i = tasa / 100.0
-    n = data.plazo_meses
-    saldo = data.monto
-    if i > 0:
-        cuota_fija = data.monto * (i * (1 + i) ** n) / ((1 + i) ** n - 1)
-    else:
-        cuota_fija = data.monto / n
-    for k in range(1, n + 1):
-        interes = round(saldo * i, 2)
-        capital = round(cuota_fija - interes, 2)
-        if k == n:  # ajuste final por redondeo
-            capital = round(saldo, 2)
-        total = round(capital + interes, 2)
-        saldo = round(saldo - capital, 2)
-        db.add(models.Cuota(credito_id=credito.id, numero=k,
-                            fecha_vencimiento=_add_months(inicio, k),
-                            capital=capital, interes=interes, total=total))
-    log_audit(db, user, "crear", "credito", credito.id,
-              f"Crédito de ${data.monto:.2f} a {socio.nombres}, {n} meses al {tasa}% mensual",
-              caja_id=socio.caja_id, afecta_socio_id=socio.id)
-    db.commit()
-    db.refresh(credito)
+    credito = _otorgar_credito(db, user, socio, data.monto, data.plazo_meses,
+                               data.tasa_mensual, data.fecha_desembolso, data.destino, data.garante)
+    db.commit(); db.refresh(credito)
     return _credito_out(credito, detalle=True)
+
+
+# ---------------- Solicitudes de crédito (las inicia el socio) ----------------
+def _solcred_out(x):
+    o = schemas.SolicitudCreditoOut.model_validate(x)
+    return o
+
+
+@creditos_router.post("/solicitud", response_model=schemas.SolicitudCreditoOut)
+def crear_solicitud_credito(data: schemas.SolicitudCreditoIn, db: Session = Depends(get_db),
+                            actor: Actor = Depends(get_current_user)):
+    if actor.rol != "socio" or not actor.socio_id:
+        raise HTTPException(403, "Solo un socio puede solicitar un crédito")
+    socio = db.get(models.Socio, actor.socio_id)
+    if not socio:
+        raise HTTPException(404, "Socio no encontrado")
+    prev = db.scalar(select(models.SolicitudCredito).where(
+        models.SolicitudCredito.socio_id == socio.id,
+        models.SolicitudCredito.estado == "pendiente"))
+    if prev:
+        raise HTTPException(400, "Ya tienes una solicitud de crédito pendiente")
+    sol = models.SolicitudCredito(caja_id=socio.caja_id, socio_id=socio.id, socio_nombre=socio.nombres,
+                                  monto=data.monto, plazo_meses=data.plazo_meses, destino=data.destino,
+                                  garante=data.garante, documentos=data.documentos)
+    db.add(sol)
+    log_audit(db, actor, "crear", "solicitud", socio.id,
+              f"{socio.nombres} solicitó un crédito de ${data.monto:.2f} a {data.plazo_meses} meses",
+              caja_id=socio.caja_id, afecta_socio_id=socio.id)
+    db.commit(); db.refresh(sol)
+    return _solcred_out(sol)
+
+
+@creditos_router.get("/solicitud", response_model=schemas.SolicitudCreditoOut | None)
+def mi_solicitud_credito(db: Session = Depends(get_db), actor: Actor = Depends(get_current_user)):
+    if actor.rol != "socio" or not actor.socio_id:
+        return None
+    sol = db.scalar(select(models.SolicitudCredito).where(
+        models.SolicitudCredito.socio_id == actor.socio_id,
+        models.SolicitudCredito.estado == "pendiente"))
+    return _solcred_out(sol) if sol else None
+
+
+@creditos_router.get("/solicitudes", response_model=list[schemas.SolicitudCreditoOut])
+def listar_solicitudes_credito(caja_id: int | None = None, db: Session = Depends(get_db),
+                               user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    cid = caja_scope(user, caja_id)
+    sols = db.scalars(select(models.SolicitudCredito).where(
+        models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado == "pendiente")
+        .order_by(models.SolicitudCredito.creado_en.desc())).all()
+    return [_solcred_out(x) for x in sols]
+
+
+@creditos_router.post("/solicitudes/{sol_id}/aprobar", response_model=schemas.CreditoDetalle)
+def aprobar_solicitud_credito(sol_id: int, db: Session = Depends(get_db),
+                              user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    sol = db.get(models.SolicitudCredito, sol_id)
+    if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
+        raise HTTPException(404, "Solicitud no encontrada")
+    if sol.estado != "pendiente":
+        raise HTTPException(400, "La solicitud ya fue resuelta")
+    socio = db.get(models.Socio, sol.socio_id)
+    credito = _otorgar_credito(db, user, socio, sol.monto, sol.plazo_meses, None,
+                               date.today(), sol.destino, sol.garante)
+    sol.estado = "aprobada"; sol.resuelto_por = user.nombre; sol.resuelto_en = datetime.utcnow()
+    db.flush(); sol.credito_id = credito.id
+    db.commit(); db.refresh(credito)
+    return _credito_out(credito, detalle=True)
+
+
+@creditos_router.post("/solicitudes/{sol_id}/rechazar", response_model=schemas.SolicitudCreditoOut)
+def rechazar_solicitud_credito(sol_id: int, motivo: str = "", db: Session = Depends(get_db),
+                               user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    sol = db.get(models.SolicitudCredito, sol_id)
+    if not sol or (user.rol != "superadmin" and sol.caja_id != user.caja_id):
+        raise HTTPException(404, "Solicitud no encontrada")
+    if sol.estado != "pendiente":
+        raise HTTPException(400, "La solicitud ya fue resuelta")
+    sol.estado = "rechazada"; sol.motivo = motivo; sol.resuelto_por = user.nombre
+    sol.resuelto_en = datetime.utcnow()
+    log_audit(db, user, "editar", "solicitud", sol.socio_id,
+              f"Solicitud de crédito de {sol.socio_nombre} rechazada", caja_id=sol.caja_id,
+              afecta_socio_id=sol.socio_id)
+    db.commit()
+    return _solcred_out(sol)
 
 
 def _aplicar_abono(db, user, cuota: models.Cuota, monto: float, fecha) -> models.Credito:
@@ -899,6 +989,9 @@ def registrar_retiro(data: schemas.RetiroIn, db: Session = Depends(get_db),
     socio = db.get(models.Socio, data.socio_id)
     if not socio or (user.rol != "superadmin" and socio.caja_id != user.caja_id):
         raise HTTPException(404, "Socio no encontrado")
+    caja = db.get(models.Caja, socio.caja_id)
+    if not caja.permite_retiros:
+        raise HTTPException(403, "Esta caja no autoriza retiros de ahorro")
     info = _socio_out(db, socio)
     if data.monto > info.total_aportes + 0.005:
         raise HTTPException(400,
@@ -1048,6 +1141,7 @@ def mi_libreta(socio_id: int | None = None, db: Session = Depends(get_db),
     return schemas.LibretaOut(
         socio=_socio_out(db, socio),
         caja_nombre=caja.nombre,
+        caja_tasa=caja.tasa_interes_mensual, permite_retiros=caja.permite_retiros,
         aportes=[schemas.AporteOut.model_validate(a) for a in aportes],
         retiros=[schemas.RetiroOut.model_validate(x) for x in retiros],
         creditos=[_credito_out(c, detalle=True) for c in
@@ -1562,3 +1656,14 @@ def crear_backup(user: models.Usuario = Depends(require_roles("superadmin"))):
     import os as _os
     ruta = crear_respaldo()
     return {"ok": True, "archivo": _os.path.basename(ruta)}
+
+
+@reportes_router.get("/notificaciones")
+def notificaciones(caja_id: int | None = None, db: Session = Depends(get_db),
+                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    cid = caja_scope(user, caja_id)
+    datos = db.scalar(select(func.count(models.SolicitudCambio.id)).where(
+        models.SolicitudCambio.caja_id == cid, models.SolicitudCambio.estado == "pendiente")) or 0
+    cred = db.scalar(select(func.count(models.SolicitudCredito.id)).where(
+        models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado == "pendiente")) or 0
+    return {"solicitudes_datos": datos, "solicitudes_credito": cred, "total": datos + cred}

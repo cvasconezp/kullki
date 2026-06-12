@@ -66,6 +66,31 @@ class CierreIn(BaseModel):
     modo: str = "repartir"   # repartir | capitalizar
 
 
+class SolicitudCreditoIn(BaseModel):
+    monto: float = Field(gt=0)
+    plazo_meses: int = Field(gt=0, le=60)
+    destino: str = ""
+    garante: str = ""
+    documentos: str = ""
+
+
+class SolicitudCreditoOut(BaseModel):
+    id: int
+    socio_id: int
+    socio_nombre: str
+    monto: float
+    plazo_meses: int
+    destino: str = ""
+    garante: str = ""
+    documentos: str = ""
+    estado: str
+    motivo: str = ""
+    creado_en: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class AsumirCaja(BaseModel):
     """El superadmin entra a una caja como tesorero o (opcionalmente) un socio."""
     caja_id: int
@@ -92,6 +117,9 @@ class CajaIn(BaseModel):
     transparencia_total: bool = False
     credito_max: float = 0.0
     encaje_factor: float = 0.0
+    permite_retiros: bool = True
+    dia_corte: int = 0
+    multa_atraso: float = 0.0
     tesorero_nombre: str
     tesorero_cedula: str
     tesorero_password: str = Field(min_length=6)
@@ -116,6 +144,9 @@ class CajaUpdate(BaseModel):
     transparencia_total: bool | None = None
     credito_max: float | None = None
     encaje_factor: float | None = None
+    permite_retiros: bool | None = None
+    dia_corte: int | None = None
+    multa_atraso: float | None = None
     activa: bool | None = None
 
 
@@ -133,6 +164,9 @@ class CajaOut(BaseModel):
     transparencia_total: bool = False
     credito_max: float = 0.0
     encaje_factor: float = 0.0
+    permite_retiros: bool = True
+    dia_corte: int = 0
+    multa_atraso: float = 0.0
     activa: bool
 
     class Config:
@@ -308,6 +342,8 @@ class DashboardOut(BaseModel):
 class LibretaOut(BaseModel):
     socio: SocioOut
     caja_nombre: str
+    caja_tasa: float = 0
+    permite_retiros: bool = True
     aportes: list[AporteOut]
     retiros: list["RetiroOut"] = []
     creditos: list[CreditoDetalle]

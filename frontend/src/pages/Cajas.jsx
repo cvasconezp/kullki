@@ -4,6 +4,7 @@ import { api, mascaraCedula } from "../lib/api.js";
 const FORM_INICIAL = {
   nombre: "", slug: "", comunidad: "",
   tasa_interes_mensual: "1.5", aporte_ordinario: "10", multa_mora: "0", credito_max: "0", encaje_factor: "0",
+  permite_retiros: true, dia_corte: "0", multa_atraso: "0",
   color_primario: "#1B3A6B", color_acento: "#E8A838", logo: "", transparencia_total: false,
   tesorero_nombre: "", tesorero_cedula: "", tesorero_password: "",
 };
@@ -28,6 +29,7 @@ function EditarCaja({ caja, onListo }) {
     aporte_ordinario: String(caja.aporte_ordinario),
     multa_mora: String(caja.multa_mora ?? 0),
     credito_max: String(caja.credito_max ?? 0), encaje_factor: String(caja.encaje_factor ?? 0),
+    permite_retiros: caja.permite_retiros !== false, dia_corte: String(caja.dia_corte ?? 0), multa_atraso: String(caja.multa_atraso ?? 0),
     color_primario: caja.color_primario || "#1B3A6B",
     color_acento: caja.color_acento || "#E8A838",
     logo: caja.logo || "", transparencia_total: !!caja.transparencia_total, activa: caja.activa,
@@ -43,6 +45,7 @@ function EditarCaja({ caja, onListo }) {
         tasa_interes_mensual: +f.tasa_interes_mensual,
         aporte_ordinario: +f.aporte_ordinario, multa_mora: +f.multa_mora,
         credito_max: +f.credito_max, encaje_factor: +f.encaje_factor,
+        permite_retiros: f.permite_retiros, dia_corte: +f.dia_corte, multa_atraso: +f.multa_atraso,
         color_primario: f.color_primario, color_acento: f.color_acento,
         logo: f.logo, transparencia_total: f.transparencia_total, activa: f.activa,
       }});
@@ -73,6 +76,16 @@ function EditarCaja({ caja, onListo }) {
         <div className="campo"><label>Encaje (crédito ≤ ahorro × factor)</label>
           <input inputMode="decimal" value={f.encaje_factor} onChange={set("encaje_factor")} /></div>
       </div>
+      <div className="dos-col">
+        <div className="campo"><label>Día de corte del aporte (0 = sin corte)</label>
+          <input inputMode="numeric" value={f.dia_corte} onChange={set("dia_corte")} /></div>
+        <div className="campo"><label>Multa por aporte atrasado (USD)</label>
+          <input inputMode="decimal" value={f.multa_atraso} onChange={set("multa_atraso")} /></div>
+      </div>
+      <div className="campo"><label>¿Permite retiros de ahorro?</label>
+        <select value={f.permite_retiros ? "1" : "0"} onChange={(e) => setF({ ...f, permite_retiros: e.target.value === "1" })}>
+          <option value="1">Sí, permite retiros</option><option value="0">No permite retiros</option>
+        </select></div>
       <div className="dos-col">
         <CampoColor label="Color primario" value={f.color_primario} onChange={set("color_primario")} />
         <CampoColor label="Color de acento" value={f.color_acento} onChange={set("color_acento")} />
@@ -187,6 +200,7 @@ export default function Cajas({ onAsumir }) {
         tasa_interes_mensual: +form.tasa_interes_mensual,
         aporte_ordinario: +form.aporte_ordinario, multa_mora: +form.multa_mora,
         credito_max: +form.credito_max, encaje_factor: +form.encaje_factor,
+        permite_retiros: form.permite_retiros, dia_corte: +form.dia_corte, multa_atraso: +form.multa_atraso,
       }});
       setOk(`Caja "${c.nombre}" creada. El tesorero ya puede entrar con su cédula.`);
       setForm(FORM_INICIAL); setMostrarForm(false); cargar();
@@ -244,6 +258,16 @@ export default function Cajas({ onAsumir }) {
             <div className="campo"><label>Encaje (crédito ≤ ahorro × factor, 0 = sin regla)</label>
               <input inputMode="decimal" value={form.encaje_factor} onChange={set("encaje_factor")} placeholder="ej. 3" /></div>
           </div>
+          <div className="dos-col">
+            <div className="campo"><label>Día de corte del aporte (0 = sin corte)</label>
+              <input inputMode="numeric" value={form.dia_corte} onChange={set("dia_corte")} placeholder="ej. 10" /></div>
+            <div className="campo"><label>Multa por aporte atrasado (USD)</label>
+              <input inputMode="decimal" value={form.multa_atraso} onChange={set("multa_atraso")} /></div>
+          </div>
+          <div className="campo"><label>¿La caja permite retiros de ahorro?</label>
+            <select value={form.permite_retiros ? "1" : "0"} onChange={(e) => setForm({ ...form, permite_retiros: e.target.value === "1" })}>
+              <option value="1">Sí, permite retiros</option><option value="0">No permite retiros</option>
+            </select></div>
           <div className="dos-col">
             <div className="campo"><label>Multa por mora (USD)</label>
               <input inputMode="decimal" value={form.multa_mora} onChange={set("multa_mora")} /></div>

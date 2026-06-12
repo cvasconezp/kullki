@@ -115,6 +115,8 @@ def init_db():
                              "consentimiento_fecha": "DATE"})
         _add_cols("cajas", {"credito_max": "FLOAT DEFAULT 0", "encaje_factor": "FLOAT DEFAULT 0"})
         _add_cols("creditos", {"garante": "VARCHAR(160) DEFAULT ''"})
+        _add_cols("cajas", {"permite_retiros": "BOOLEAN DEFAULT TRUE", "dia_corte": "INTEGER DEFAULT 0",
+                            "multa_atraso": "FLOAT DEFAULT 0"})
         _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE"})
 
         # Superadmin inicial desde variables de entorno

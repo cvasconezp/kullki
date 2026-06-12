@@ -89,6 +89,42 @@ function Recordatorios() {
   );
 }
 
+function SolicitudesCredito({ onCambio }) {
+  const [sols, setSols] = useState([]); const [error, setError] = useState("");
+  const cargar = () => api("/creditos/solicitudes").then(setSols).catch(() => setSols([]));
+  useEffect(() => { cargar(); }, []);
+  const aprobar = async (id) => {
+    setError("");
+    try { await api(`/creditos/solicitudes/${id}/aprobar`, { method: "POST" }); cargar(); onCambio && onCambio(); }
+    catch (e) { setError(e.message); }
+  };
+  const rechazar = async (id) => {
+    const m = window.prompt("Motivo del rechazo (opcional):") || "";
+    setError("");
+    try { await api(`/creditos/solicitudes/${id}/rechazar?motivo=${encodeURIComponent(m)}`, { method: "POST" }); cargar(); }
+    catch (e) { setError(e.message); }
+  };
+  if (!sols.length) return null;
+  return (
+    <div className="tarjeta" style={{ borderColor: "var(--sara)" }}>
+      <h3>Solicitudes de crédito ({sols.length})</h3>
+      {error && <div className="error">{error}</div>}
+      {sols.map((s) => (
+        <div key={s.id} style={{ borderBottom: "1px dashed var(--regla)", padding: "8px 0" }}>
+          <div className="principal">{s.socio_nombre} · {usd(s.monto)} · {s.plazo_meses} meses</div>
+          <div className="detalle" style={{ margin: "2px 0 8px" }}>
+            {s.destino || "Sin destino"}{s.garante ? ` · garante: ${s.garante}` : ""}{s.documentos ? ` · docs: ${s.documentos}` : ""}
+          </div>
+          <div className="dos-col">
+            <button className="boton secundario" onClick={() => rechazar(s.id)}>Rechazar</button>
+            <button className="boton" onClick={() => aprobar(s.id)}>Aprobar y otorgar</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Creditos() {
   const [creditos, setCreditos] = useState(null);
   const [socios, setSocios] = useState([]);
@@ -161,6 +197,7 @@ export default function Creditos() {
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
 
+      <SolicitudesCredito onCambio={cargar} />
       <Recordatorios />
 
       {mostrarForm && (

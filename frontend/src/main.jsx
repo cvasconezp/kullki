@@ -5,6 +5,8 @@ import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
+// Desinstala service workers previos (el SW causaba pantalla en blanco al refrescar).
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+  if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
 }

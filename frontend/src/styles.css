@@ -489,3 +489,27 @@ details[open] summary::before { content: "▾ "; }
 .doc-legal p { font-size: 14.5px; line-height: 1.6; color: var(--tinta); margin: 0 0 8px; }
 .doc-legal .doc-meta { font-size: 12.5px; color: var(--tinta-suave); }
 .doc-legal a { color: var(--kullki); }
+
+/* ---------- Barra superior en móvil: acciones debajo del nombre ---------- */
+@media (max-width: 560px) {
+  .topbar { flex-wrap: wrap; align-items: flex-start; }
+  .marca { max-width: 100%; }
+  .topbar-acc { width: 100%; justify-content: flex-end; margin-top: 8px; }
+}
+
+/* ---------- Tutorial del socio (tarjetas horizontales) ---------- */
+.tut-overlay { position: fixed; inset: 0; background: rgba(15,36,68,.55); z-index: 50;
+  display: flex; align-items: center; justify-content: center; padding: 16px; }
+.tut-box { background: var(--carta); border-radius: 18px; padding: 18px; width: 100%; max-width: 460px;
+  box-shadow: 0 18px 48px rgba(0,0,0,.3); }
+.tut-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.tut-cab strong { font-family: var(--display); color: var(--kullki-oscuro); font-size: 17px; }
+.tut-skip { background: none; border: none; color: var(--tinta-suave); font-size: 13px; cursor: pointer; }
+.tut-scroller { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+.tut-card { scroll-snap-align: center; flex: 0 0 86%; background: var(--papel); border: 1px solid var(--regla);
+  border-radius: 14px; padding: 22px 18px; text-align: center; min-height: 190px; }
+.tut-emoji { font-size: 40px; }
+.tut-tit { font-family: var(--display); font-weight: 800; color: var(--kullki-oscuro); font-size: 18px; margin: 10px 0 6px; }
+.tut-txt { font-size: 14px; color: var(--tinta-suave); line-height: 1.5; }
+.tut-pie { text-align: center; color: var(--tinta-suave); font-size: 12px; margin: 8px 0 12px; }

@@ -9,6 +9,7 @@ export default function Aportes() {
   const [modo, setModo] = useState("aporte");
   const [form, setForm] = useState({ socio_id: "", monto: "", tipo: "ordinario", nota: "" });
   const [guardando, setGuardando] = useState(false);
+  const [permiteRetiros, setPermiteRetiros] = useState(true);
   const [editId, setEditId] = useState(null);   // `${_t}${id}`
   const [editMonto, setEditMonto] = useState("");
 
@@ -19,6 +20,7 @@ export default function Aportes() {
     api("/socios").then((s) => setSocios(s.filter((x) => x.activo))).catch((e) => setError(e.message));
     api("/aportes?limit=40").then(setAportes).catch((e) => setError(e.message));
     api("/retiros?limit=40").then(setRetiros).catch(() => {});
+    api("/dashboard").then((d) => { setPermiteRetiros(d.caja.permite_retiros !== false); if (d.caja.permite_retiros === false) setModo("aporte"); }).catch(() => {});
   };
   useEffect(() => { cargar(); }, []);
 
@@ -72,10 +74,12 @@ export default function Aportes() {
       {ok && <div className="exito">{ok}</div>}
 
       <div className="tarjeta">
-        <div className="segmentos" role="tablist">
-          <button role="tab" className={modo === "aporte" ? "seg activo" : "seg"} onClick={() => setModo("aporte")}>Aporte</button>
-          <button role="tab" className={modo === "retiro" ? "seg activo" : "seg"} onClick={() => setModo("retiro")}>Retiro</button>
-        </div>
+        {permiteRetiros && (
+          <div className="segmentos" role="tablist">
+            <button role="tab" className={modo === "aporte" ? "seg activo" : "seg"} onClick={() => setModo("aporte")}>Aporte</button>
+            <button role="tab" className={modo === "retiro" ? "seg activo" : "seg"} onClick={() => setModo("retiro")}>Retiro</button>
+          </div>
+        )}
         <h3>{modo === "aporte" ? "Registrar aporte" : "Registrar retiro de ahorro"}</h3>
         <div className="campo"><label htmlFor="as">Socio</label>
           <select id="as" value={form.socio_id} onChange={(e) => setForm({ ...form, socio_id: e.target.value })}>

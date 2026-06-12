@@ -207,3 +207,42 @@ export function imprimirInformeAsamblea(informe, cierre) {
   if (!w) { alert("Permite las ventanas emergentes para descargar el PDF."); return; }
   w.document.write(html); w.document.close();
 }
+
+// Solicitud de crédito del socio en PDF con membrete de la caja.
+export function imprimirSolicitudCredito(lib, sol) {
+  const ses = getSesion() || {};
+  const color = ses.color_primario || "#1B3A6B";
+  const acento = ses.color_acento || "#E8A838";
+  const logo = ses.logo || (lib.caja_nombre || "K").replace(/^caja (de ahorro )?/i, "").trim()[0] || "K";
+  const s = lib.socio;
+  const tasa = lib.caja_tasa || 0, i = tasa / 100, n = sol.plazo_meses, m = sol.monto;
+  const cuota = i > 0 ? m * (i * (1 + i) ** n) / ((1 + i) ** n - 1) : m / n;
+  const hoy = new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" });
+  const fila = (l, v) => `<tr><td class="l">${l}</td><td class="v">${v}</td></tr>`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Solicitud de crédito · ${s.nombres}</title>
+  <style>*{box-sizing:border-box}body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;color:#1d2530;margin:0;padding:0 28px 40px}
+  .cab{display:flex;align-items:center;gap:16px;padding:22px 0;border-bottom:3px solid ${acento}}
+  .logo{width:56px;height:56px;border-radius:12px;background:${color};color:${acento};display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800}
+  .cab h1{font-size:20px;margin:0;color:${color}} .cab .sub{font-size:12.5px;color:#66707d}
+  .doc{margin-left:auto;text-align:right}.doc .t{font-size:15px;font-weight:700;color:${color}}.doc .d{font-size:11.5px;color:#66707d}
+  h3{color:${color};font-size:14px;margin:22px 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px} td{padding:8px 10px;border-bottom:1px solid #eef1f4}
+  td.l{color:#66707d;width:38%} td.v{font-weight:600}
+  .firmas{display:flex;justify-content:space-between;margin-top:60px} .firma{width:42%;border-top:1px solid #98a;padding-top:6px;text-align:center;font-size:12px;color:#555}
+  .pie{margin-top:26px;font-size:11px;color:#8a929c;text-align:center;border-top:1px solid #eef1f4;padding-top:12px}</style></head><body>
+   <div class="cab"><div class="logo">${logo}</div>
+     <div><h1>${lib.caja_nombre || "Caja de ahorro"}</h1><div class="sub">Kullki por Yachay Deep Labs</div></div>
+     <div class="doc"><div class="t">Solicitud de crédito</div><div class="d">${hoy}</div></div></div>
+   <h3>Datos del solicitante</h3>
+   <table>${fila("Socio", s.nombres)}${fila("Cédula", s.cedula)}${fila("Ahorro actual", usd(s.total_aportes))}</table>
+   <h3>Detalle del crédito solicitado</h3>
+   <table>${fila("Monto solicitado", usd(m))}${fila("Plazo", n + " meses")}${fila("Tasa", tasa + "% mensual")}
+   ${fila("Cuota estimada", usd(cuota) + " / mes")}${fila("Total estimado a pagar", usd(cuota * n))}
+   ${fila("Destino", sol.destino || "—")}${fila("Garante / aval", sol.garante || "—")}${fila("Documentos", sol.documentos || "—")}</table>
+   <div class="firmas"><div class="firma">Firma del socio</div><div class="firma">Firma del garante</div></div>
+   <div class="pie">Documento generado por Kullki · ${lib.caja_nombre || ""} · ${hoy}. Sujeto a aprobación de la directiva/tesorería.</div>
+   <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { alert("Permite las ventanas emergentes para descargar el PDF."); return; }
+  w.document.write(html); w.document.close();
+}

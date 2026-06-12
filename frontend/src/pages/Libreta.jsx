@@ -3,11 +3,14 @@ import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
 import ExportarEstado from "../components/ExportarEstado.jsx";
 import MisDatos from "../components/MisDatos.jsx";
 import Seguridad2FA from "../components/Seguridad2FA.jsx";
+import CreditoSocio from "../components/CreditoSocio.jsx";
+import Tutorial from "../components/Tutorial.jsx";
 
 export default function Libreta() {
   const [lib, setLib] = useState(null);
   const [error, setError] = useState("");
   const [verCedula, setVerCedula] = useState(false);
+  const [verTut, setVerTut] = useState(() => localStorage.getItem("kullki_tut_socio") !== "1");
 
   const cargar = () => api("/mi-libreta").then(setLib).catch((e) => setError(e.message));
   useEffect(() => { cargar(); }, []);
@@ -20,6 +23,7 @@ export default function Libreta() {
 
   return (
     <>
+      {verTut && <Tutorial onCerrar={() => { localStorage.setItem("kullki_tut_socio", "1"); setVerTut(false); }} />}
       <div className="libreta">
         <div className="eyebrow">{caja_nombre}</div>
         <div className="lib-titular">
@@ -56,6 +60,8 @@ export default function Libreta() {
           </div>
         );
       })()}
+
+      <CreditoSocio lib={lib} />
 
       <ExportarEstado lib={lib} />
 

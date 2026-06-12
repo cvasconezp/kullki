@@ -22,6 +22,9 @@ class Caja(Base):
     transparencia_total: Mapped[bool] = mapped_column(Boolean, default=False)  # socios ven toda la bitácora
     credito_max: Mapped[float] = mapped_column(Float, default=0.0)     # monto máx. de crédito (0 = sin límite)
     encaje_factor: Mapped[float] = mapped_column(Float, default=0.0)   # crédito máx = ahorro * factor (0 = sin regla)
+    permite_retiros: Mapped[bool] = mapped_column(Boolean, default=True)  # la caja autoriza retiros
+    dia_corte: Mapped[int] = mapped_column(Integer, default=0)         # día límite del mes para aportar (0 = sin corte)
+    multa_atraso: Mapped[float] = mapped_column(Float, default=0.0)    # multa por aporte fuera del corte
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -184,6 +187,26 @@ class SolicitudCambio(Base):
     socio_nombre: Mapped[str] = mapped_column(String(120))
     campos: Mapped[str] = mapped_column(Text, default="{}")   # JSON con los cambios propuestos
     estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # pendiente|aprobada|rechazada
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    resuelto_por: Mapped[str] = mapped_column(String(120), default="")
+    resuelto_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SolicitudCredito(Base):
+    """Solicitud de crédito iniciada por el socio; la aprueba el tesorero."""
+    __tablename__ = "solicitudes_credito"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
+    socio_id: Mapped[int] = mapped_column(ForeignKey("socios.id"), index=True)
+    socio_nombre: Mapped[str] = mapped_column(String(120))
+    monto: Mapped[float] = mapped_column(Float)
+    plazo_meses: Mapped[int] = mapped_column(Integer)
+    destino: Mapped[str] = mapped_column(String(200), default="")
+    garante: Mapped[str] = mapped_column(String(160), default="")
+    documentos: Mapped[str] = mapped_column(Text, default="")
+    estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # pendiente|aprobada|rechazada
+    motivo: Mapped[str] = mapped_column(String(200), default="")
+    credito_id: Mapped[int | None] = mapped_column(ForeignKey("creditos.id"), nullable=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     resuelto_por: Mapped[str] = mapped_column(String(120), default="")
     resuelto_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
