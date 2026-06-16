@@ -52,7 +52,7 @@ export default function Informes() {
   const descargarExcel = async (tipo) => {
     try {
       const base = import.meta.env.VITE_API_URL || "http://localhost:8000";
-      const token = JSON.parse(sessionStorage.getItem("kullki_sesion"))?.token;
+      const token = JSON.parse(sessionStorage.getItem("kullki_sesion"))?.access_token;
       const res = await fetch(`${base}/exportar/excel/${tipo}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
