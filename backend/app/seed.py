@@ -154,8 +154,9 @@ def reseed_demo():
             usuario_ids = [m.usuario_id for m in db.query(models.Membresia).filter_by(caja_id=cid).all()]
             if cred_ids:
                 db.query(models.Cuota).filter(models.Cuota.credito_id.in_(cred_ids)).delete(synchronize_session=False)
-            for M in (models.Credito, models.Aporte, models.Retiro, models.Auditoria,
-                      models.SolicitudCambio, models.Acceso, models.Membresia, models.Socio):
+            for M in (models.SolicitudCredito, models.SolicitudCambio,
+                      models.Credito, models.Aporte, models.Retiro, models.Auditoria,
+                      models.Acceso, models.Membresia, models.Socio):
                 db.query(M).filter_by(caja_id=cid).delete(synchronize_session=False)
             db.query(models.Caja).filter_by(id=cid).delete(synchronize_session=False)
             for uid in usuario_ids:
