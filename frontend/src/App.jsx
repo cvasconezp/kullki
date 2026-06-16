@@ -201,4 +201,11 @@ export default function App() {
           {esTesorero && activa === "notif" && <Notificaciones />}
           {esDirectiva && activa === "creditos" && <AprobacionCreditos />}
           {esSocio && activa === "libreta" && <Libreta vista="libreta" />}
-          {esSocio && activa ===
+          {esSocio && activa === "credito" && <Libreta vista="credito" />}
+          {esSocio && activa === "perfil" && <Libreta vista="perfil" />}
+          {activa === "bitacora" && !esSuper && <Bitacora />}
+        </main>
+      </div>
+    </div>
+  );
+}
