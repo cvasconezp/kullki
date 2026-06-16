@@ -64,10 +64,10 @@ function rutaDe(s) {
 export default function App() {
   const ruta = useRuta();
   const [sesion, setS] = useState(getSesion());
-  const [bloqueado, setBloqueado] = useState(() => localStorage.getItem("kullki_lock") === "1");
+  const [bloqueado, setBloqueado] = useState(() => sessionStorage.getItem("kullki_lock") === "1");
   const [verTut, setVerTut] = useState(false);
-  const bloquear = () => { localStorage.setItem("kullki_lock", "1"); setBloqueado(true); };
-  const desbloquear = () => { localStorage.removeItem("kullki_lock"); setBloqueado(false); };
+  const bloquear = () => { sessionStorage.setItem("kullki_lock", "1"); setBloqueado(true); };
+  const desbloquear = () => { sessionStorage.removeItem("kullki_lock"); setBloqueado(false); };
 
   useEffect(() => {
     // Rutas públicas siempre con la marca Kullki/YD, sin importar si hay sesión.
