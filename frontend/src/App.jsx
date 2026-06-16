@@ -24,34 +24,34 @@ import Lock from "./components/Lock.jsx";
 import Campana from "./components/Campana.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 
-// id interno · ruta (URL) · etiqueta · ícono · color del ícono
+// id interno · ruta (URL) · etiqueta completa · abreviatura móvil · ícono · color del ícono
 const NAV_TESORERO = [
-  { id: "inicio", ruta: "balances", label: "Balances", ico: "📊", c: "#0E7A5C" },
-  { id: "socios", ruta: "socios", label: "Socios", ico: "👥", c: "#2563EB" },
-  { id: "aportes", ruta: "movimientos", label: "Movimientos", ico: "💸", c: "#D9A116" },
-  { id: "creditos", ruta: "creditos", label: "Créditos", ico: "🏦", c: "#7C3AED" },
-  { id: "notif", ruta: "notificaciones", label: "Notificaciones", ico: "🔔", c: "#DC2626" },
-  { id: "informes", ruta: "informe", label: "Informe", ico: "📄", c: "#0891B2" },
-  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "📜", c: "#6B7280" },
+  { id: "inicio",    ruta: "balances",       label: "Balances",        short: "Saldos",   ico: "📊", c: "#0E7A5C" },
+  { id: "socios",    ruta: "socios",         label: "Socios",          short: "Socios",   ico: "👥", c: "#2563EB" },
+  { id: "aportes",   ruta: "movimientos",    label: "Movimientos",     short: "Movim.",   ico: "💸", c: "#D9A116" },
+  { id: "creditos",  ruta: "creditos",       label: "Créditos",        short: "Créd.",    ico: "🏦", c: "#7C3AED" },
+  { id: "notif",     ruta: "notificaciones", label: "Notificaciones",  short: "Notif.",   ico: "🔔", c: "#DC2626" },
+  { id: "informes",  ruta: "informe",        label: "Informe",         short: "Inf.",     ico: "📄", c: "#0891B2" },
+  { id: "bitacora",  ruta: "bitacora",       label: "Bitácora",        short: "Bitác.",   ico: "📜", c: "#6B7280" },
 ];
 const NAV_SOCIO = [
-  { id: "libreta", ruta: "libreta", label: "Mi libreta", ico: "📒", c: "#0E7A5C" },
-  { id: "credito", ruta: "credito", label: "Crédito", ico: "💰", c: "#D9A116" },
-  { id: "perfil", ruta: "perfil", label: "Perfil", ico: "👤", c: "#2563EB" },
-  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "📜", c: "#6B7280" },
+  { id: "libreta",  ruta: "libreta",  label: "Mi libreta", short: "Libreta", ico: "📒", c: "#0E7A5C" },
+  { id: "credito",  ruta: "credito",  label: "Crédito",    short: "Créd.",   ico: "💰", c: "#D9A116" },
+  { id: "perfil",   ruta: "perfil",   label: "Perfil",     short: "Perfil",  ico: "👤", c: "#2563EB" },
+  { id: "bitacora", ruta: "bitacora", label: "Bitácora",   short: "Bitác.",  ico: "📜", c: "#6B7280" },
 ];
 const NAV_SUPER = [
-  { id: "cajas", ruta: "", label: "Cajas", ico: "🏛", c: "#0E7A5C" },
-  { id: "analisis", ruta: "analisis", label: "Análisis", ico: "📈", c: "#7C3AED" },
-  { id: "usuarios", ruta: "usuarios", label: "Usuarios", ico: "🔑", c: "#DC2626" },
-  { id: "uso", ruta: "uso", label: "Uso", ico: "📊", c: "#2563EB" },
+  { id: "cajas",    ruta: "",         label: "Cajas",    short: "Cajas",   ico: "🏛", c: "#0E7A5C" },
+  { id: "analisis", ruta: "analisis", label: "Análisis", short: "Anal.",   ico: "📈", c: "#7C3AED" },
+  { id: "usuarios", ruta: "usuarios", label: "Usuarios", short: "Users",   ico: "🔑", c: "#DC2626" },
+  { id: "uso",      ruta: "uso",      label: "Uso",      short: "Uso",     ico: "📊", c: "#2563EB" },
 ];
 const NAV_DIRECTIVA = [
-  { id: "inicio", ruta: "balances", label: "Resumen", ico: "📊", c: "#0E7A5C" },
-  { id: "socios", ruta: "socios", label: "Socios", ico: "👥", c: "#2563EB" },
-  { id: "creditos", ruta: "creditos", label: "Créditos", ico: "🏦", c: "#7C3AED" },
-  { id: "informes", ruta: "informe", label: "Informe", ico: "📄", c: "#0891B2" },
-  { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "📜", c: "#6B7280" },
+  { id: "inicio",   ruta: "balances", label: "Resumen",  short: "Resumen", ico: "📊", c: "#0E7A5C" },
+  { id: "socios",   ruta: "socios",   label: "Socios",   short: "Socios",  ico: "👥", c: "#2563EB" },
+  { id: "creditos", ruta: "creditos", label: "Créditos", short: "Créd.",   ico: "🏦", c: "#7C3AED" },
+  { id: "informes", ruta: "informe",  label: "Informe",  short: "Inf.",    ico: "📄", c: "#0891B2" },
+  { id: "bitacora", ruta: "bitacora", label: "Bitácora", short: "Bitác.",  ico: "📜", c: "#6B7280" },
 ];
 const SECCION_DEF = { tesorero: "balances", socio: "libreta", directiva: "balances" };
 
@@ -182,7 +182,7 @@ export default function App() {
           <nav className="nav" aria-label="Navegación principal">
             {nav.map((n) => (
               <button key={n.id} className={activa === n.id ? "activo" : ""} onClick={() => irA(n)}>
-                <span className="ico" aria-hidden="true" style={{ "--c": n.c }}>{n.ico}</span>{n.label}
+                <span className="ico" aria-hidden="true" style={{ "--c": n.c }}>{n.ico}</span><span className="nav-short">{n.short || n.label}</span><span className="nav-full">{n.label}</span>
               </button>
             ))}
           </nav>

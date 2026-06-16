@@ -167,6 +167,9 @@ button { font-family: var(--cuerpo); cursor: pointer; }
   background: color-mix(in srgb, var(--c, var(--kullki)) 16%, transparent); }
 .nav button.activo .ico { background: color-mix(in srgb, var(--c, var(--kullki)) 28%, transparent); }
 .nav button.activo { color: var(--kullki-oscuro); background: var(--kullki-tinte); }
+/* móvil: abreviatura visible, título completo oculto */
+.nav-full { display: none; }
+.nav-short { display: inline; }
 
 /* ---------- login ---------- */
 .login { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 28px 24px; }
@@ -311,6 +314,9 @@ details[open] summary::before { content: "▾ "; }
   .nav button { flex-direction: row; justify-content: flex-start; gap: 11px; font-size: 14.5px;
     padding: 11px 13px; border-radius: 11px; }
   .nav button .ico { font-size: 17px; width: 28px; height: 28px; }
+  /* escritorio: título completo visible, abreviatura oculta */
+  .nav-full { display: inline; }
+  .nav-short { display: none; }
   .contenido { padding: 4px 0 48px; flex: 1; min-width: 0; }
   .topbar { padding: 16px 22px 12px; }
   .marca .logo { max-width: none; font-size: 19px; }
