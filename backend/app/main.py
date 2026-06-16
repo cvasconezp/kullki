@@ -28,6 +28,7 @@ async def cabeceras_seguridad(request, call_next):
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "no-referrer"
     resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return resp
 
 for r in (auth_router, cajas_router, socios_router, aportes_router,

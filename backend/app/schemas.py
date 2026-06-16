@@ -117,7 +117,7 @@ class AsumirCaja(BaseModel):
 
 class CambioPassword(BaseModel):
     actual: str
-    nueva: str = Field(min_length=6)
+    nueva: str = Field(min_length=8)
 
 
 # ---------- Cajas ----------
@@ -139,13 +139,13 @@ class CajaIn(BaseModel):
     multa_atraso: float = 0.0
     tesorero_nombre: str
     tesorero_cedula: str
-    tesorero_password: str = Field(min_length=6)
+    tesorero_password: str = Field(min_length=8)
 
 
 class DirectivaIn(BaseModel):
     nombre: str
     cedula: str
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)
 
 
 class CajaUpdate(BaseModel):

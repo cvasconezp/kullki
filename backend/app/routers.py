@@ -347,6 +347,8 @@ def cambiar_password(data: schemas.CambioPassword, db: Session = Depends(get_db)
         raise HTTPException(400, "La contraseña actual no coincide")
     if data.nueva.strip() == user.cedula:
         raise HTTPException(400, "Tu nueva contraseña no puede ser tu número de cédula")
+    if not any(c.isdigit() for c in data.nueva):
+        raise HTTPException(400, "La contraseña debe contener al menos un número")
     user.password_hash = hash_password(data.nueva)
     user.debe_cambiar_password = False
     db.commit()
@@ -1880,12 +1882,14 @@ def estado_seguridad(db: Session = Depends(get_db),
         {"clave": "Contraseña de administrador propia", "ok": superadmin_env,
          "detalle": "Definida por variable de entorno." if superadmin_env
                     else "FALTA: configura SUPERADMIN_PASSWORD en Railway."},
-        {"clave": "Contraseñas cifradas (PBKDF2)", "ok": True, "detalle": "Nunca se guardan en texto plano."},
-        {"clave": "Conexión segura (HTTPS)", "ok": True, "detalle": "Tráfico cifrado extremo a extremo."},
-        {"clave": "Bloqueo por intentos fallidos", "ok": True, "detalle": "5 intentos y bloqueo temporal."},
+        {"clave": "Contraseñas cifradas (PBKDF2-SHA256)", "ok": True, "detalle": "100,000 iteraciones. Nunca se guardan en texto plano."},
+        {"clave": "Conexión segura (HTTPS + HSTS)", "ok": True, "detalle": "Tráfico cifrado extremo a extremo. HSTS activo 1 año."},
+        {"clave": "Bloqueo por intentos fallidos", "ok": True, "detalle": "5 intentos y bloqueo temporal de 15 min."},
         {"clave": "Auto-bloqueo de sesión", "ok": True, "detalle": "Suspensión por inactividad + PIN."},
         {"clave": "Bitácora inmutable / sin borrados", "ok": True, "detalle": "Todo queda auditado."},
-        {"clave": "Cabeceras de seguridad", "ok": True, "detalle": "nosniff, anti-clickjacking, etc."},
+        {"clave": "Cabeceras de seguridad", "ok": True, "detalle": "HSTS, nosniff, anti-clickjacking, Referrer-Policy."},
+        {"clave": "Política de contraseñas", "ok": True, "detalle": "Mínimo 8 caracteres, al menos un número, no puede ser la cédula."},
+        {"clave": "2FA para tesoreros", "ok": True, "detalle": "TOTP obligatorio. Sin 2FA activo, no se puede operar."},
     ]
     return {"checks": checks,
             "usuarios_con_clave_inicial_pendiente": pendientes,
