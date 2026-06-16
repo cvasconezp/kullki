@@ -24,6 +24,11 @@ class Caja(Base):
     encaje_factor: Mapped[float] = mapped_column(Float, default=0.0)   # crédito máx = ahorro * factor (0 = sin regla)
     permite_retiros: Mapped[bool] = mapped_column(Boolean, default=True)  # la caja autoriza retiros
     dia_corte: Mapped[int] = mapped_column(Integer, default=0)         # día límite del mes para aportar (0 = sin corte)
+    # Servicios opcionales activables por caja
+    permite_eco_ahorro: Mapped[bool] = mapped_column(Boolean, default=False)
+    permite_mascotas: Mapped[bool] = mapped_column(Boolean, default=False)
+    permite_inversiones: Mapped[bool] = mapped_column(Boolean, default=False)
+    permite_credito_educativo: Mapped[bool] = mapped_column(Boolean, default=False)
     multa_atraso: Mapped[float] = mapped_column(Float, default=0.0)    # multa por aporte fuera del corte
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

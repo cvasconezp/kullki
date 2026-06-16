@@ -137,6 +137,10 @@ class CajaIn(BaseModel):
     permite_retiros: bool = True
     dia_corte: int = 0
     multa_atraso: float = 0.0
+    permite_eco_ahorro: bool = False
+    permite_mascotas: bool = False
+    permite_inversiones: bool = False
+    permite_credito_educativo: bool = False
     tesorero_nombre: str
     tesorero_cedula: str
     tesorero_password: str = Field(min_length=8)
@@ -165,6 +169,10 @@ class CajaUpdate(BaseModel):
     dia_corte: int | None = None
     multa_atraso: float | None = None
     activa: bool | None = None
+    permite_eco_ahorro: bool | None = None
+    permite_mascotas: bool | None = None
+    permite_inversiones: bool | None = None
+    permite_credito_educativo: bool | None = None
 
 
 class CajaOut(BaseModel):
@@ -184,6 +192,10 @@ class CajaOut(BaseModel):
     permite_retiros: bool = True
     dia_corte: int = 0
     multa_atraso: float = 0.0
+    permite_eco_ahorro: bool = False
+    permite_mascotas: bool = False
+    permite_inversiones: bool = False
+    permite_credito_educativo: bool = False
     activa: bool
 
     class Config:

@@ -126,6 +126,7 @@ def init_db():
                             "garante_estado": "VARCHAR(20) DEFAULT 'pendiente'",
                             "garante2_estado": "VARCHAR(20) DEFAULT ''"})
         _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE"})
+        _add_cols("cajas", {"permite_eco_ahorro": "BOOLEAN DEFAULT FALSE", "permite_mascotas": "BOOLEAN DEFAULT FALSE", "permite_inversiones": "BOOLEAN DEFAULT FALSE", "permite_credito_educativo": "BOOLEAN DEFAULT FALSE"})
 
         # Superadmin inicial desde variables de entorno
         # Chequeo de configuración de seguridad

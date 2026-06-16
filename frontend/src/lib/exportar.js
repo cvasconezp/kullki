@@ -147,7 +147,7 @@ export function imprimirEstadoCuenta(lib, periodo) {
 // Nuevos campos opcionales: transaccionId, hora (HH:MM), socioId, cuentaId
 export function imprimirBoucher({ tipo, monto, fecha, hora, socio, nota, registradoPor, cajaInfo, extra, transaccionId, socioId }) {
   // Enmascara la cédula: muestra primero 3 y últimos 3 dígitos → 167····242
-  const maskCedula = (c) => c ? String(c).slice(0, 3) + "····" + String(c).slice(-3) : null;
+  const maskCedula = (c) => c ? String(c).slice(0, 2) + "······" + String(c).slice(-2) : null;
   const ses = getSesion() || {};
   const color = cajaInfo?.color_primario || ses.color_primario || "#1B3A6B";
   const acento = cajaInfo?.color_acento || ses.color_acento || "#E8A838";

@@ -147,6 +147,7 @@ export default function Aportes() {
   const [form, setForm] = useState({ socio_id: "", monto: "", tipo: "ordinario", nota: "", cantidad_kg: "" });
   const [guardando, setGuardando] = useState(false);
   const [permiteRetiros, setPermiteRetiros] = useState(true);
+  const [cajaFlags, setCajaFlags] = useState({});
   const [editId, setEditId] = useState(null);   // `${_t}${id}`
   const [editMonto, setEditMonto] = useState("");
 
@@ -157,7 +158,7 @@ export default function Aportes() {
     api("/socios").then((s) => setSocios(s.filter((x) => x.activo))).catch((e) => setError(e.message));
     api("/aportes?limit=40").then(setAportes).catch((e) => setError(e.message));
     api("/retiros?limit=40").then(setRetiros).catch(() => {});
-    api("/dashboard").then((d) => { setPermiteRetiros(d.caja.permite_retiros !== false); if (d.caja.permite_retiros === false) setModo("aporte"); }).catch(() => {});
+    api("/dashboard").then((d) => { setPermiteRetiros(d.caja.permite_retiros !== false); if (d.caja.permite_retiros === false) setModo("aporte"); setCajaFlags(d.caja || {}); }).catch(() => {});
   };
   useEffect(() => { cargar(); }, []);
 
@@ -236,10 +237,12 @@ export default function Aportes() {
                 <select id="at" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
                   <option value="ordinario">Ordinario</option>
                   <option value="extraordinario">Extraordinario</option>
-                  <option value="eco_ahorro">Eco ahorro</option>
-                  <option value="mascotas">Mascotas</option>
-                  <option value="ingreso">Cuota de ingreso (membresía, no es ahorro)</option>
-                  <option value="multa">Multa (va al fondo, no al ahorro)</option>
+                  {cajaFlags.permite_eco_ahorro && <option value="eco_ahorro">🌿 Eco ahorro</option>}
+                  {cajaFlags.permite_mascotas && <option value="mascotas">🐾 Mascotas</option>}
+                  {cajaFlags.permite_inversiones && <option value="inversion">📈 Inversiones</option>}
+                  {cajaFlags.permite_credito_educativo && <option value="credito_educativo">🎓 Crédito educativo</option>}
+                  <option value="ingreso">Cuota de ingreso (membresía)</option>
+                  <option value="multa">Multa (va al fondo)</option>
                 </select></div>
             ) : (
               <div className="campo"><label htmlFor="an">Nota (opcional)</label>

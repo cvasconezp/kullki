@@ -5,6 +5,7 @@ const FORM_INICIAL = {
   nombre: "", slug: "", comunidad: "",
   tasa_interes_mensual: "1.5", aporte_ordinario: "10", multa_mora: "0", credito_max: "0", encaje_factor: "0",
   permite_retiros: true, dia_corte: "0", multa_atraso: "0",
+  permite_eco_ahorro: false, permite_mascotas: false, permite_inversiones: false, permite_credito_educativo: false,
   color_primario: "#1B3A6B", color_acento: "#E8A838", logo: "", transparencia_total: false,
   tesorero_nombre: "", tesorero_cedula: "", tesorero_password: "",
 };
@@ -33,6 +34,8 @@ function EditarCaja({ caja, onListo }) {
     color_primario: caja.color_primario || "#1B3A6B",
     color_acento: caja.color_acento || "#E8A838",
     logo: caja.logo || "", transparencia_total: !!caja.transparencia_total, activa: caja.activa,
+    permite_eco_ahorro: !!caja.permite_eco_ahorro, permite_mascotas: !!caja.permite_mascotas,
+    permite_inversiones: !!caja.permite_inversiones, permite_credito_educativo: !!caja.permite_credito_educativo,
   });
   const [error, setError] = useState(""); const [guardando, setGuardando] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -48,6 +51,8 @@ function EditarCaja({ caja, onListo }) {
         permite_retiros: f.permite_retiros, dia_corte: +f.dia_corte, multa_atraso: +f.multa_atraso,
         color_primario: f.color_primario, color_acento: f.color_acento,
         logo: f.logo, transparencia_total: f.transparencia_total, activa: f.activa,
+        permite_eco_ahorro: f.permite_eco_ahorro, permite_mascotas: f.permite_mascotas,
+        permite_inversiones: f.permite_inversiones, permite_credito_educativo: f.permite_credito_educativo,
       }});
       onListo(true);
     } catch (e) { setError(e.message); setGuardando(false); }
@@ -97,6 +102,17 @@ function EditarCaja({ caja, onListo }) {
           <option value="0">Privada — cada socio ve solo lo suyo (recomendado)</option>
           <option value="1">Transparencia total — todos ven todo (modo asamblea)</option>
         </select>
+      </div>
+      <div className="campo">
+        <label>Servicios opcionales activados en esta caja</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", paddingTop: 4 }}>
+          {[["permite_eco_ahorro","🌿 Eco ahorro"],["permite_mascotas","🐾 Mascotas"],["permite_inversiones","📈 Inversiones"],["permite_credito_educativo","🎓 Crédito educativo"]].map(([k,l]) => (
+            <label key={k} style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer" }}>
+              <input type="checkbox" checked={!!f[k]} onChange={(e) => setF({ ...f, [k]: e.target.checked })} />
+              {l}
+            </label>
+          ))}
+        </div>
       </div>
       <div className="campo">
         <label>Estado</label>
@@ -201,6 +217,8 @@ export default function Cajas({ onAsumir }) {
         aporte_ordinario: +form.aporte_ordinario, multa_mora: +form.multa_mora,
         credito_max: +form.credito_max, encaje_factor: +form.encaje_factor,
         permite_retiros: form.permite_retiros, dia_corte: +form.dia_corte, multa_atraso: +form.multa_atraso,
+        permite_eco_ahorro: form.permite_eco_ahorro, permite_mascotas: form.permite_mascotas,
+        permite_inversiones: form.permite_inversiones, permite_credito_educativo: form.permite_credito_educativo,
       }});
       setOk(`Caja "${c.nombre}" creada. El tesorero ya puede entrar con su cédula.`);
       setForm(FORM_INICIAL); setMostrarForm(false); cargar();
@@ -284,6 +302,17 @@ export default function Cajas({ onAsumir }) {
               <option value="0">Privada — cada socio ve solo lo suyo (recomendado)</option>
               <option value="1">Transparencia total — todos ven todo (modo asamblea)</option>
             </select></div>
+          <div className="campo">
+            <label>Servicios opcionales activados en esta caja</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", paddingTop: 4 }}>
+              {[["permite_eco_ahorro","🌿 Eco ahorro"],["permite_mascotas","🐾 Mascotas"],["permite_inversiones","📈 Inversiones"],["permite_credito_educativo","🎓 Crédito educativo"]].map(([k,l]) => (
+                <label key={k} style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer" }}>
+                  <input type="checkbox" checked={!!form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.checked })} />
+                  {l}
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="vista-previa" style={{ background: form.color_primario }}>
             <span className="vp-logo" style={{ color: form.color_acento }}>{form.logo || (form.nombre[0] || "K").toUpperCase()}</span>
             <span className="vp-txt">{form.nombre || "Nombre de la caja"}</span>

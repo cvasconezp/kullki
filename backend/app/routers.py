@@ -347,6 +347,10 @@ def cambiar_password(data: schemas.CambioPassword, db: Session = Depends(get_db)
         raise HTTPException(400, "La contraseña actual no coincide")
     if data.nueva.strip() == user.cedula:
         raise HTTPException(400, "Tu nueva contraseña no puede ser tu número de cédula")
+    if not any(c.isupper() for c in data.nueva):
+        raise HTTPException(400, "La contraseña debe contener al menos una letra mayúscula")
+    if not any(c.islower() for c in data.nueva):
+        raise HTTPException(400, "La contraseña debe contener al menos una letra minúscula")
     if not any(c.isdigit() for c in data.nueva):
         raise HTTPException(400, "La contraseña debe contener al menos un número")
     user.password_hash = hash_password(data.nueva)
@@ -380,7 +384,11 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
                        transparencia_total=data.transparencia_total,
                        credito_max=data.credito_max, encaje_factor=data.encaje_factor,
                        permite_retiros=data.permite_retiros, dia_corte=data.dia_corte,
-                       multa_atraso=data.multa_atraso)
+                       multa_atraso=data.multa_atraso,
+                       permite_eco_ahorro=data.permite_eco_ahorro,
+                       permite_mascotas=data.permite_mascotas,
+                       permite_inversiones=data.permite_inversiones,
+                       permite_credito_educativo=data.permite_credito_educativo)
     db.add(caja)
     db.flush()
 

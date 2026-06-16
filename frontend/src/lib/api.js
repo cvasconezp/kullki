@@ -1,22 +1,22 @@
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export function getSesion() {
-  try { return JSON.parse(localStorage.getItem("kullki_sesion")) || null; }
+  try { return JSON.parse(sessionStorage.getItem("kullki_sesion")) || null; }
   catch { return null; }
 }
 export function setSesion(s) {
-  if (s) localStorage.setItem("kullki_sesion", JSON.stringify(s));
-  else localStorage.removeItem("kullki_sesion");
+  if (s) sessionStorage.setItem("kullki_sesion", JSON.stringify(s));
+  else sessionStorage.removeItem("kullki_sesion");
 }
 
 // Sesión original del superadmin mientras "actúa como" tesorero/socio
 export function getAdminSesion() {
-  try { return JSON.parse(localStorage.getItem("kullki_admin")) || null; }
+  try { return JSON.parse(sessionStorage.getItem("kullki_admin")) || null; }
   catch { return null; }
 }
 export function setAdminSesion(s) {
-  if (s) localStorage.setItem("kullki_admin", JSON.stringify(s));
-  else localStorage.removeItem("kullki_admin");
+  if (s) sessionStorage.setItem("kullki_admin", JSON.stringify(s));
+  else sessionStorage.removeItem("kullki_admin");
 }
 
 export async function api(path, { method = "GET", body, token } = {}) {
