@@ -801,8 +801,8 @@ def multas_masivas(caja_id: int | None = None, db: Session = Depends(get_db),
                                                     models.Socio.activo)).all()
     multados = 0
     for s in socios:
-        # ¿Ya tiene multa de atraso este mes?
-        ya = db.scalar(select(func.count()).where(
+        # ¿Ya tiene multa de atraso este mes? (usa count(id) para forzar FROM correcto)
+        ya = db.scalar(select(func.count(models.Aporte.id)).where(
             models.Aporte.socio_id == s.id, models.Aporte.caja_id == cid,
             models.Aporte.tipo == "multa", models.Aporte.fecha >= mes_inicio,
             models.Aporte.anulado == False,
@@ -810,7 +810,7 @@ def multas_masivas(caja_id: int | None = None, db: Session = Depends(get_db),
         if ya:
             continue
         # ¿Aportó ordinariamente este mes?
-        aportó = db.scalar(select(func.count()).where(
+        aportó = db.scalar(select(func.count(models.Aporte.id)).where(
             models.Aporte.socio_id == s.id, models.Aporte.caja_id == cid,
             models.Aporte.tipo.in_(["ordinario", "extraordinario"]),
             models.Aporte.fecha >= mes_inicio, models.Aporte.anulado == False)) or 0

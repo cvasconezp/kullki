@@ -146,6 +146,7 @@ export default function Aportes() {
   const [modo, setModo] = useState("aporte");
   const [form, setForm] = useState({ socio_id: "", monto: "", tipo: "ordinario", nota: "", cantidad_kg: "" });
   const [guardando, setGuardando] = useState(false);
+  const [multando, setMultando] = useState(false);
   const [permiteRetiros, setPermiteRetiros] = useState(true);
   const [cajaFlags, setCajaFlags] = useState({});
   const [editId, setEditId] = useState(null);   // `${_t}${id}`
@@ -268,15 +269,18 @@ export default function Aportes() {
             registraron aporte este mes (corte: día {cajaFlags.dia_corte}).
           </div>
           <button className="boton" style={{ background: "var(--cochinilla)" }}
+            disabled={multando}
             onClick={async () => {
               if (!window.confirm("¿Aplicar multas a socios sin aporte este mes?")) return;
+              setMultando(true);
               try {
                 const r = await api("/aportes/multas-masivas", { method: "POST" });
                 setOk(`✓ ${r.multados} socio(s) multados · Total ${usd(r.total)}`);
                 cargar();
               } catch (e) { setError(e.message); }
+              finally { setMultando(false); }
             }}>
-            ⚡ Aplicar multas del mes
+            {multando ? "Aplicando…" : "⚡ Aplicar multas del mes"}
           </button>
         </div>
       )}

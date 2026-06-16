@@ -51,10 +51,12 @@ export default function Informes() {
 
   const descargarExcel = async (tipo) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || ""}/reportes/exportar/excel/${tipo}`, {
-        headers: { Authorization: `Bearer ${JSON.parse(sessionStorage.getItem("kullki_sesion"))?.token}` }
+      const base = import.meta.env.VITE_API_URL || "http://localhost:8000";
+      const token = JSON.parse(sessionStorage.getItem("kullki_sesion"))?.token;
+      const res = await fetch(`${base}/exportar/excel/${tipo}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error("Error al descargar");
+      if (!res.ok) throw new Error(`Error al descargar (${res.status})`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
