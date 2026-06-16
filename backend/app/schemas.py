@@ -268,6 +268,7 @@ class AporteOut(BaseModel):
     id: int
     socio_id: int
     socio_nombres: str | None = None
+    socio_cedula: str | None = None
     monto: float
     fecha: date
     tipo: str
@@ -396,6 +397,7 @@ class RetiroOut(BaseModel):
     id: int
     socio_id: int
     socio_nombres: str | None = None
+    socio_cedula: str | None = None
     monto: float
     fecha: date
     nota: str

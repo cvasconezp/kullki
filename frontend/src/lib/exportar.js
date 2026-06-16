@@ -144,62 +144,93 @@ export function imprimirEstadoCuenta(lib, periodo) {
 
 // ─── Boucher de movimiento ────────────────────────────────────────────────────
 // Imprime un recibo pequeño al registrar un aporte, retiro o pago de cuota.
-export function imprimirBoucher({ tipo, monto, fecha, socio, nota, registradoPor, cajaInfo, extra }) {
+// Nuevos campos opcionales: transaccionId, hora (HH:MM), socioId, cuentaId
+export function imprimirBoucher({ tipo, monto, fecha, hora, socio, nota, registradoPor, cajaInfo, extra, transaccionId, socioId }) {
   const ses = getSesion() || {};
   const color = cajaInfo?.color_primario || ses.color_primario || "#1B3A6B";
   const acento = cajaInfo?.color_acento || ses.color_acento || "#E8A838";
   const cajaNombre = cajaInfo?.nombre || ses.caja_nombre || "Caja de ahorro";
   const logoTxt = cajaInfo?.logo || ses.logo || cajaNombre[0] || "K";
-  const hoy = fecha
-    ? new Date(fecha + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" })
-    : new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" });
+
+  // Fecha y hora — si no viene hora usamos la actual
+  const horaStr = hora || new Date().toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const fechaStr = fecha
+    ? new Date(fecha + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase()
+    : new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+
+  // N° de comprobante: ID zero-padded a 6 dígitos
+  const numComp = transaccionId ? String(transaccionId).padStart(6, "0") : null;
+  // N° de cuenta interna: KULLKI-{socio_id padded}
+  const numCuenta = socioId ? `KULLKI-${String(socioId).padStart(6, "0")}` : null;
+
   const tipoLabel = {
     ordinario: "Aporte ordinario", extraordinario: "Aporte extraordinario",
     eco_ahorro: "Eco ahorro", mascotas: "Ahorro mascotas",
     multa: "Multa", ingreso: "Cuota de ingreso", retiro: "Retiro de ahorro",
     pago_cuota: "Pago de cuota de crédito", abono: "Abono parcial de crédito",
   }[tipo] || tipo;
+  const tipoSubtitulo = ["pago_cuota", "abono"].includes(tipo) ? "CRÉDITO" : "CUENTAS DE AHORRO";
   const esIngreso = !["retiro", "multa"].includes(tipo);
-  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Boucher</title>
+
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Comprobante</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;color:#1d2530;
-         width:320px;margin:0 auto;padding:20px 16px 32px}
-    .cab{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:2px solid ${acento};margin-bottom:12px}
-    .logo{width:40px;height:40px;border-radius:8px;background:${color};color:${acento};
-          display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex:none}
-    .caja{font-size:13px;font-weight:700;color:${color}}
-    .caja small{display:block;font-weight:400;color:#66707d;font-size:11px}
-    .tipo{text-align:center;font-size:12px;text-transform:uppercase;letter-spacing:.06em;
-          color:#fff;background:${esIngreso ? "#0a7a4a" : "#b3372b"};
-          border-radius:20px;padding:3px 14px;margin:10px auto 6px;width:fit-content}
-    .monto{text-align:center;font-size:32px;font-weight:800;color:${color};letter-spacing:-.5px}
-    .monto small{font-size:14px;font-weight:400;color:#66707d}
-    table{width:100%;margin-top:14px;font-size:12px;border-collapse:collapse}
-    td{padding:5px 4px;border-bottom:1px dotted #e3e7ec;vertical-align:top}
-    td:first-child{color:#66707d;width:42%}
-    td:last-child{font-weight:600;text-align:right}
-    .pie{margin-top:18px;font-size:10px;color:#99a;text-align:center;border-top:1px solid #eef1f4;padding-top:10px}
-    @media print{body{width:auto}}
+    body{font-family:"Courier New",Courier,monospace;color:#1d2530;
+         width:340px;margin:0 auto;padding:18px 16px 32px;font-size:13px}
+    .cab{text-align:center;padding-bottom:12px;border-bottom:2px solid ${acento};margin-bottom:10px}
+    .logo-wrap{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px}
+    .logo{width:36px;height:36px;border-radius:7px;background:${color};color:${acento};
+          display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex:none}
+    .caja-nom{font-size:15px;font-weight:700;color:${color};letter-spacing:.01em}
+    .sub-tipo{font-size:11px;color:#66707d;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+    .tipo-badge{display:inline-block;font-size:11.5px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.06em;color:#fff;background:${esIngreso ? "#0a7a4a" : "#b3372b"};
+          border-radius:4px;padding:2px 10px;margin:10px auto 4px}
+    .monto{text-align:center;font-size:30px;font-weight:800;color:${color};
+           letter-spacing:-.5px;font-family:-apple-system,"Segoe UI",sans-serif;margin:4px 0 12px}
+    .monto small{font-size:13px;font-weight:400;color:#66707d;display:block}
+    .separador{border:none;border-top:1px dashed #c8cdd4;margin:10px 0}
+    table{width:100%;border-collapse:collapse}
+    tr td{padding:4px 2px;vertical-align:top;line-height:1.4}
+    tr td:first-child{color:#555;width:46%;padding-right:4px}
+    tr td:first-child::after{content:": "}
+    tr td:last-child{font-weight:600;text-align:right}
+    .pie{margin-top:16px;font-size:10px;color:#8a929c;text-align:center;
+         border-top:1px dashed #c8cdd4;padding-top:10px;line-height:1.5;font-family:inherit}
+    @media print{body{width:auto;padding:4px 8px}}
   </style></head><body>
   <div class="cab">
-    <div class="logo">${logoTxt}</div>
-    <div class="caja">${cajaNombre}<small>Kullki · Yachay Deep Labs</small></div>
+    <div class="logo-wrap">
+      <div class="logo">${logoTxt}</div>
+      <div class="caja-nom">${cajaNombre}</div>
+    </div>
+    <div class="sub-tipo">${tipoSubtitulo}</div>
   </div>
-  <div class="tipo">${tipoLabel}</div>
-  <div class="monto">${usd(monto)}<br><small>${esIngreso ? "ingreso" : "egreso"}</small></div>
+  <div style="text-align:center">
+    <div class="tipo-badge">${tipoLabel}</div>
+  </div>
+  <div class="monto">${usd(monto)}<small>${esIngreso ? "ingreso" : "egreso"} · Moneda: USD</small></div>
+  <hr class="separador">
   <table>
+    ${numCuenta ? `<tr><td>Cuenta</td><td>${numCuenta}</td></tr>` : ""}
     <tr><td>Socio</td><td>${socio?.nombres || socio || "—"}</td></tr>
     ${socio?.cedula ? `<tr><td>Cédula</td><td>${socio.cedula}</td></tr>` : ""}
-    <tr><td>Fecha</td><td>${hoy}</td></tr>
-    ${nota ? `<tr><td>Nota</td><td>${nota}</td></tr>` : ""}
+    <tr><td>Fecha</td><td>${fechaStr}</td></tr>
+    <tr><td>Hora</td><td>${horaStr}</td></tr>
+    ${numComp ? `<tr><td>N° comprobante</td><td>${numComp}</td></tr>` : ""}
+    ${nota ? `<tr><td>Nota</td><td style="font-weight:400">${nota}</td></tr>` : ""}
     ${extra ? `<tr><td>${extra.label}</td><td>${extra.valor}</td></tr>` : ""}
-    ${registradoPor ? `<tr><td>Registrado por</td><td>${registradoPor}</td></tr>` : ""}
+    ${registradoPor ? `<tr><td>Cajero</td><td>${registradoPor}</td></tr>` : ""}
   </table>
-  <div class="pie">Kullki — ${cajaNombre}<br>Este documento es un comprobante interno.</div>
+  <hr class="separador">
+  <div class="pie">
+    Kullki · Yachay Deep Labs<br>
+    ${cajaNombre}<br>
+    Comprobante interno — La bitácora respalda cada movimiento.
+  </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},200)}</script>
   </body></html>`;
-  const w = window.open("", "_blank", "width=380,height=580");
+  const w = window.open("", "_blank", "width=400,height=640");
   if (!w) { alert("Permite las ventanas emergentes para imprimir el boucher."); return; }
   w.document.write(html); w.document.close();
 }

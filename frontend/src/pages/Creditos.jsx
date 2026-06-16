@@ -134,10 +134,14 @@ export default function Creditos() {
   const _boucherPago = (d, cuotaId, tipo) => {
     const ses = getSesion() || {};
     const cuota = (d.cuotas || []).find((c) => c.id === cuotaId);
+    const _hora = (ts) => ts ? new Date(ts).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: false }) : new Date().toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: false });
     imprimirBoucher({
       tipo, monto: cuota ? (tipo === "abono" ? cuota.abonado : cuota.total) : 0,
       fecha: cuota?.fecha_pago || new Date().toISOString().slice(0, 10),
-      socio: { nombres: d.socio_nombres || "" },
+      hora: _hora(cuota?.creado_en),
+      transaccionId: cuota?.id,
+      socioId: d.socio_id,
+      socio: { nombres: d.socio_nombres || "", cedula: d.socio_cedula || "" },
       nota: cuota ? `Cuota ${cuota.numero} de ${d.plazo_meses} · ${d.destino || ""}` : "",
       registradoPor: ses.nombre,
       cajaInfo: { nombre: ses.caja_nombre, color_primario: ses.color_primario, color_acento: ses.color_acento, logo: ses.logo },

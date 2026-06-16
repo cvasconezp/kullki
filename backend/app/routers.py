@@ -692,6 +692,7 @@ def listar_aportes(caja_id: int | None = None, socio_id: int | None = None,
     for a in aportes:
         item = schemas.AporteOut.model_validate(a)
         item.socio_nombres = a.socio.nombres
+        item.socio_cedula = a.socio.cedula
         out.append(item)
     return out
 
@@ -726,6 +727,7 @@ def registrar_aporte(data: schemas.AporteIn, db: Session = Depends(get_db),
     db.commit()
     item = schemas.AporteOut.model_validate(aporte)
     item.socio_nombres = socio.nombres
+    item.socio_cedula = socio.cedula
     return item
 
 
@@ -1264,6 +1266,7 @@ def listar_retiros(caja_id: int | None = None, limit: int = 100, db: Session = D
     for r in retiros:
         item = schemas.RetiroOut.model_validate(r)
         item.socio_nombres = r.socio.nombres
+        item.socio_cedula = r.socio.cedula
         out.append(item)
     return out
 
@@ -1296,6 +1299,7 @@ def registrar_retiro(data: schemas.RetiroIn, db: Session = Depends(get_db),
     db.commit()
     item = schemas.RetiroOut.model_validate(retiro)
     item.socio_nombres = socio.nombres
+    item.socio_cedula = socio.cedula
     return item
 
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, usd, fechaCorta, getSesion } from "../lib/api.js";
 import { imprimirBoucher } from "../lib/exportar.js";
 
+const _hora = (ts) => ts ? new Date(ts).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', hour12: false }) : new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', hour12: false });
 function CobroCuota() {
   const [socios, setSocios] = useState([]);
   const [creditosPorSocio, setCreditosPorSocio] = useState({});
@@ -56,6 +57,9 @@ function CobroCuota() {
         tipo: parcial ? "abono" : "pago_cuota",
         monto: montoImpreso,
         fecha: cuotaActualizada?.fecha_pago || new Date().toISOString().slice(0, 10),
+        hora: _hora(cuotaActualizada?.creado_en),
+        transaccionId: cuotaActualizada?.id,
+        socioId: +socioId,
         socio: { nombres: cuotaDetalle.socio_nombres },
         nota: `Cuota ${cuotaDetalle.cuota.numero} de ${cuotaDetalle.plazo_meses} · ${cuotaDetalle.destino || ""}`,
         registradoPor: ses.nombre,
@@ -162,11 +166,11 @@ export default function Aportes() {
       if (modo === "aporte") {
         const a = await api("/aportes", { method: "POST", body: { ...form, socio_id: +form.socio_id, monto: +form.monto } });
         setOk(`Aporte de ${usd(a.monto)} de ${a.socio_nombres} registrado.`);
-        imprimirBoucher({ tipo: form.tipo, monto: a.monto, fecha: a.fecha, socio: { nombres: a.socio_nombres }, nota: form.nota, registradoPor: ses.nombre, cajaInfo: { nombre: ses.caja_nombre, color_primario: ses.color_primario, color_acento: ses.color_acento, logo: ses.logo } });
+        imprimirBoucher({ tipo: form.tipo, monto: a.monto, fecha: a.fecha, hora: _hora(a.creado_en), transaccionId: a.id, socioId: a.socio_id, socio: { nombres: a.socio_nombres, cedula: a.socio_cedula }, nota: form.nota, registradoPor: ses.nombre, cajaInfo: { nombre: ses.caja_nombre, color_primario: ses.color_primario, color_acento: ses.color_acento, logo: ses.logo } });
       } else {
         const r = await api("/retiros", { method: "POST", body: { socio_id: +form.socio_id, monto: +form.monto, nota: form.nota } });
         setOk(`Retiro de ${usd(r.monto)} de ${r.socio_nombres} registrado.`);
-        imprimirBoucher({ tipo: "retiro", monto: r.monto, fecha: r.fecha, socio: { nombres: r.socio_nombres }, nota: form.nota, registradoPor: ses.nombre, cajaInfo: { nombre: ses.caja_nombre, color_primario: ses.color_primario, color_acento: ses.color_acento, logo: ses.logo } });
+        imprimirBoucher({ tipo: "retiro", monto: r.monto, fecha: r.fecha, hora: _hora(r.creado_en), transaccionId: r.id, socioId: r.socio_id, socio: { nombres: r.socio_nombres, cedula: r.socio_cedula }, nota: form.nota, registradoPor: ses.nombre, cajaInfo: { nombre: ses.caja_nombre, color_primario: ses.color_primario, color_acento: ses.color_acento, logo: ses.logo } });
       }
       setForm({ ...form, monto: "", nota: "" }); cargar();
     } catch (e) { setError(e.message); }
