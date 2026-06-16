@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { api, usd, fechaCorta } from "../lib/api.js";
-import { waLink } from "../lib/exportar.js";
+import { api, usd, fechaCorta, getSesion } from "../lib/api.js";
+import { waLink, imprimirBoucher, imprimirTablaAmortizacion } from "../lib/exportar.js";
 import SolicitudesCredito from "../components/SolicitudesCredito.jsx";
 
-function TablaCuotas({ credito, onPagar, onAbonar, pagando }) {
+function TablaCuotas({ credito, onPagar, onAbonar, pagando, onImprimir }) {
   const [abonos, setAbonos] = useState({});
   const primeraPendiente = credito.cuotas.find((q) => !q.pagada)?.id;
   return (
     <div>
+      <div style={{ textAlign: "right", marginBottom: 6 }}>
+        <button className="boton mini secundario" onClick={onImprimir}>🖨 Tabla amortización</button>
+      </div>
       {credito.cuotas.map((c) => {
         const vencida = !c.pagada && new Date(c.fecha_vencimiento) < new Date();
         const pendiente = +(c.total - (c.abonado || 0)).toFixed(2);
@@ -128,12 +131,26 @@ export default function Creditos() {
     finally { setTrabajando(false); }
   };
 
+  const _boucherPago = (d, cuotaId, tipo) => {
+    const ses = getSesion() || {};
+    const cuota = (d.cuotas || []).find((c) => c.id === cuotaId);
+    imprimirBoucher({
+      tipo, monto: cuota ? (tipo === "abono" ? cuota.abonado : cuota.total) : 0,
+      fecha: cuota?.fecha_pago || new Date().toISOString().slice(0, 10),
+      socio: { nombres: d.socio_nombres || "" },
+      nota: cuota ? `Cuota ${cuota.numero} de ${d.plazo_meses} · ${d.destino || ""}` : "",
+      registradoPor: ses.nombre,
+      cajaInfo: { nombre: ses.caja_nombre, color_primario: ses.color_primario, color_acento: ses.color_acento, logo: ses.logo },
+    });
+  };
+
   const pagar = async (cuotaId, creditoId) => {
     setError(""); setTrabajando(true);
     try {
       const d = await api(`/creditos/cuotas/${cuotaId}/pagar`, { method: "POST", body: {} });
       setDetalle((prev) => ({ ...prev, [creditoId]: d }));
       api("/creditos").then(setCreditos);
+      _boucherPago(d, cuotaId, "pago_cuota");
     } catch (e) { setError(e.message); }
     finally { setTrabajando(false); }
   };
@@ -145,6 +162,7 @@ export default function Creditos() {
         { method: "POST", body: { monto } });
       setDetalle((prev) => ({ ...prev, [creditoId]: d }));
       api("/creditos").then(setCreditos);
+      _boucherPago(d, cuotaId, "abono");
     } catch (e) { setError(e.message); }
     finally { setTrabajando(false); }
   };
@@ -226,25 +244,4 @@ export default function Creditos() {
                     : <span className="pill neutro">al día</span>}
                 </div>
                 <div className="detalle">
-                  {usd(c.monto)} · {c.plazo_meses} meses al {c.tasa_mensual}% · {c.tipo === "emergente" ? "emergente · " : ""}{c.destino || "sin destino"}{c.garante ? ` · garante: ${c.garante}` : ""}
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div className="cifra">{usd(c.saldo_capital)}</div>
-                <div className="detalle">{c.cuotas_pagadas}/{c.plazo_meses} cuotas</div>
-              </div>
-            </div>
-            <details onToggle={(e) => e.target.open && !detalle[c.id] && abrir(c.id)}>
-              <summary>Ver tabla de cuotas</summary>
-              {detalle[c.id]
-                ? <TablaCuotas credito={detalle[c.id]} pagando={trabajando}
-                    onPagar={(cuotaId) => pagar(cuotaId, c.id)}
-                    onAbonar={(cuotaId, monto) => abonar(cuotaId, monto, c.id)} />
-                : <div className="vacio">Cargando cuotas…</div>}
-            </details>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
+                  {usd(c.monto)} · {c.plazo_meses} meses al {

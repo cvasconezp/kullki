@@ -33,6 +33,12 @@ export default function Dashboard() {
           <div className="v">{d.cuotas_en_mora > 0 ? usd(d.monto_en_mora) : "—"}</div>
           <div className="l">{d.cuotas_en_mora > 0 ? `${d.cuotas_en_mora} cuota(s) vencidas` : "Sin mora"}</div>
         </div>
+        {d.cuota_sri > 0 && (
+          <div className="kpi">
+            <div className="v" style={{ fontSize: 15 }}>{usd(d.cuota_sri)}</div>
+            <div className="l">Contribución SRI 0,05%</div>
+          </div>
+        )}
       </div>
     </>
   );

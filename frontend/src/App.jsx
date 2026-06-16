@@ -28,9 +28,9 @@ import Tutorial from "./components/Tutorial.jsx";
 const NAV_TESORERO = [
   { id: "inicio", ruta: "balances", label: "Balances", ico: "📊", c: "#0E7A5C" },
   { id: "socios", ruta: "socios", label: "Socios", ico: "👥", c: "#2563EB" },
-  { id: "aportes", ruta: "movimientos", label: "Movim.", ico: "💸", c: "#D9A116" },
+  { id: "aportes", ruta: "movimientos", label: "Movimientos", ico: "💸", c: "#D9A116" },
   { id: "creditos", ruta: "creditos", label: "Créditos", ico: "🏦", c: "#7C3AED" },
-  { id: "notif", ruta: "notificaciones", label: "Notif.", ico: "🔔", c: "#DC2626" },
+  { id: "notif", ruta: "notificaciones", label: "Notificaciones", ico: "🔔", c: "#DC2626" },
   { id: "informes", ruta: "informe", label: "Informe", ico: "📄", c: "#0891B2" },
   { id: "bitacora", ruta: "bitacora", label: "Bitácora", ico: "📜", c: "#6B7280" },
 ];
@@ -70,8 +70,10 @@ export default function App() {
   const desbloquear = () => { localStorage.removeItem("kullki_lock"); setBloqueado(false); };
 
   useEffect(() => {
-    if (sesion && sesion.rol !== "superadmin") applyTheme(sesion);
-    else resetTheme();
+    // Rutas públicas siempre con la marca Kullki/YD, sin importar si hay sesión.
+    const rutaPublica = ruta === "/" || ruta === "/privacidad" || ruta === "/terminos" || ruta === "/ingresar";
+    if (rutaPublica || !sesion || sesion.rol === "superadmin") resetTheme();
+    else applyTheme(sesion);
   }, [sesion, ruta]);
 
   // Tutorial del socio: se abre solo la primera vez
@@ -199,11 +201,4 @@ export default function App() {
           {esTesorero && activa === "notif" && <Notificaciones />}
           {esDirectiva && activa === "creditos" && <AprobacionCreditos />}
           {esSocio && activa === "libreta" && <Libreta vista="libreta" />}
-          {esSocio && activa === "credito" && <Libreta vista="credito" />}
-          {esSocio && activa === "perfil" && <Libreta vista="perfil" />}
-          {activa === "bitacora" && !esSuper && <Bitacora />}
-        </main>
-      </div>
-    </div>
-  );
-}
+          {esSocio && activa ===

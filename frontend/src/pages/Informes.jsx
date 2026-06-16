@@ -78,6 +78,12 @@ export default function Informes() {
           <div className="fila"><span>Abonos parciales en tránsito</span><span className="cifra">{usd(d.abonos_en_transito)}</span></div>}
         {d.cuotas_en_mora > 0 &&
           <div className="fila"><span>En mora ({d.cuotas_en_mora} cuotas)</span><span className="cifra neg">{usd(d.monto_en_mora)}</span></div>}
+        {d.cuota_sri > 0 && (
+          <div className="fila" style={{ borderTop: "1px dashed var(--regla)", marginTop: 4, paddingTop: 8 }}>
+            <span>Contribución SRI 0,05% (activos totales)</span>
+            <span className="cifra" style={{ color: "var(--tinta-suave)" }}>{usd(d.cuota_sri)}</span>
+          </div>
+        )}
       </div>
 
       <div className="tarjeta">

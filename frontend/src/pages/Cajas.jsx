@@ -323,6 +323,7 @@ export default function Cajas({ onAsumir }) {
             </div>
             <div className="acciones-caja">
               <button onClick={() => asumir(c, "tesorero")}>Entrar como tesorero</button>
+              <button onClick={() => asumir(c, "directiva")}>Entrar como directiva</button>
               <button onClick={() => { setEligiendo(eligiendo === c.id ? null : c.id); setEditando(null); }}>
                 Ver como socio
               </button>
@@ -341,11 +342,4 @@ export default function Cajas({ onAsumir }) {
                 onElegir={(sid) => asumir(c, "socio", sid)} />
             )}
             {dirigiendo === c.id && (
-              <AgregarDirectiva caja={c} onListo={() => setDirigiendo(null)} />
-            )}
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
+              <AgregarDirectiva caja={c} onListo={() => setD

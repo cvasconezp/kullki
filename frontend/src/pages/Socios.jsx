@@ -101,10 +101,10 @@ function Expediente({ socioId, onCerrar }) {
   };
   const [aviso, setAviso] = useState("");
   const reiniciarClave = async () => {
-    if (!window.confirm("¿Reiniciar la contraseña de este socio? Volverá a ser su número de cédula y deberá cambiarla al ingresar.")) return;
+    if (!window.confirm("¿Reiniciar la contraseña de este socio? Se generará una clave temporal aleatoria que deberá entregar personalmente.")) return;
     setError(""); setAviso("");
     try { const r = await api("/auth/restablecer/password", { method: "POST", body: { cedula: lib.socio.cedula } });
-      setAviso(`Contraseña reiniciada. Clave temporal: ${r.password_temporal} (la cédula). El socio debe cambiarla al ingresar.`); }
+      setAviso(`Clave temporal: ${r.password_temporal} — Entrégala al socio. Deberá cambiarla al ingresar.`); }
     catch (e) { setError(e.message); }
   };
   const reiniciar2FA = async () => {
@@ -305,6 +305,48 @@ function Solicitudes({ onCambio }) {
   );
 }
 
+function SociosSinAcceso({ onReinicio }) {
+  const [items, setItems] = useState(null);
+  const [abierto, setAbierto] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api("/socios/sin-acceso").then(setItems).catch(() => setItems([]));
+  }, []);
+  if (!items || items.length === 0) return null;
+  const reiniciar = async (cedula, nombre) => {
+    if (!window.confirm(`¿Reiniciar la contraseña de ${nombre}? Se generará una nueva clave temporal.`)) return;
+    setError(""); setAviso("");
+    try {
+      const r = await api("/auth/restablecer/password", { method: "POST", body: { cedula } });
+      setAviso(`${nombre}: clave temporal → ${r.password_temporal}`);
+      onReinicio && onReinicio();
+    } catch (e) { setError(e.message); }
+  };
+  return (
+    <div className="tarjeta" style={{ borderColor: "var(--sara)" }}>
+      <div className="seccion-titulo" style={{ margin: "0 0 6px" }}>
+        <h3 style={{ margin: 0, color: "var(--sara)" }}>⚠️ Sin primer acceso ({items.length})</h3>
+        <button className="boton mini secundario" onClick={() => setAbierto(!abierto)}>{abierto ? "Ocultar" : "Ver lista"}</button>
+      </div>
+      <div className="detalle" style={{ fontSize: 13, color: "var(--tinta-suave)", marginBottom: 4 }}>
+        Socios que nunca han ingresado al sistema. Su contraseña es la cédula (vulnerable). Reiníciala y entrega la nueva clave.
+      </div>
+      {aviso && <div className="exito" style={{ marginTop: 6 }}>{aviso}</div>}
+      {error && <div className="error">{error}</div>}
+      {abierto && items.map((s) => (
+        <div className="fila" key={s.socio_id}>
+          <div>
+            <div className="principal">{s.nombres}</div>
+            <div className="detalle">CI {mascaraCedula(s.cedula)}{s.whatsapp ? ` · ${s.whatsapp}` : s.telefono ? ` · ${s.telefono}` : ""}</div>
+          </div>
+          <button className="boton mini secundario" onClick={() => reiniciar(s.cedula, s.nombres)}>Nueva clave</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const FORM0 = { nombres: "", cedula: "", whatsapp: "", correo: "", telefono: "",
   fecha_nacimiento: "", genero: "", direccion: "", ocupacion: "",
   estado_civil: "", nivel_instruccion: "", num_cargas: "", contacto_emergencia: "", consentimiento_datos: false };
@@ -323,6 +365,8 @@ export default function Socios() {
   useEffect(() => { cargar(); }, []);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
+  const [claveNueva, setClaveNueva] = useState(null); // { nombre, cedula, password_temporal }
+
   const crear = async () => {
     setError(""); setOk(""); setCreando(true);
     try {
@@ -330,8 +374,13 @@ export default function Socios() {
       body.num_cargas = body.num_cargas === "" ? 0 : +body.num_cargas;
       if (!body.fecha_nacimiento) delete body.fecha_nacimiento;
       const s = await api("/socios", { method: "POST", body });
-      setOk(`${s.nombres} registrado. Su acceso inicial es su cédula como usuario y contraseña.`);
-      setForm(FORM0); setMostrarForm(false); setVerExtra(false); cargar();
+      setForm(FORM0); setMostrarForm(false); setVerExtra(false);
+      if (s.password_temporal) {
+        setClaveNueva({ nombre: s.nombres, cedula: form.cedula, password: s.password_temporal });
+      } else {
+        setOk(`${s.nombres} registrado.`);
+      }
+      cargar();
     } catch (e) { setError(e.message); }
     finally { setCreando(false); }
   };
@@ -348,7 +397,30 @@ export default function Socios() {
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
 
+      {claveNueva && (
+        <div className="tarjeta" style={{ borderColor: "var(--kullki)", background: "var(--superficie)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <h3 style={{ marginTop: 0, color: "var(--kullki)" }}>✅ {claveNueva.nombre} registrado</h3>
+            <button className="boton mini secundario" onClick={() => setClaveNueva(null)}>Cerrar</button>
+          </div>
+          <div className="detalle" style={{ fontSize: 13.5, lineHeight: 1.6 }}>
+            Entrega esta clave al socio. <strong>No la podrás ver de nuevo.</strong> El sistema le pedirá cambiarla en su primer ingreso.
+          </div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 12 }}>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div className="detalle" style={{ fontSize: 11 }}>USUARIO (cédula)</div>
+              <div className="principal" style={{ fontFamily: "var(--mono)", fontSize: 18, letterSpacing: 1 }}>{claveNueva.cedula}</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div className="detalle" style={{ fontSize: 11 }}>CONTRASEÑA TEMPORAL</div>
+              <div className="principal" style={{ fontFamily: "var(--mono)", fontSize: 28, letterSpacing: 4, color: "var(--kullki)" }}>{claveNueva.password}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!soloLectura && <Solicitudes onCambio={cargar} />}
+      {!soloLectura && <SociosSinAcceso onReinicio={cargar} />}
 
       {mostrarForm && (
         <div className="tarjeta">
