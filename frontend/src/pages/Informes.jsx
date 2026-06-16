@@ -49,15 +49,45 @@ export default function Informes() {
   if (error) return <div className="error">{error}</div>;
   if (!informe) return <div className="vacio">Preparando el informe…</div>;
 
+  const descargarExcel = async (tipo) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ""}/reportes/exportar/excel/${tipo}`, {
+        headers: { Authorization: `Bearer ${JSON.parse(sessionStorage.getItem("kullki_sesion"))?.token}` }
+      });
+      if (!res.ok) throw new Error("Error al descargar");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kullki_${tipo}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { alert(e.message); }
+  };
+
   const d = informe.dashboard;
 
   return (
     <div id="informe">
       <div className="seccion-titulo no-print-margin">
         <h2>Informe de asamblea</h2>
-        <button className="boton mini no-print" onClick={() => imprimirInformeAsamblea(informe, cierre)}>
-          🖨 PDF con membrete
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="boton mini no-print" onClick={() => imprimirInformeAsamblea(informe, cierre)}>
+            🖨 PDF con membrete
+          </button>
+          <button className="boton mini secundario no-print" onClick={() => descargarExcel("balance")}>
+            ⬇ Balance
+          </button>
+          <button className="boton mini secundario no-print" onClick={() => descargarExcel("cartera")}>
+            ⬇ Cartera
+          </button>
+          <button className="boton mini secundario no-print" onClick={() => descargarExcel("movimientos")}>
+            ⬇ Movimientos
+          </button>
+          <button className="boton mini secundario no-print" onClick={() => descargarExcel("completo")}>
+            ⬇ Backup Excel
+          </button>
+        </div>
       </div>
 
       <div className="tarjeta solo-print-header">

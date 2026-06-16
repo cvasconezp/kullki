@@ -1,7 +1,8 @@
 from datetime import date, datetime, timedelta
 from collections import defaultdict
-import json, time, os
+import io, json, time, os
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -777,6 +778,59 @@ def anular_aporte(aporte_id: int, db: Session = Depends(get_db),
     item = schemas.AporteOut.model_validate(ap)
     item.socio_nombres = ap.socio.nombres
     return item
+
+
+
+@aportes_router.post("/multas-masivas")
+def multas_masivas(caja_id: int | None = None, db: Session = Depends(get_db),
+                   actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    """Aplica multa automática a todos los socios sin aporte ordinario este mes."""
+    cid = caja_scope(actor, caja_id)
+    caja = db.get(models.Caja, cid)
+    hoy = date.today()
+
+    if not caja.dia_corte or caja.dia_corte <= 0:
+        raise HTTPException(400, "La caja no tiene día de corte configurado")
+    if not caja.multa_atraso or caja.multa_atraso <= 0:
+        raise HTTPException(400, "La caja no tiene monto de multa configurado")
+    if hoy.day <= caja.dia_corte:
+        raise HTTPException(400, f"El día de corte ({caja.dia_corte}) aún no ha pasado este mes")
+
+    mes_inicio = date(hoy.year, hoy.month, 1)
+    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
+                                                    models.Socio.activo)).all()
+    multados = 0
+    for s in socios:
+        # ¿Ya tiene multa de atraso este mes?
+        ya = db.scalar(select(func.count()).where(
+            models.Aporte.socio_id == s.id, models.Aporte.caja_id == cid,
+            models.Aporte.tipo == "multa", models.Aporte.fecha >= mes_inicio,
+            models.Aporte.anulado == False,
+            models.Aporte.nota.contains(f"día {caja.dia_corte}"))) or 0
+        if ya:
+            continue
+        # ¿Aportó ordinariamente este mes?
+        aportó = db.scalar(select(func.count()).where(
+            models.Aporte.socio_id == s.id, models.Aporte.caja_id == cid,
+            models.Aporte.tipo.in_(["ordinario", "extraordinario"]),
+            models.Aporte.fecha >= mes_inicio, models.Aporte.anulado == False)) or 0
+        if aportó:
+            continue
+        # Aplicar multa
+        db.add(models.Aporte(
+            caja_id=cid, socio_id=s.id, monto=caja.multa_atraso, fecha=hoy,
+            tipo="multa", nota=f"Atraso de aporte (pasó el día {caja.dia_corte})",
+            registrado_por=actor.id))
+        multados += 1
+
+    if multados > 0:
+        log_audit(db, actor, "crear", "aporte", 0,
+                  f"Multas masivas: {multados} socio(s) — ${caja.multa_atraso:.2f} c/u", caja_id=cid)
+        db.commit()
+
+    return {"ok": True, "multados": multados,
+            "monto_por_socio": caja.multa_atraso,
+            "total": round(multados * caja.multa_atraso, 2)}
 
 
 # ---------------------------------------------------------------- créditos
@@ -1949,6 +2003,56 @@ def ejecutar_cierre(data: schemas.CierreIn, caja_id: int | None = None,
     db.commit()
     return {"ok": True, "modo": data.modo, "repartido": round(repartido, 2), "socios": n}
 
+
+
+
+# ---------------------------------------------------------------- exportar Excel
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx(data: bytes, filename: str) -> StreamingResponse:
+    return StreamingResponse(io.BytesIO(data), media_type=_XLSX,
+                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@reportes_router.get("/exportar/excel/balance")
+def exportar_excel_balance(caja_id: int | None = None, db: Session = Depends(get_db),
+                            actor: Actor = Depends(require_roles("tesorero", "superadmin", "directiva"))):
+    """Balance de ahorros por socio en Excel."""
+    from .excel import excel_balance
+    cid = caja_scope(actor, caja_id)
+    caja = db.get(models.Caja, cid)
+    return _xlsx(excel_balance(db, cid), f"balance-socios-{caja.slug}-{date.today()}.xlsx")
+
+
+@reportes_router.get("/exportar/excel/cartera")
+def exportar_excel_cartera(caja_id: int | None = None, db: Session = Depends(get_db),
+                            actor: Actor = Depends(require_roles("tesorero", "superadmin", "directiva"))):
+    """Cartera de crédito en Excel."""
+    from .excel import excel_cartera
+    cid = caja_scope(actor, caja_id)
+    caja = db.get(models.Caja, cid)
+    return _xlsx(excel_cartera(db, cid), f"cartera-credito-{caja.slug}-{date.today()}.xlsx")
+
+
+@reportes_router.get("/exportar/excel/movimientos")
+def exportar_excel_movimientos(caja_id: int | None = None, db: Session = Depends(get_db),
+                                actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    """Libro de movimientos (aportes + retiros) en Excel."""
+    from .excel import excel_movimientos
+    cid = caja_scope(actor, caja_id)
+    caja = db.get(models.Caja, cid)
+    return _xlsx(excel_movimientos(db, cid), f"movimientos-{caja.slug}-{date.today()}.xlsx")
+
+
+@reportes_router.get("/exportar/excel/completo")
+def exportar_excel_completo(caja_id: int | None = None, db: Session = Depends(get_db),
+                             actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    """Respaldo completo de la caja en Excel (5 hojas)."""
+    from .excel import excel_completo
+    cid = caja_scope(actor, caja_id)
+    caja = db.get(models.Caja, cid)
+    return _xlsx(excel_completo(db, cid), f"kullki-backup-{caja.slug}-{date.today()}.xlsx")
 
 @reportes_router.get("/admin/backups")
 def listar_backups(user: models.Usuario = Depends(require_roles("superadmin"))):

@@ -260,6 +260,27 @@ export default function Aportes() {
         )}
       </div>
 
+      {cajaFlags.dia_corte > 0 && (
+        <div className="tarjeta no-print">
+          <h3>Multas automáticas</h3>
+          <div className="detalle" style={{ marginBottom: 10 }}>
+            Aplica una multa de <strong>{usd(cajaFlags.multa_atraso || 0)}</strong> a todos los socios que no
+            registraron aporte este mes (corte: día {cajaFlags.dia_corte}).
+          </div>
+          <button className="boton" style={{ background: "var(--cochinilla)" }}
+            onClick={async () => {
+              if (!window.confirm("¿Aplicar multas a socios sin aporte este mes?")) return;
+              try {
+                const r = await api("/aportes/multas-masivas", { method: "POST" });
+                setOk(`✓ ${r.multados} socio(s) multados · Total ${usd(r.total)}`);
+                cargar();
+              } catch (e) { setError(e.message); }
+            }}>
+            ⚡ Aplicar multas del mes
+          </button>
+        </div>
+      )}
+
       <div className="tarjeta">
         <h3>Movimientos recientes</h3>
         {!aportes && <div className="vacio">Cargando…</div>}
