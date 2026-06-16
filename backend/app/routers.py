@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 from collections import defaultdict
-import json, time, os, secrets
+import json, time, os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -155,7 +155,6 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
             caja_slug=c.caja_slug, socio_id=c.socio_id,
             color_primario=c.color_primario, color_acento=c.color_acento, logo=c.logo,
             debe_cambiar_password=user.debe_cambiar_password,
-            requiere_activar_2fa=(c.rol == "tesorero" and not user.totp_activo),
             requiere_seleccion=False, cajas=cajas)
 
     # Varias cajas: token "sin anclar"; el front muestra el selector
@@ -189,7 +188,6 @@ def seleccionar_caja(data: schemas.SeleccionCaja, db: Session = Depends(get_db),
         color_acento=caja.color_acento if caja else None,
         logo=caja.logo if caja else None,
         debe_cambiar_password=user.debe_cambiar_password,
-        requiere_activar_2fa=(m.rol == "tesorero" and not user.totp_activo),
         requiere_seleccion=False, cajas=[])
 
 
@@ -305,16 +303,15 @@ def restablecer_2fa(data: schemas.CedulaIn, db: Session = Depends(get_db),
 @auth_router.post("/restablecer/password")
 def restablecer_password(data: schemas.CedulaIn, db: Session = Depends(get_db),
                          actor: Actor = Depends(require_roles("superadmin", "tesorero"))):
-    """Reinicia la contraseña a un PIN de 6 dígitos aleatorio y obliga a cambiarla al próximo ingreso."""
+    """Reinicia la contraseña a la cédula y obliga a cambiarla en el próximo ingreso."""
     u = _usuario_administrable(db, actor, data.cedula)
     if u.es_superadmin and actor.rol != "superadmin":
         raise HTTPException(403, "No puedes reiniciar la clave de un administrador")
-    pwd_temporal = "".join(str(secrets.randbelow(10)) for _ in range(6))
-    u.password_hash = hash_password(pwd_temporal); u.debe_cambiar_password = True
+    u.password_hash = hash_password(u.cedula); u.debe_cambiar_password = True
     log_audit(db, actor, "editar", "usuario", u.id,
               f"Reinició la contraseña de {u.nombre}", caja_id=actor.caja_id)
     db.commit()
-    return {"ok": True, "nombre": u.nombre, "password_temporal": pwd_temporal}
+    return {"ok": True, "nombre": u.nombre, "password_temporal": u.cedula}
 
 
 @auth_router.get("/mis-cajas", response_model=list[schemas.CajaMembresia])
@@ -460,31 +457,6 @@ def listar_socios(caja_id: int | None = None, db: Session = Depends(get_db),
     return [_socio_out(db, s) for s in socios]
 
 
-@socios_router.get("/sin-acceso")
-def socios_sin_acceso(caja_id: int | None = None, db: Session = Depends(get_db),
-                      actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
-    """Socios que NUNCA han ingresado al sistema (ultimo_acceso=null).
-    Sus contraseñas siguen siendo el PIN temporal entregado al registrarse.
-    El tesorero puede usar esta lista para entregarles la clave o desactivar su acceso."""
-    cid = caja_scope(actor, caja_id)
-    rows = db.execute(
-        select(models.Socio.id, models.Socio.nombres, models.Socio.cedula,
-               models.Socio.telefono, models.Socio.whatsapp,
-               models.Usuario.ultimo_acceso, models.Usuario.debe_cambiar_password,
-               models.Usuario.activo.label("cuenta_activa"))
-        .join(models.Membresia, (models.Membresia.socio_id == models.Socio.id)
-              & (models.Membresia.caja_id == cid))
-        .join(models.Usuario, models.Usuario.id == models.Membresia.usuario_id)
-        .where(models.Socio.caja_id == cid, models.Socio.activo,
-               models.Usuario.ultimo_acceso.is_(None))
-        .order_by(models.Socio.nombres)
-    ).all()
-    return [{"socio_id": r.id, "nombres": r.nombres, "cedula": r.cedula,
-             "telefono": r.telefono, "whatsapp": r.whatsapp,
-             "debe_cambiar_password": r.debe_cambiar_password,
-             "cuenta_activa": r.cuenta_activa} for r in rows]
-
-
 @socios_router.post("", response_model=schemas.SocioOut)
 def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
                 actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
@@ -510,13 +482,9 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
     # Cuenta de acceso: una sola por persona (cédula). Si ya existe (porque es
     # socia/tesorera de otra caja), la REUTILIZAMOS y solo añadimos la membresía.
     usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
-    pwd_temporal = None
     if not usuario:
-        # Contraseña inicial: 6 dígitos aleatorios (NO la cédula, que es semipública).
-        # El tesorero la entrega al socio en papel; el socio debe cambiarla al primer ingreso.
-        pwd_temporal = "".join(str(secrets.randbelow(10)) for _ in range(6))
         usuario = models.Usuario(nombre=data.nombres, cedula=data.cedula,
-                                 password_hash=hash_password(pwd_temporal),
+                                 password_hash=hash_password(data.cedula),
                                  debe_cambiar_password=True)
         db.add(usuario)
         db.flush()
@@ -527,10 +495,7 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
               f"Socio {socio.nombres} ({socio.cedula}) registrado", caja_id=cid,
               afecta_socio_id=socio.id)
     db.commit()
-    out = _socio_out(db, socio)
-    if pwd_temporal:
-        out.password_temporal = pwd_temporal  # solo visible en la respuesta de creación
-    return out
+    return _socio_out(db, socio)
 
 
 PERMITIDOS_SOCIO = {"telefono", "whatsapp", "correo", "direccion", "ocupacion",
@@ -739,8 +704,7 @@ def registrar_aporte(data: schemas.AporteIn, db: Session = Depends(get_db),
         raise HTTPException(400, "El socio está inactivo")
     fecha = data.fecha or date.today()
     aporte = models.Aporte(caja_id=socio.caja_id, socio_id=socio.id, monto=data.monto,
-                           fecha=fecha, tipo=data.tipo, nota=data.nota, registrado_por=user.id,
-                           cantidad_kg=data.cantidad_kg if data.tipo == "eco_ahorro" else None)
+                           fecha=fecha, tipo=data.tipo, nota=data.nota, registrado_por=user.id)
     db.add(aporte)
     db.flush()
     log_audit(db, user, "crear", "aporte", aporte.id,
@@ -1226,6 +1190,8 @@ def _aplicar_abono(db, user, cuota: models.Cuota, monto: float, fecha) -> models
     return credito
 
 
+
+
 @creditos_router.post("/{credito_id}/precancelar", response_model=schemas.CreditoDetalle)
 def precancelar_credito(credito_id: int, db: Session = Depends(get_db),
                         user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
@@ -1241,7 +1207,6 @@ def precancelar_credito(credito_id: int, db: Session = Depends(get_db),
     pendientes = [q for q in credito.cuotas if not q.pagada]
     capital_restante = round(sum(q.capital for q in pendientes), 2)
     for cuota in pendientes:
-        # Se cobra solo el capital; los intereses futuros se condonan
         cuota.total = round(cuota.capital + (cuota.abonado or 0), 2)
         cuota.abonado = cuota.total
         cuota.pagada = True
@@ -1254,7 +1219,6 @@ def precancelar_credito(credito_id: int, db: Session = Depends(get_db),
     db.commit()
     db.refresh(credito)
     return _credito_out(credito, detalle=True)
-
 
 @creditos_router.post("/cuotas/{cuota_id}/pagar", response_model=schemas.CreditoDetalle)
 def pagar_cuota(cuota_id: int, data: schemas.PagoCuotaIn, db: Session = Depends(get_db),
@@ -1418,17 +1382,13 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
     creditos_activos = db.scalar(select(func.count(models.Credito.id))
                                  .where(models.Credito.caja_id == cid,
                                         models.Credito.estado == "activo")) or 0
-    fondo = round(total_aportes + cap_recuperado + intereses
-                  + abonos_transito - desembolsado - total_retiros - capitalizado, 2)
-    capital_calle = round(desembolsado - cap_recuperado, 2)
-    # Cuota SRI: 0.05% sobre activos totales (fondo disponible + capital en la calle)
-    cuota_sri = round((fondo + capital_calle) * 0.0005, 2)
     return schemas.DashboardOut(
         caja=schemas.CajaOut.model_validate(caja),
         socios_activos=socios_activos,
-        fondo_disponible=fondo,
+        fondo_disponible=round(total_aportes + cap_recuperado + intereses
+                               + abonos_transito - desembolsado - total_retiros - capitalizado, 2),
         total_aportes=round(total_aportes, 2),
-        capital_prestado=capital_calle,
+        capital_prestado=round(desembolsado - cap_recuperado, 2),
         capital_recuperado=round(cap_recuperado, 2),
         intereses_cobrados=round(intereses, 2),
         total_retiros=round(total_retiros, 2),
@@ -1437,7 +1397,6 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
         creditos_activos=creditos_activos,
         cuotas_en_mora=int(mora[0]),
         monto_en_mora=round(float(mora[1]), 2),
-        cuota_sri=cuota_sri,
     )
 
 
@@ -1968,4 +1927,72 @@ def ejecutar_cierre(data: schemas.CierreIn, caja_id: int | None = None,
                                  nota=f"Pago de utilidad ejercicio {anio}", registrado_por=user.id))
         repartido += u; n += 1
     db.add(models.Cierre(caja_id=cid, fecha=hoy, modo=data.modo, intereses=round(intereses, 2),
-             
+                         total_ahorro=round(total_ahorro, 2), num_socios=n, creado_por=user.nombre))
+    log_audit(db, user, "crear", "cierre", 0,
+              f"Cierre de ejercicio ({data.modo}): ${repartido:.2f} en utilidades a {n} socios", caja_id=cid)
+    db.commit()
+    return {"ok": True, "modo": data.modo, "repartido": round(repartido, 2), "socios": n}
+
+
+@reportes_router.get("/admin/backups")
+def listar_backups(user: models.Usuario = Depends(require_roles("superadmin"))):
+    from .backup import listar_respaldos, BACKUP_DIR, BACKUP_KEEP
+    return {"directorio": BACKUP_DIR, "conserva": BACKUP_KEEP,
+            "habilitado": os.getenv("BACKUP_ENABLED", "1") != "0",
+            "intervalo_horas": float(os.getenv("BACKUP_INTERVAL_HORAS", "24")),
+            "respaldos": listar_respaldos()}
+
+
+@reportes_router.post("/admin/backups/crear")
+def crear_backup(user: models.Usuario = Depends(require_roles("superadmin"))):
+    from .backup import crear_respaldo
+    import os as _os
+    ruta = crear_respaldo()
+    return {"ok": True, "archivo": _os.path.basename(ruta)}
+
+
+@reportes_router.get("/admin/usuarios")
+def listar_usuarios(caja_id: int | None = None, rol: str | None = None, q: str | None = None,
+                    db: Session = Depends(get_db),
+                    actor: Actor = Depends(require_roles("superadmin"))):
+    """Directorio de cuentas y accesos (superadmin). Una fila por membresía; el
+    superadmin aparece como fila propia. Filtros por caja, rol y texto (nombre/cédula)."""
+    filas = []
+    # Superadmins (sin membresía/caja)
+    if not caja_id and rol in (None, "superadmin"):
+        for u in db.scalars(select(models.Usuario).where(models.Usuario.es_superadmin)).all():
+            filas.append({"usuario_id": u.id, "nombre": u.nombre, "cedula": u.cedula,
+                          "rol": "superadmin", "caja_id": None, "caja_nombre": "—",
+                          "totp_activo": u.totp_activo, "activo": u.activo,
+                          "debe_cambiar_password": u.debe_cambiar_password,
+                          "ultimo_acceso": u.ultimo_acceso.isoformat() if u.ultimo_acceso else None})
+    # Membresías (tesorero/socio/directiva)
+    consulta = select(models.Membresia, models.Usuario, models.Caja).join(
+        models.Usuario, models.Membresia.usuario_id == models.Usuario.id).join(
+        models.Caja, models.Membresia.caja_id == models.Caja.id).where(models.Membresia.activo)
+    if caja_id:
+        consulta = consulta.where(models.Membresia.caja_id == caja_id)
+    if rol and rol != "superadmin":
+        consulta = consulta.where(models.Membresia.rol == rol)
+    for m, u, caja in db.execute(consulta).all():
+        filas.append({"usuario_id": u.id, "nombre": u.nombre, "cedula": u.cedula,
+                      "rol": m.rol, "caja_id": caja.id, "caja_nombre": caja.nombre,
+                      "totp_activo": u.totp_activo, "activo": u.activo,
+                      "debe_cambiar_password": u.debe_cambiar_password,
+                      "ultimo_acceso": u.ultimo_acceso.isoformat() if u.ultimo_acceso else None})
+    if q:
+        ql = q.strip().lower()
+        filas = [f for f in filas if ql in f["nombre"].lower() or ql in f["cedula"]]
+    filas.sort(key=lambda f: (f["caja_nombre"], f["nombre"]))
+    return filas
+
+
+@reportes_router.get("/notificaciones")
+def notificaciones(caja_id: int | None = None, db: Session = Depends(get_db),
+                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin"))):
+    cid = caja_scope(user, caja_id)
+    datos = db.scalar(select(func.count(models.SolicitudCambio.id)).where(
+        models.SolicitudCambio.caja_id == cid, models.SolicitudCambio.estado == "pendiente")) or 0
+    cred = db.scalar(select(func.count(models.SolicitudCredito.id)).where(
+        models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado == "pendiente")) or 0
+    return {"solicitudes_datos": datos, "solicitudes_credito": cred, "total": datos + cred}
