@@ -142,6 +142,158 @@ export function imprimirEstadoCuenta(lib, periodo) {
   w.document.write(html); w.document.close();
 }
 
+// ─── Boucher de movimiento ────────────────────────────────────────────────────
+// Imprime un recibo pequeño al registrar un aporte, retiro o pago de cuota.
+export function imprimirBoucher({ tipo, monto, fecha, socio, nota, registradoPor, cajaInfo, extra }) {
+  const ses = getSesion() || {};
+  const color = cajaInfo?.color_primario || ses.color_primario || "#1B3A6B";
+  const acento = cajaInfo?.color_acento || ses.color_acento || "#E8A838";
+  const cajaNombre = cajaInfo?.nombre || ses.caja_nombre || "Caja de ahorro";
+  const logoTxt = cajaInfo?.logo || ses.logo || cajaNombre[0] || "K";
+  const hoy = fecha
+    ? new Date(fecha + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" })
+    : new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" });
+  const tipoLabel = {
+    ordinario: "Aporte ordinario", extraordinario: "Aporte extraordinario",
+    eco_ahorro: "Eco ahorro", mascotas: "Ahorro mascotas",
+    multa: "Multa", ingreso: "Cuota de ingreso", retiro: "Retiro de ahorro",
+    pago_cuota: "Pago de cuota de crédito", abono: "Abono parcial de crédito",
+  }[tipo] || tipo;
+  const esIngreso = !["retiro", "multa"].includes(tipo);
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Boucher</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;color:#1d2530;
+         width:320px;margin:0 auto;padding:20px 16px 32px}
+    .cab{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:2px solid ${acento};margin-bottom:12px}
+    .logo{width:40px;height:40px;border-radius:8px;background:${color};color:${acento};
+          display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex:none}
+    .caja{font-size:13px;font-weight:700;color:${color}}
+    .caja small{display:block;font-weight:400;color:#66707d;font-size:11px}
+    .tipo{text-align:center;font-size:12px;text-transform:uppercase;letter-spacing:.06em;
+          color:#fff;background:${esIngreso ? "#0a7a4a" : "#b3372b"};
+          border-radius:20px;padding:3px 14px;margin:10px auto 6px;width:fit-content}
+    .monto{text-align:center;font-size:32px;font-weight:800;color:${color};letter-spacing:-.5px}
+    .monto small{font-size:14px;font-weight:400;color:#66707d}
+    table{width:100%;margin-top:14px;font-size:12px;border-collapse:collapse}
+    td{padding:5px 4px;border-bottom:1px dotted #e3e7ec;vertical-align:top}
+    td:first-child{color:#66707d;width:42%}
+    td:last-child{font-weight:600;text-align:right}
+    .pie{margin-top:18px;font-size:10px;color:#99a;text-align:center;border-top:1px solid #eef1f4;padding-top:10px}
+    @media print{body{width:auto}}
+  </style></head><body>
+  <div class="cab">
+    <div class="logo">${logoTxt}</div>
+    <div class="caja">${cajaNombre}<small>Kullki · Yachay Deep Labs</small></div>
+  </div>
+  <div class="tipo">${tipoLabel}</div>
+  <div class="monto">${usd(monto)}<br><small>${esIngreso ? "ingreso" : "egreso"}</small></div>
+  <table>
+    <tr><td>Socio</td><td>${socio?.nombres || socio || "—"}</td></tr>
+    ${socio?.cedula ? `<tr><td>Cédula</td><td>${socio.cedula}</td></tr>` : ""}
+    <tr><td>Fecha</td><td>${hoy}</td></tr>
+    ${nota ? `<tr><td>Nota</td><td>${nota}</td></tr>` : ""}
+    ${extra ? `<tr><td>${extra.label}</td><td>${extra.valor}</td></tr>` : ""}
+    ${registradoPor ? `<tr><td>Registrado por</td><td>${registradoPor}</td></tr>` : ""}
+  </table>
+  <div class="pie">Kullki — ${cajaNombre}<br>Este documento es un comprobante interno.</div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},200)}</script>
+  </body></html>`;
+  const w = window.open("", "_blank", "width=380,height=580");
+  if (!w) { alert("Permite las ventanas emergentes para imprimir el boucher."); return; }
+  w.document.write(html); w.document.close();
+}
+
+// ─── Tabla de amortización ────────────────────────────────────────────────────
+export function imprimirTablaAmortizacion(credito, cajaInfo) {
+  const ses = getSesion() || {};
+  const color = cajaInfo?.color_primario || ses.color_primario || "#1B3A6B";
+  const acento = cajaInfo?.color_acento || ses.color_acento || "#E8A838";
+  const cajaNombre = cajaInfo?.nombre || ses.caja_nombre || "Caja de ahorro";
+  const logoTxt = cajaInfo?.logo || ses.logo || cajaNombre[0] || "K";
+  const hoy = new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" });
+  const saldoInicial = credito.monto;
+  let saldoAcum = saldoInicial;
+  const filas = (credito.cuotas || []).map((c) => {
+    const pendiente = +(c.total - (c.abonado || 0)).toFixed(2);
+    const fila = `<tr style="${c.pagada ? "opacity:.55" : ""}">
+      <td class="num">${c.numero}</td>
+      <td>${fechaCorta(c.fecha_vencimiento)}</td>
+      <td class="num">${usd(saldoAcum)}</td>
+      <td class="num">${usd(c.capital)}</td>
+      <td class="num">${usd(c.interes)}</td>
+      <td class="num">${usd(c.total)}</td>
+      <td class="num">${c.abonado > 0 ? usd(c.abonado) : "—"}</td>
+      <td class="num">${c.pagada ? '<span style="color:#0a7a4a">✓ Pagada</span>' : pendiente < c.total ? '<span style="color:#d97706">Parcial</span>' : '<span style="color:#b3372b">Pendiente</span>'}</td>
+    </tr>`;
+    saldoAcum = Math.max(0, +(saldoAcum - c.capital).toFixed(2));
+    return fila;
+  }).join("");
+  const pagadas = (credito.cuotas || []).filter(c => c.pagada).length;
+  const totalIntereses = (credito.cuotas || []).reduce((s, c) => s + c.interes, 0);
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
+  <title>Tabla de amortización · ${credito.socio_nombres || ""}</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;color:#1d2530;margin:0;padding:0 24px 36px}
+    .cab{display:flex;align-items:center;gap:14px;padding:18px 0;border-bottom:3px solid ${acento};margin-bottom:14px}
+    .logo{width:48px;height:48px;border-radius:10px;background:${color};color:${acento};
+          display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none}
+    .cab h1{font-size:17px;margin:0;color:${color}}
+    .cab small{font-size:11.5px;color:#66707d;display:block;margin-top:2px}
+    .doc{margin-left:auto;text-align:right}
+    .doc .t{font-size:14px;font-weight:700;color:${color}}
+    .doc .d{font-size:11px;color:#66707d}
+    .meta{display:flex;flex-wrap:wrap;gap:6px 24px;font-size:12.5px;margin:0 0 12px}
+    .meta b{color:${color}}
+    .kpis{display:flex;gap:10px;margin:0 0 16px;flex-wrap:wrap}
+    .kpi{flex:1;min-width:120px;border:1px solid #e3e7ec;border-radius:8px;padding:8px 10px}
+    .kpi .v{font-size:16px;font-weight:700;color:${color}}
+    .kpi .l{font-size:10px;color:#66707d;margin-top:1px}
+    table{width:100%;border-collapse:collapse;font-size:11.5px}
+    th{background:${color}11;color:${color};padding:7px 8px;text-align:left;font-size:10px;
+       text-transform:uppercase;letter-spacing:.04em}
+    td{padding:6px 8px;border-bottom:1px solid #eef1f4}
+    .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .pie{margin-top:20px;font-size:10px;color:#8a929c;text-align:center;border-top:1px solid #eef1f4;padding-top:10px}
+    @media print{body{padding:0 8px}}
+  </style></head><body>
+  <div class="cab">
+    <div class="logo">${logoTxt}</div>
+    <div><h1>${cajaNombre}</h1><small>Kullki · Yachay Deep Labs</small></div>
+    <div class="doc"><div class="t">Tabla de amortización</div><div class="d">Emitida el ${hoy}</div></div>
+  </div>
+  <div class="meta">
+    <span><b>Socio:</b> ${credito.socio_nombres || "—"}</span>
+    <span><b>Monto:</b> ${usd(credito.monto)}</span>
+    <span><b>Tasa:</b> ${credito.tasa_mensual}% mensual</span>
+    <span><b>Plazo:</b> ${credito.plazo_meses} meses</span>
+    <span><b>Tipo:</b> ${credito.tipo === "emergente" ? "Emergente" : "Ordinario"}</span>
+    <span><b>Destino:</b> ${credito.destino || "—"}</span>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="v">${usd(credito.monto)}</div><div class="l">Capital prestado</div></div>
+    <div class="kpi"><div class="v">${usd(totalIntereses)}</div><div class="l">Total intereses</div></div>
+    <div class="kpi"><div class="v">${usd(credito.monto + totalIntereses)}</div><div class="l">Total a pagar</div></div>
+    <div class="kpi"><div class="v">${pagadas}/${credito.plazo_meses}</div><div class="l">Cuotas pagadas</div></div>
+    <div class="kpi"><div class="v">${usd(credito.saldo_capital || 0)}</div><div class="l">Saldo pendiente</div></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th class="num">#</th><th>Vencimiento</th><th class="num">Saldo inicial</th>
+      <th class="num">Capital</th><th class="num">Interés</th>
+      <th class="num">Cuota</th><th class="num">Abonado</th><th>Estado</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+  </table>
+  <div class="pie">Generado por Kullki · ${cajaNombre} · ${hoy}. Sujeto al reglamento de la caja.</div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
+  </body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { alert("Permite las ventanas emergentes para imprimir la tabla."); return; }
+  w.document.write(html); w.document.close();
+}
+
 // Enlace WhatsApp (click-to-chat, sin API). Normaliza números de Ecuador.
 export function waLink(numero, mensaje) {
   let n = (numero || "").replace(/[^0-9]/g, "");

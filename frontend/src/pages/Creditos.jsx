@@ -244,4 +244,44 @@ export default function Creditos() {
                     : <span className="pill neutro">al día</span>}
                 </div>
                 <div className="detalle">
-                  {usd(c.monto)} · {c.plazo_meses} meses al {
+                  {usd(c.monto)} · {c.plazo_meses} meses al {c.tasa_mensual}% · {c.tipo === "emergente" ? "emergente · " : ""}{c.destino || "sin destino"}{c.garante ? ` · garante: ${c.garante}` : ""}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div className="cifra">{usd(c.saldo_capital)}</div>
+                <div className="detalle">{c.cuotas_pagadas}/{c.plazo_meses} cuotas</div>
+              </div>
+            </div>
+            <details onToggle={(e) => e.target.open && !detalle[c.id] && abrir(c.id)}>
+              <summary>Ver tabla de cuotas</summary>
+              {detalle[c.id]
+                ? <TablaCuotas credito={detalle[c.id]} pagando={trabajando}
+                    onPagar={(cuotaId) => pagar(cuotaId, c.id)}
+                    onAbonar={(cuotaId, monto) => abonar(cuotaId, monto, c.id)}
+                    onImprimir={() => imprimirTablaAmortizacion(detalle[c.id])} />
+                : <div className="vacio">Cargando cuotas…</div>}
+              {c.estado !== "pagado" && detalle[c.id] && (
+                <div style={{ marginTop: 8, textAlign: "right" }}>
+                  <button className="boton mini secundario" style={{ color: "var(--cochinilla)" }}
+                    disabled={trabajando}
+                    onClick={async () => {
+                      if (!window.confirm(`¿Liquidar anticipadamente el crédito de ${c.socio_nombres}? Solo se cobrará el capital pendiente.`)) return;
+                      setError(""); setTrabajando(true);
+                      try {
+                        await api(`/creditos/${c.id}/precancelar`, { method: "POST" });
+                        setOk(`Crédito de ${c.socio_nombres} liquidado anticipadamente.`);
+                        cargar(); setDetalle({});
+                      } catch (e) { setError(e.message); }
+                      finally { setTrabajando(false); }
+                    }}>
+                    💳 Liquidar anticipadamente
+                  </button>
+                </div>
+              )}
+            </details>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}

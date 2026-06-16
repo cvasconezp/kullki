@@ -342,4 +342,11 @@ export default function Cajas({ onAsumir }) {
                 onElegir={(sid) => asumir(c, "socio", sid)} />
             )}
             {dirigiendo === c.id && (
-              <AgregarDirectiva caja={c} onListo={() => setD
+              <AgregarDirectiva caja={c} onListo={() => setDirigiendo(null)} />
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
