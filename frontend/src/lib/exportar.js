@@ -146,6 +146,8 @@ export function imprimirEstadoCuenta(lib, periodo) {
 // Imprime un recibo pequeño al registrar un aporte, retiro o pago de cuota.
 // Nuevos campos opcionales: transaccionId, hora (HH:MM), socioId, cuentaId
 export function imprimirBoucher({ tipo, monto, fecha, hora, socio, nota, registradoPor, cajaInfo, extra, transaccionId, socioId }) {
+  // Enmascara la cédula: muestra primero 3 y últimos 3 dígitos → 167····242
+  const maskCedula = (c) => c ? String(c).slice(0, 3) + "····" + String(c).slice(-3) : null;
   const ses = getSesion() || {};
   const color = cajaInfo?.color_primario || ses.color_primario || "#1B3A6B";
   const acento = cajaInfo?.color_acento || ses.color_acento || "#E8A838";
@@ -214,7 +216,7 @@ export function imprimirBoucher({ tipo, monto, fecha, hora, socio, nota, registr
   <table>
     ${numCuenta ? `<tr><td>Cuenta</td><td>${numCuenta}</td></tr>` : ""}
     <tr><td>Socio</td><td>${socio?.nombres || socio || "—"}</td></tr>
-    ${socio?.cedula ? `<tr><td>Cédula</td><td>${socio.cedula}</td></tr>` : ""}
+    ${socio?.cedula ? `<tr><td>Cédula</td><td>${maskCedula(socio.cedula)}</td></tr>` : ""}
     <tr><td>Fecha</td><td>${fechaStr}</td></tr>
     <tr><td>Hora</td><td>${horaStr}</td></tr>
     ${numComp ? `<tr><td>N° comprobante</td><td>${numComp}</td></tr>` : ""}

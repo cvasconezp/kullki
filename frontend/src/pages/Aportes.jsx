@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta, getSesion } from "../lib/api.js";
 import { imprimirBoucher } from "../lib/exportar.js";
+import BuscadorSocio from "../components/BuscadorSocio.jsx";
 
 const _hora = (ts) => ts ? new Date(ts).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', hour12: false }) : new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', hour12: false });
 function CobroCuota() {
@@ -81,13 +82,13 @@ function CobroCuota() {
       {error && <div className="error">{error}</div>}
       {ok && <div className="exito">{ok}</div>}
       <div className="campo">
-        <label htmlFor="cc-socio">Socio con crédito activo</label>
-        <select id="cc-socio" value={socioId} onChange={(e) => seleccionarSocio(e.target.value)}>
-          <option value="">Elige un socio…</option>
-          {socios.filter((s) => !!creditosPorSocio[s.id]).map((s) => (
-            <option key={s.id} value={s.id}>{s.nombres}</option>
-          ))}
-        </select>
+        <label>Socio con crédito activo</label>
+        <BuscadorSocio
+          socios={socios.filter((s) => !!creditosPorSocio[s.id])}
+          value={socioId}
+          onChange={(id) => seleccionarSocio(id)}
+          placeholder="Buscar socio con crédito…"
+        />
       </div>
       {socioId && !tieneCreditoActivo && (
         <div className="vacio">Este socio no tiene crédito activo.</div>
@@ -221,11 +222,13 @@ export default function Aportes() {
         {modo !== "cuota" && <h3>{modo === "aporte" ? "Registrar aporte" : "Registrar retiro de ahorro"}</h3>}
         {modo !== "cuota" && (
           <>
-            <div className="campo"><label htmlFor="as">Socio</label>
-              <select id="as" value={form.socio_id} onChange={(e) => setForm({ ...form, socio_id: e.target.value })}>
-                <option value="">Elige un socio…</option>
-                {socios.map((s) => <option key={s.id} value={s.id}>{s.nombres}</option>)}
-              </select></div>
+            <div className="campo"><label>Socio</label>
+              <BuscadorSocio
+                socios={socios}
+                value={form.socio_id}
+                onChange={(id) => setForm({ ...form, socio_id: id })}
+                placeholder="Buscar socio…"
+              /></div>
             <div className="campo"><label htmlFor="am">Monto (USD)</label>
               <input id="am" inputMode="decimal" value={form.monto} placeholder="10.00" onChange={(e) => setForm({ ...form, monto: e.target.value })} /></div>
             {modo === "aporte" ? (
