@@ -177,10 +177,26 @@ def init_db():
                             "garante2_estado": "VARCHAR(20) DEFAULT ''"})
         _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE", "pin_hash": "VARCHAR(128) DEFAULT ''"})
         _add_cols("cajas", {"permite_eco_ahorro": "BOOLEAN DEFAULT FALSE", "permite_mascotas": "BOOLEAN DEFAULT FALSE", "permite_inversiones": "BOOLEAN DEFAULT FALSE", "permite_credito_educativo": "BOOLEAN DEFAULT FALSE"})
+        _add_cols("cajas", {"tipo_caja": "VARCHAR(20) DEFAULT 'normal'"})
+        # Crear tabla egresos si no existe
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS egresos (
+                    id SERIAL PRIMARY KEY,
+                    caja_id INTEGER NOT NULL REFERENCES cajas(id),
+                    monto FLOAT NOT NULL,
+                    concepto VARCHAR(200) DEFAULT '',
+                    fecha DATE NOT NULL,
+                    registrado_por INTEGER NOT NULL REFERENCES usuarios(id),
+                    creado_en TIMESTAMP DEFAULT NOW(),
+                    anulado BOOLEAN DEFAULT FALSE
+                )
+            """))
         # Normalizar NULLs en cajas (filas anteriores a la migración)
         with engine.begin() as conn:
             conn.execute(text("""
                 UPDATE cajas SET
+                  tipo_caja = COALESCE(tipo_caja, 'normal'),
                   multa_atraso = COALESCE(multa_atraso, 0),
                   dia_corte = COALESCE(dia_corte, 0),
                   encaje_factor = COALESCE(encaje_factor, 0),

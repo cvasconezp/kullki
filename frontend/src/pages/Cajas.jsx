@@ -7,7 +7,7 @@ const FORM_INICIAL = {
   permite_retiros: true, dia_corte: "0", multa_atraso: "0",
   permite_eco_ahorro: false, permite_mascotas: false, permite_inversiones: false, permite_credito_educativo: false,
   color_primario: "#1B3A6B", color_acento: "#E8A838", logo: "", transparencia_total: false,
-  tesorero_nombre: "", tesorero_cedula: "", tesorero_password: "",
+  tesorero_nombre: "", tesorero_cedula: "", tesorero_email: "", tipo_caja: "normal",
 };
 
 function CampoColor({ label, value, onChange }) {
@@ -399,12 +399,17 @@ export default function Cajas({ onAsumir }) {
           <div className="dos-col">
             <div className="campo"><label>Cédula</label>
               <input inputMode="numeric" value={form.tesorero_cedula} onChange={set("tesorero_cedula")} /></div>
-            <div className="campo"><label>Contraseña inicial</label>
-              <input value={form.tesorero_password} onChange={set("tesorero_password")} /></div>
+            <div className="campo"><label>Correo electrónico</label>
+              <input type="email" placeholder="Se le enviará la contraseña" value={form.tesorero_email} onChange={set("tesorero_email")} /></div>
+          </div>
+          <div className="campo"><label>Tipo de caja</label>
+            <select value={form.tipo_caja} onChange={set("tipo_caja")}>
+              <option value="normal">Normal (ahorro + créditos)</option>
+              <option value="festiva">Festiva / eventos (solo aportes y egresos)</option>
+            </select>
           </div>
           <button className="boton" onClick={crear}
-            disabled={creando || !form.nombre || !form.slug || !form.tesorero_nombre
-              || !form.tesorero_cedula || form.tesorero_password.length < 6}>
+            disabled={creando || !form.nombre || !form.slug || !form.tesorero_nombre || !form.tesorero_cedula}>
             {creando ? "Creando…" : "Crear caja"}
           </button>
         </div>

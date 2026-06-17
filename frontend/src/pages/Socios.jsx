@@ -86,10 +86,12 @@ function Expediente({ socioId, onCerrar }) {
   const [sol, setSol] = useState(null);
   const soloLectura = (getSesion() || {}).rol === "directiva";
 
+  const [solsCredito, setSolsCredito] = useState([]);
   const cargar = () => {
     api(`/mi-libreta?socio_id=${socioId}`).then(setLib).catch((e) => setError(e.message));
     if (!soloLectura)
       api("/socios/solicitudes").then((l) => setSol(l.find((x) => x.socio_id === socioId) || null)).catch(() => {});
+    api(`/creditos/solicitudes?estado=todas&socio_id=${socioId}`).then(setSolsCredito).catch(() => {});
   };
   useEffect(() => { cargar(); }, [socioId]);
   const resolver = async (accion) => {
@@ -315,6 +317,37 @@ function Expediente({ socioId, onCerrar }) {
                 <div className={`cifra ${m.clase}`}>{m.signo}{usd(m.monto)}</div>
               </div>
             ))}
+          </div>
+        );
+      })()}
+
+      {/* ── Sección 3: Historial solicitudes crédito ── */}
+      {solsCredito.length > 0 && (() => {
+        const BEST = {
+          pendiente:      ["pendiente",             "neutro"],
+          en_aprobacion: ["en revisión directiva", "sara"  ],
+          aprobada:       ["aprobada",               "ok"    ],
+          rechazada:      ["rechazada",              "mora"  ],
+          correccion:     ["por corregir",           "mora"  ],
+        };
+        return (
+          <div className="tarjeta">
+            <h3>Historial de solicitudes de crédito</h3>
+            {solsCredito.map((s) => {
+              const [lab, cls] = BEST[s.estado] || [s.estado, "neutro"];
+              return (
+                <div key={s.id} style={{ borderBottom: "1px dashed var(--regla)", padding: "8px 0" }}>
+                  <div className="fila" style={{ alignItems: "flex-start" }}>
+                    <div>
+                      <div className="principal">{usd(s.monto)} · {s.plazo_meses} meses{s.destino ? ` · ${s.destino}` : ""}</div>
+                      <div className="detalle">{fechaCorta(s.creado_en)}{s.tipo === "emergente" ? " · emergente" : ""}</div>
+                    </div>
+                    <span className={"pill " + cls}>{lab}</span>
+                  </div>
+                  {s.motivo && <div className="detalle" style={{ color: "var(--cochinilla)", marginTop: 3 }}>💬 {s.motivo}</div>}
+                </div>
+              );
+            })}
           </div>
         );
       })()}

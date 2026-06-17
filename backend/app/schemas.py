@@ -150,9 +150,11 @@ class CajaIn(BaseModel):
     permite_mascotas: bool = False
     permite_inversiones: bool = False
     permite_credito_educativo: bool = False
+    tipo_caja: str = "normal"
     tesorero_nombre: str
     tesorero_cedula: str
-    tesorero_password: str = Field(min_length=8)
+    tesorero_email: str = ""
+    tesorero_password: str = ""
 
 
 class DirectivaIn(BaseModel):
@@ -184,6 +186,7 @@ class CajaUpdate(BaseModel):
     permite_mascotas: bool | None = None
     permite_inversiones: bool | None = None
     permite_credito_educativo: bool | None = None
+    tipo_caja: str | None = None
 
 
 class CajaOut(BaseModel):
@@ -195,7 +198,7 @@ class CajaOut(BaseModel):
         if isinstance(data, dict):
             _num = [("multa_atraso",0.0),("dia_corte",0),("encaje_factor",0.0),
                     ("credito_max",0.0),("credito_emergente_max",0.0),("credito_emergente_plazo",0)]
-            _str = [("logo",""),("logo_url",""),("color_primario","#1B3A6B"),("color_acento","#E8A838")]
+            _str = [("logo",""),("logo_url",""),("color_primario","#1B3A6B"),("color_acento","#E8A838"),("tipo_caja","normal")]
             _bool = [("transparencia_total",False),("permite_retiros",True),
                      ("permite_eco_ahorro",False),("permite_mascotas",False),
                      ("permite_inversiones",False),("permite_credito_educativo",False)]
@@ -227,6 +230,7 @@ class CajaOut(BaseModel):
     permite_mascotas: bool = False
     permite_inversiones: bool = False
     permite_credito_educativo: bool = False
+    tipo_caja: str = "normal"
     activa: bool
 
     class Config:
@@ -386,6 +390,25 @@ class PagoCuotaIn(BaseModel):
 
 
 # ---------- Reportes ----------
+class EgresoIn(BaseModel):
+    monto: float
+    concepto: str = ""
+    fecha: date | None = None
+    caja_id: int | None = None
+
+class EgresoOut(BaseModel):
+    id: int
+    caja_id: int
+    monto: float
+    concepto: str = ""
+    fecha: date
+    registrado_por: int
+    creado_en: datetime
+    anulado: bool = False
+    class Config:
+        from_attributes = True
+
+
 class DashboardOut(BaseModel):
     caja: CajaOut
     socios_activos: int
@@ -400,6 +423,12 @@ class DashboardOut(BaseModel):
     creditos_activos: int
     cuotas_en_mora: int
     monto_en_mora: float
+    cartera_en_riesgo: float = 0
+    porcentaje_mora: float = 0
+    indice_liquidez: float = 0
+    proyeccion_cobros_30d: float = 0
+    semaforo: str = "verde"  # verde | amarillo | rojo
+    alertas: list[str] = []
 
 
 class LibretaOut(BaseModel):

@@ -433,16 +433,25 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
                        permite_eco_ahorro=data.permite_eco_ahorro,
                        permite_mascotas=data.permite_mascotas,
                        permite_inversiones=data.permite_inversiones,
-                       permite_credito_educativo=data.permite_credito_educativo)
+                       permite_credito_educativo=data.permite_credito_educativo,
+                       tipo_caja=data.tipo_caja)
     db.add(caja)
     db.flush()
 
     # Cuenta del tesorero: reutiliza si la cédula ya existe (persona en varias cajas)
     tesorero = db.scalar(select(models.Usuario)
                          .where(models.Usuario.cedula == data.tesorero_cedula))
+    # Generar contraseña aleatoria si no se proporcionó
+    import secrets, string as _string
+    if not data.tesorero_password:
+        _alpha = _string.ascii_letters + _string.digits
+        pwd_generada = "".join(secrets.choice(_alpha) for _ in range(12))
+    else:
+        pwd_generada = data.tesorero_password
+
     if not tesorero:
         tesorero = models.Usuario(nombre=data.tesorero_nombre, cedula=data.tesorero_cedula,
-                                  password_hash=hash_password(data.tesorero_password),
+                                  password_hash=hash_password(pwd_generada),
                                   debe_cambiar_password=True)
         db.add(tesorero)
         db.flush()
@@ -453,6 +462,39 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
     log_audit(db, actor, "crear", "caja", caja.id,
               f"Caja '{caja.nombre}' creada con tesorero {tesorero.nombre}", caja_id=caja.id)
     db.commit()
+
+    # Enviar credenciales por email si se proporcionó correo
+    if data.tesorero_email:
+        try:
+            import smtplib, os as _os
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            SMTP_HOST = _os.getenv("SMTP_HOST", "")
+            SMTP_PORT = int(_os.getenv("SMTP_PORT", "587"))
+            SMTP_USER = _os.getenv("SMTP_USER", "")
+            SMTP_PASS = _os.getenv("SMTP_PASS", "")
+            EMAIL_FROM = _os.getenv("EMAIL_FROM", SMTP_USER)
+            if SMTP_HOST:
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = f"Bienvenido a {caja.nombre} · Kullki"
+                msg["From"] = EMAIL_FROM
+                msg["To"] = data.tesorero_email
+                html = f"""
+<p>Hola, <strong>{data.tesorero_nombre}</strong> 👋</p>
+<p>Se te ha creado una cuenta de tesorero en <strong>{caja.nombre}</strong> en la plataforma Kullki.</p>
+<p><strong>Cédula:</strong> {data.tesorero_cedula}<br>
+<strong>Contraseña temporal:</strong> <code>{pwd_generada}</code></p>
+<p>Deberás cambiar tu contraseña al ingresar por primera vez.</p>
+<p>Accede en: <a href="https://kullki.vercel.app">kullki.vercel.app</a></p>
+<hr><p style="font-size:11px;color:#888">Kullki · Yachay Deep Labs</p>
+"""
+                msg.attach(MIMEText(html, "html"))
+                with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as smtp:
+                    smtp.starttls()
+                    smtp.login(SMTP_USER, SMTP_PASS)
+                    smtp.sendmail(EMAIL_FROM, data.tesorero_email, msg.as_string())
+        except Exception as _e:
+            pass  # No fallar si el email no se pudo enviar
     db.refresh(caja)
     return caja
 
@@ -1248,19 +1290,21 @@ def mi_solicitud_credito(db: Session = Depends(get_db), actor: Actor = Depends(g
 
 
 @creditos_router.get("/solicitudes", response_model=list[schemas.SolicitudCreditoOut])
-def listar_solicitudes_credito(caja_id: int | None = None, estado: str | None = None,
+def listar_solicitudes_credito(caja_id: int | None = None, estado: str | None = None, socio_id: int | None = None,
                                db: Session = Depends(get_db),
                                user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
     # Por defecto: el tesorero revisa las "pendiente"; la directiva, las que ya pasaron el filtro.
+    filtros_base = [models.SolicitudCredito.caja_id == cid]
+    if socio_id:
+        filtros_base.append(models.SolicitudCredito.socio_id == socio_id)
     if estado == "todas":
-        sols = db.scalars(select(models.SolicitudCredito).where(
-            models.SolicitudCredito.caja_id == cid)
+        sols = db.scalars(select(models.SolicitudCredito).where(*filtros_base)
             .order_by(models.SolicitudCredito.creado_en.desc())).all()
     else:
         estados = [estado] if estado else (["en_aprobacion"] if user.rol == "directiva" else ["pendiente"])
-        sols = db.scalars(select(models.SolicitudCredito).where(
-            models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado.in_(estados))
+        filtros_base.append(models.SolicitudCredito.estado.in_(estados))
+        sols = db.scalars(select(models.SolicitudCredito).where(*filtros_base)
             .order_by(models.SolicitudCredito.creado_en.desc())).all()
     out = []
     for x in sols:
@@ -1647,6 +1691,8 @@ def anular_retiro(retiro_id: int, db: Session = Depends(get_db),
 reportes_router = APIRouter(tags=["reportes"])
 
 
+def usd_str(v): return f"${v:,.2f}"
+
 @reportes_router.get("/dashboard", response_model=schemas.DashboardOut)
 def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
               user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
@@ -1688,21 +1734,83 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
     creditos_activos = db.scalar(select(func.count(models.Credito.id))
                                  .where(models.Credito.caja_id == cid,
                                         models.Credito.estado == "activo")) or 0
+    # ── Métricas ejecutivas adicionales ──
+    # Cartera en riesgo: deuda pendiente de créditos con ≥1 cuota vencida >30 días
+    hace_30 = hoy - timedelta(days=30)
+    creditos_riesgo_ids = db.scalars(
+        select(models.Cuota.credito_id).distinct()
+        .join(models.Credito)
+        .where(models.Credito.caja_id == cid,
+               models.Cuota.pagada.is_(False),
+               models.Cuota.fecha_vencimiento < hace_30)
+    ).all()
+    cartera_riesgo = float(db.scalar(
+        select(func.coalesce(func.sum(models.Cuota.total - models.Cuota.abonado), 0))
+        .join(models.Credito)
+        .where(models.Credito.caja_id == cid,
+               models.Cuota.pagada.is_(False),
+               models.Cuota.credito_id.in_(creditos_riesgo_ids))
+    ) or 0)
+
+    # Proyección cobros próximos 30 días
+    en_30 = hoy + timedelta(days=30)
+    proyeccion = float(db.scalar(
+        select(func.coalesce(func.sum(models.Cuota.total - models.Cuota.abonado), 0))
+        .join(models.Credito)
+        .where(models.Credito.caja_id == cid,
+               models.Cuota.pagada.is_(False),
+               models.Cuota.fecha_vencimiento >= hoy,
+               models.Cuota.fecha_vencimiento <= en_30)
+    ) or 0)
+
+    capital_prestado_val = round(desembolsado - cap_recuperado, 2)
+    fondo_disp = round(total_aportes + cap_recuperado + intereses
+                       + abonos_transito - desembolsado - total_retiros - capitalizado, 2)
+    pct_mora = round(float(mora[1]) / capital_prestado_val * 100, 1) if capital_prestado_val > 0 else 0
+    idx_liquidez = round(fondo_disp / float(total_aportes) * 100, 1) if float(total_aportes) > 0 else 100.0
+
+    # Semáforo y alertas
+    alertas = []
+    if pct_mora > 15:
+        semaforo = "rojo"
+        alertas.append(f"🔴 Mora crítica: {pct_mora}% del capital en la calle está vencido")
+    elif pct_mora > 5:
+        semaforo = "amarillo"
+        alertas.append(f"🟡 Mora elevada: {pct_mora}% del capital en la calle está vencido")
+    else:
+        semaforo = "verde"
+    if idx_liquidez < 15:
+        semaforo = "rojo"
+        alertas.append(f"🔴 Liquidez crítica: solo el {idx_liquidez}% del fondo está disponible")
+    elif idx_liquidez < 30:
+        if semaforo == "verde":
+            semaforo = "amarillo"
+        alertas.append(f"🟡 Liquidez baja: el {idx_liquidez}% del fondo está disponible")
+    if cartera_riesgo > 0:
+        alertas.append(f"⚠️ Cartera en riesgo: {usd_str(cartera_riesgo)} con mora >30 días")
+    if not alertas:
+        alertas.append("🟢 Todo en orden — sin alertas activas")
+
     return schemas.DashboardOut(
         caja=schemas.CajaOut.model_validate(caja),
         socios_activos=socios_activos,
-        fondo_disponible=round(total_aportes + cap_recuperado + intereses
-                               + abonos_transito - desembolsado - total_retiros - capitalizado, 2),
-        total_aportes=round(total_aportes, 2),
-        capital_prestado=round(desembolsado - cap_recuperado, 2),
+        fondo_disponible=fondo_disp,
+        total_aportes=round(float(total_aportes), 2),
+        capital_prestado=capital_prestado_val,
         capital_recuperado=round(cap_recuperado, 2),
         intereses_cobrados=round(intereses, 2),
-        total_retiros=round(total_retiros, 2),
+        total_retiros=round(float(total_retiros), 2),
         abonos_en_transito=round(abonos_transito, 2),
         utilidades_capitalizadas=round(capitalizado, 2),
         creditos_activos=creditos_activos,
         cuotas_en_mora=int(mora[0]),
         monto_en_mora=round(float(mora[1]), 2),
+        cartera_en_riesgo=round(cartera_riesgo, 2),
+        porcentaje_mora=pct_mora,
+        indice_liquidez=idx_liquidez,
+        proyeccion_cobros_30d=round(proyeccion, 2),
+        semaforo=semaforo,
+        alertas=alertas,
     )
 
 
@@ -2446,3 +2554,49 @@ def enviar_recordatorios_cuotas(
     log_audit(db, actor, "notificar", "caja", cid,
               f"Recordatorios enviados: {enviados} socios notificados", caja_id=cid)
     return {"enviados": enviados, "omitidos": len(socios_a_notificar) - enviados, "errores": errores}
+
+# ─── Egresos institucionales (cajas festivas y gastos de caja) ─────────────────
+_egresos_import_done = False
+
+@reportes_router.post("/egresos", response_model=schemas.EgresoOut)
+def registrar_egreso(data: schemas.EgresoIn, db: Session = Depends(get_db),
+                     actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    cid = caja_scope(actor, data.caja_id)
+    egreso = models.Egreso(
+        caja_id=cid,
+        monto=data.monto,
+        concepto=data.concepto,
+        fecha=data.fecha or hoy_ec(),
+        registrado_por=actor.id,
+    )
+    db.add(egreso)
+    log_audit(db, actor, "crear", "egreso", 0,
+              f"Egreso ${data.monto:.2f}: {data.concepto}", caja_id=cid)
+    db.commit()
+    db.refresh(egreso)
+    return egreso
+
+@reportes_router.get("/egresos", response_model=list[schemas.EgresoOut])
+def listar_egresos(caja_id: int | None = None, db: Session = Depends(get_db),
+                   actor: Actor = Depends(require_roles("tesorero", "superadmin", "directiva"))):
+    cid = caja_scope(actor, caja_id)
+    return db.scalars(
+        select(models.Egreso).where(models.Egreso.caja_id == cid,
+                                    models.Egreso.anulado.is_(False))
+        .order_by(models.Egreso.fecha.desc())
+    ).all()
+
+@reportes_router.delete("/egresos/{egreso_id}")
+def anular_egreso(egreso_id: int, db: Session = Depends(get_db),
+                  actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
+    eg = db.get(models.Egreso, egreso_id)
+    if not eg:
+        raise HTTPException(404, "Egreso no encontrado")
+    cid = caja_scope(actor, None)
+    if eg.caja_id != cid:
+        raise HTTPException(403, "No autorizado")
+    eg.anulado = True
+    log_audit(db, actor, "anular", "egreso", egreso_id,
+              f"Egreso anulado: ${eg.monto:.2f} {eg.concepto}", caja_id=cid)
+    db.commit()
+    return {"ok": True}

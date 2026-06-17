@@ -33,6 +33,7 @@ class Caja(Base):
     permite_inversiones: Mapped[bool] = mapped_column(Boolean, default=False)
     permite_credito_educativo: Mapped[bool] = mapped_column(Boolean, default=False)
     multa_atraso: Mapped[float] = mapped_column(Float, default=0.0)    # multa por aporte fuera del corte
+    tipo_caja: Mapped[str] = mapped_column(String(20), default="normal")  # normal | festiva
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -254,3 +255,16 @@ class Retiro(Base):
     anulado: Mapped[bool] = mapped_column(Boolean, default=False)
 
     socio: Mapped["Socio"] = relationship()
+
+
+class Egreso(Base):
+    """Egreso institucional de la caja (gasto del evento, festividad, etc.) sin socio asociado."""
+    __tablename__ = "egresos"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
+    monto: Mapped[float] = mapped_column(Float)
+    concepto: Mapped[str] = mapped_column(String(200), default="")
+    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    anulado: Mapped[bool] = mapped_column(Boolean, default=False)
