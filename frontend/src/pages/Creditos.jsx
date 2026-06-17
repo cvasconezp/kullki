@@ -269,7 +269,9 @@ export default function Creditos() {
                   <button className="boton mini secundario" style={{ color: "var(--cochinilla)" }}
                     disabled={trabajando}
                     onClick={async () => {
-                      if (!window.confirm(`¿Liquidar anticipadamente el crédito de ${c.socio_nombres}? Solo se cobrará el capital pendiente.`)) return;
+                      const cuotasPend = (detalle[c.id]?.cuotas || []).filter(q => !q.pagada);
+                      const capitalPend = cuotasPend.reduce((s, q) => s + (q.capital || 0), 0);
+                      if (!window.confirm(`¿Liquidar anticipadamente el crédito de ${c.socio_nombres}?\n\nCapital pendiente a pagar: ${usd(capitalPend)}\nLos intereses futuros quedan condonados.`)) return;
                       setError(""); setTrabajando(true);
                       try {
                         await api(`/creditos/${c.id}/precancelar`, { method: "POST" });

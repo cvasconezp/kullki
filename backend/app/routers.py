@@ -1,6 +1,12 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from collections import defaultdict
 import io, json, time, os
+
+_TZ_EC = timezone(timedelta(hours=-5))   # America/Guayaquil
+
+def hoy_ec() -> date:
+    """Fecha actual en zona horaria de Ecuador (UTC-5)."""
+    return datetime.now(_TZ_EC).date()
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -39,7 +45,7 @@ def _saldo_capital(credito: models.Credito) -> float:
 
 
 def _en_mora(credito: models.Credito) -> bool:
-    hoy = date.today()
+    hoy = hoy_ec()
     return any((not c.pagada) and c.fecha_vencimiento < hoy for c in credito.cuotas)
 
 
@@ -561,7 +567,7 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
         raise HTTPException(400, "Ya existe un socio con esa cédula en esta caja")
     socio = models.Socio(caja_id=cid, nombres=data.nombres, cedula=data.cedula,
                          telefono=data.telefono,
-                         fecha_ingreso=data.fecha_ingreso or date.today(),
+                         fecha_ingreso=data.fecha_ingreso or hoy_ec(),
                          fecha_nacimiento=data.fecha_nacimiento, genero=data.genero,
                          correo=data.correo, whatsapp=data.whatsapp,
                          direccion=data.direccion, ocupacion=data.ocupacion,
@@ -570,7 +576,7 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
                          num_cargas=data.num_cargas,
                          contacto_emergencia=data.contacto_emergencia,
                          consentimiento_datos=data.consentimiento_datos,
-                         consentimiento_fecha=date.today() if data.consentimiento_datos else None)
+                         consentimiento_fecha=hoy_ec() if data.consentimiento_datos else None)
     db.add(socio)
     db.flush()
 
@@ -707,7 +713,7 @@ async def importar_socios_excel(
                 nivel_instruccion=_cell(row, CI["nivel_instruccion"]),
                 num_cargas=num_cargas,
                 contacto_emergencia=_cell(row, CI["contacto_emergencia"]),
-                fecha_ingreso=fi or date.today(),
+                fecha_ingreso=fi or hoy_ec(),
                 fecha_nacimiento=fn,
             )
             db.add(socio)
@@ -940,7 +946,7 @@ def registrar_aporte(data: schemas.AporteIn, db: Session = Depends(get_db),
         raise HTTPException(404, "Socio no encontrado")
     if not socio.activo:
         raise HTTPException(400, "El socio está inactivo")
-    fecha = data.fecha or date.today()
+    fecha = data.fecha or hoy_ec()
     aporte = models.Aporte(caja_id=socio.caja_id, socio_id=socio.id, monto=data.monto,
                            fecha=fecha, tipo=data.tipo, nota=data.nota, registrado_por=user.id)
     db.add(aporte)
@@ -1013,7 +1019,7 @@ def multas_masivas(caja_id: int | None = None, db: Session = Depends(get_db),
     """Aplica multa automática a todos los socios sin aporte ordinario este mes."""
     cid = caja_scope(actor, caja_id)
     caja = db.get(models.Caja, cid)
-    hoy = date.today()
+    hoy = hoy_ec()
 
     if not caja.dia_corte or caja.dia_corte <= 0:
         raise HTTPException(400, "La caja no tiene día de corte configurado")
@@ -1121,7 +1127,7 @@ def _otorgar_credito(db, actor, socio, monto, plazo, tasa_mensual, inicio, desti
             raise HTTPException(400, f"Por la regla de encaje, este socio puede recibir máximo "
                                      f"${tope:.2f} (ahorro ${info.total_aportes:.2f} × {caja.encaje_factor})")
     tasa = tasa_mensual if tasa_mensual is not None else caja.tasa_interes_mensual
-    inicio = inicio or date.today()
+    inicio = inicio or hoy_ec()
     credito = models.Credito(caja_id=socio.caja_id, socio_id=socio.id, monto=monto,
                              tasa_mensual=tasa, plazo_meses=plazo, fecha_desembolso=inicio,
                              destino=destino, garante=garante, tipo=tipo, registrado_por=actor.id)
@@ -1385,7 +1391,7 @@ def aprobar_solicitud_credito(sol_id: int, db: Session = Depends(get_db),
     socio = db.get(models.Socio, sol.socio_id)
     garante_txt = sol.garante + (" / " + sol.garante2 if sol.garante2 else "")
     credito = _otorgar_credito(db, user, socio, sol.monto, sol.plazo_meses, None,
-                               date.today(), sol.destino, garante_txt, sol.tipo)
+                               hoy_ec(), sol.destino, garante_txt, sol.tipo)
     sol.estado = "aprobada"; sol.resuelto_por = user.nombre; sol.resuelto_en = datetime.utcnow()
     db.flush(); sol.credito_id = credito.id
     db.commit(); db.refresh(credito)
@@ -1452,7 +1458,7 @@ def _aplicar_abono(db, user, cuota: models.Cuota, monto: float, fecha) -> models
     pendiente = round(cuota.total - (cuota.abonado or 0), 2)
     if monto > pendiente + 0.005:
         raise HTTPException(400, f"El abono excede lo pendiente de la cuota (${pendiente:.2f})")
-    fecha = fecha or date.today()
+    fecha = fecha or hoy_ec()
 
     # Multa de mora automática: una sola vez, en el primer abono tras el vencimiento
     caja = db.get(models.Caja, credito.caja_id)
@@ -1501,7 +1507,7 @@ def precancelar_credito(credito_id: int, db: Session = Depends(get_db),
         raise HTTPException(403, "Sin acceso a este crédito")
     if credito.estado == "pagado":
         raise HTTPException(400, "El crédito ya está pagado")
-    hoy = date.today()
+    hoy = hoy_ec()
     pendientes = [q for q in credito.cuotas if not q.pagada]
     capital_restante = round(sum(q.capital for q in pendientes), 2)
     for cuota in pendientes:
@@ -1583,7 +1589,7 @@ def registrar_retiro(data: schemas.RetiroIn, db: Session = Depends(get_db),
             "El socio tiene crédito activo: su ahorro respalda la deuda. "
             f"Puede retirar máximo ${max(0, info.total_aportes - info.saldo_credito):.2f}")
     retiro = models.Retiro(caja_id=socio.caja_id, socio_id=socio.id, monto=data.monto,
-                           fecha=data.fecha or date.today(), nota=data.nota,
+                           fecha=data.fecha or hoy_ec(), nota=data.nota,
                            registrado_por=user.id)
     db.add(retiro)
     db.flush()
@@ -1669,7 +1675,7 @@ def dashboard(caja_id: int | None = None, db: Session = Depends(get_db),
     capitalizado = float(db.scalar(select(func.coalesce(func.sum(models.Aporte.monto), 0))
                                    .where(models.Aporte.caja_id == cid, models.Aporte.tipo == "utilidad",
                                           models.Aporte.anulado.is_(False))) or 0)
-    hoy = date.today()
+    hoy = hoy_ec()
     mora = db.execute(
         select(func.count(models.Cuota.id),
                func.coalesce(func.sum(models.Cuota.total - models.Cuota.abonado), 0))
@@ -1780,7 +1786,7 @@ def informe_asamblea(caja_id: int | None = None, db: Session = Depends(get_db),
             multas=info.total_multas, saldo_credito=info.saldo_credito, en_mora=en_mora))
     log_audit(db, user, "crear", "informe", 0, "Informe de asamblea generado", caja_id=cid)
     db.commit()
-    return schemas.InformeAsamblea(caja=dash.caja, fecha=date.today(),
+    return schemas.InformeAsamblea(caja=dash.caja, fecha=hoy_ec(),
                                    dashboard=dash, filas=filas)
 
 
@@ -1902,7 +1908,7 @@ def demografia(caja_id: int | None = None, db: Session = Depends(get_db),
     cid = caja_scope(user, caja_id)
     socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
                                                    models.Socio.activo)).all()
-    hoy = date.today()
+    hoy = hoy_ec()
     def edad(f):
         if not f:
             return None
@@ -1937,7 +1943,7 @@ def recordatorios(caja_id: int | None = None, dias: int = 7, db: Session = Depen
     from datetime import timedelta
     cid = caja_scope(user, caja_id)
     caja = db.get(models.Caja, cid)
-    hoy = date.today(); limite = hoy + timedelta(days=dias)
+    hoy = hoy_ec(); limite = hoy + timedelta(days=dias)
     out = []
     creditos = db.scalars(select(models.Credito).where(models.Credito.caja_id == cid,
                                                        models.Credito.estado == "activo")).all()
@@ -2109,7 +2115,7 @@ def analitica(caja_id: int | None = None, db: Session = Depends(get_db),
         if not f: return None
         return hoy_d.year - f.year - ((hoy_d.month, hoy_d.day) < (f.month, f.day))
     from datetime import date as _date
-    hoy_d = _date.today()
+    hoy_d = _hoy_ec()
     genero, instr, civil, ocup = {}, {}, {}, {}
     rangos = {"18-29": 0, "30-44": 0, "45-59": 0, "60+": 0, "Sin dato": 0}
     edades = []
@@ -2215,7 +2221,7 @@ def ejecutar_cierre(data: schemas.CierreIn, caja_id: int | None = None,
     total_ahorro = sum(i.total_aportes for _, i in infos)
     if total_ahorro <= 0:
         raise HTTPException(400, "No hay ahorro para distribuir proporcionalmente.")
-    hoy = date.today(); anio = hoy.year; repartido = 0.0; n = 0
+    hoy = hoy_ec(); anio = hoy.year; repartido = 0.0; n = 0
     for s, info in infos:
         u = round(intereses * info.total_aportes / total_ahorro, 2)
         if u <= 0:
@@ -2256,7 +2262,7 @@ def exportar_excel_balance(caja_id: int | None = None, db: Session = Depends(get
     from .excel import excel_balance
     cid = caja_scope(actor, caja_id)
     caja = db.get(models.Caja, cid)
-    return _xlsx(excel_balance(db, cid), f"balance-socios-{caja.slug}-{date.today()}.xlsx")
+    return _xlsx(excel_balance(db, cid), f"balance-socios-{caja.slug}-{hoy_ec()}.xlsx")
 
 
 @reportes_router.get("/exportar/excel/cartera")
@@ -2266,7 +2272,7 @@ def exportar_excel_cartera(caja_id: int | None = None, db: Session = Depends(get
     from .excel import excel_cartera
     cid = caja_scope(actor, caja_id)
     caja = db.get(models.Caja, cid)
-    return _xlsx(excel_cartera(db, cid), f"cartera-credito-{caja.slug}-{date.today()}.xlsx")
+    return _xlsx(excel_cartera(db, cid), f"cartera-credito-{caja.slug}-{hoy_ec()}.xlsx")
 
 
 @reportes_router.get("/exportar/excel/movimientos")
@@ -2276,7 +2282,7 @@ def exportar_excel_movimientos(caja_id: int | None = None, db: Session = Depends
     from .excel import excel_movimientos
     cid = caja_scope(actor, caja_id)
     caja = db.get(models.Caja, cid)
-    return _xlsx(excel_movimientos(db, cid), f"movimientos-{caja.slug}-{date.today()}.xlsx")
+    return _xlsx(excel_movimientos(db, cid), f"movimientos-{caja.slug}-{hoy_ec()}.xlsx")
 
 
 @reportes_router.get("/exportar/excel/completo")
@@ -2286,7 +2292,7 @@ def exportar_excel_completo(caja_id: int | None = None, db: Session = Depends(ge
     from .excel import excel_completo
     cid = caja_scope(actor, caja_id)
     caja = db.get(models.Caja, cid)
-    return _xlsx(excel_completo(db, cid), f"kullki-backup-{caja.slug}-{date.today()}.xlsx")
+    return _xlsx(excel_completo(db, cid), f"kullki-backup-{caja.slug}-{hoy_ec()}.xlsx")
 
 @reportes_router.get("/admin/backups")
 def listar_backups(user: models.Usuario = Depends(require_roles("superadmin"))):
@@ -2380,7 +2386,7 @@ def enviar_recordatorios_cuotas(
     cid = caja_scope(actor, None)
     caja = db.get(models.Caja, cid)
 
-    hoy = date.today()
+    hoy = hoy_ec()
     inicio_mes = hoy.replace(day=1)
     fin_mes = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
 

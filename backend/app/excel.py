@@ -7,10 +7,17 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from . import models
+from datetime import date, datetime, timedelta, timezone
 
 _HDR_FONT = Font(bold=True, color="FFFFFF", size=11)
 _HDR_FILL = PatternFill("solid", fgColor="1B3A6B")
 _HDR_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+
+_TZ_EC = timezone(timedelta(hours=-5))
+def hoy_ec() -> date:
+    return datetime.now(_TZ_EC).date()
+
 
 def _mask_cedula(cedula: str) -> str:
     """Enmascara la cédula: 17••••••01 (muestra primeros 2 y últimos 2 dígitos)."""
