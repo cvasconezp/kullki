@@ -264,25 +264,35 @@ export default function Aportes() {
 
       {cajaFlags.dia_corte > 0 && (
         <div className="tarjeta no-print">
-          <h3>Multas automáticas</h3>
-          <div className="detalle" style={{ marginBottom: 10 }}>
-            Aplica una multa de <strong>{usd(cajaFlags.multa_atraso || 0)}</strong> a todos los socios que no
-            registraron aporte este mes (corte: día {cajaFlags.dia_corte}).
+          <h3>Multas por atraso</h3>
+          <div className="detalle" style={{ marginBottom: 8 }}>
+            El sistema aplica automáticamente una multa de{" "}
+            <strong>{usd(cajaFlags.multa_atraso || 0)}</strong> a los socios sin aporte
+            ordinario cada día {cajaFlags.dia_corte} del mes.
           </div>
-          <button className="boton" style={{ background: "var(--cochinilla)" }}
-            disabled={multando}
-            onClick={async () => {
-              if (!window.confirm("¿Aplicar multas a socios sin aporte este mes?")) return;
-              setMultando(true);
-              try {
-                const r = await api("/aportes/multas-masivas", { method: "POST" });
-                setOk(`✓ ${r.multados} socio(s) multados · Total ${usd(r.total)}`);
-                cargar();
-              } catch (e) { setError(e.message); }
-              finally { setMultando(false); }
-            }}>
-            {multando ? "Aplicando…" : "⚡ Aplicar multas del mes"}
-          </button>
+          {cajaFlags.multa_atraso > 0
+            ? <div className="detalle" style={{ color: "var(--ok)", marginBottom: 10 }}>🟢 Activo — corre automáticamente a las 08:00 cada día {cajaFlags.dia_corte}.</div>
+            : <div className="detalle" style={{ color: "var(--sara)", marginBottom: 10 }}>⚠️ El monto de multa es $0,00 — configúralo en la edición de la caja para que tenga efecto.</div>
+          }
+          <details>
+            <summary className="detalle" style={{ cursor: "pointer", color: "var(--tinta-suave)" }}>Aplicar manualmente (solo si es necesario)</summary>
+            <div style={{ paddingTop: 8 }}>
+              <button className="boton secundario" style={{ color: "var(--cochinilla)" }}
+                disabled={multando}
+                onClick={async () => {
+                  if (!window.confirm("¿Aplicar multas ahora manualmente? Esto es adicional a la ejecución automática del sistema.")) return;
+                  setMultando(true);
+                  try {
+                    const r = await api("/aportes/multas-masivas", { method: "POST" });
+                    setOk(`✓ ${r.multados} socio(s) multados · Total ${usd(r.total)}`);
+                    cargar();
+                  } catch (e) { setError(e.message); }
+                  finally { setMultando(false); }
+                }}>
+                {multando ? "Aplicando…" : "Aplicar multas ahora"}
+              </button>
+            </div>
+          </details>
         </div>
       )}
 

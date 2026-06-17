@@ -90,6 +90,81 @@ def root():
     return {"app": "Kullki", "by": "Yachay Deep Labs", "status": "ok"}
 
 
+
+
+# ── Multas automáticas (APScheduler) ─────────────────────────────────────────
+def _aplicar_multas_automaticas():
+    """Corre diariamente. Aplica multas a socios sin aporte en cajas donde
+    hoy coincide con el día de corte y multa_atraso > 0. Idempotente: si ya
+    se registraron multas este mes para una caja, no las duplica."""
+    from datetime import datetime, timedelta, timezone, date
+    import logging
+    _log = logging.getLogger("kullki.multas_auto")
+    _TZ_EC = timezone(timedelta(hours=-5))
+    hoy = datetime.now(_TZ_EC).date()
+
+    db = SessionLocal()
+    try:
+        cajas = db.scalars(
+            select(models.Caja).where(
+                models.Caja.activa.is_(True),
+                models.Caja.dia_corte > 0,
+                models.Caja.multa_atraso > 0,
+            )
+        ).all()
+        for caja in cajas:
+            if hoy.day != caja.dia_corte:
+                continue  # no es el día de corte de esta caja
+            inicio_mes = hoy.replace(day=1)
+            # Idempotencia: si ya hay multas de atraso este mes, saltar
+            ya_aplicadas = db.scalar(
+                select(models.Aporte.id).where(
+                    models.Aporte.caja_id == caja.id,
+                    models.Aporte.tipo == "multa",
+                    models.Aporte.nota == "Multa automática por atraso en aporte",
+                    models.Aporte.fecha >= inicio_mes,
+                )
+            )
+            if ya_aplicadas:
+                _log.info(f"Caja {caja.nombre}: multas de {hoy.strftime('%B %Y')} ya aplicadas.")
+                continue
+            # Socios activos sin aporte ordinario este mes
+            ids_con_aporte = set(db.scalars(
+                select(models.Aporte.socio_id).where(
+                    models.Aporte.caja_id == caja.id,
+                    models.Aporte.fecha >= inicio_mes,
+                    models.Aporte.fecha < hoy,
+                    models.Aporte.tipo == "ordinario",
+                    models.Aporte.anulado.is_(False),
+                )
+            ).all())
+            socios = db.scalars(
+                select(models.Socio).where(
+                    models.Socio.caja_id == caja.id,
+                    models.Socio.activo.is_(True),
+                )
+            ).all()
+            aplicadas = 0
+            for socio in socios:
+                if socio.id not in ids_con_aporte:
+                    db.add(models.Aporte(
+                        socio_id=socio.id,
+                        caja_id=caja.id,
+                        monto=caja.multa_atraso,
+                        tipo="multa",
+                        fecha=hoy,
+                        nota="Multa automática por atraso en aporte",
+                        registrado_por=1,  # sistema
+                    ))
+                    aplicadas += 1
+            if aplicadas:
+                db.commit()
+                _log.info(f"Caja '{caja.nombre}': {aplicadas} multas automáticas de ${caja.multa_atraso:.2f} aplicadas.")
+    except Exception as e:
+        _log.error(f"Error en multas automáticas: {e}")
+    finally:
+        db.close()
+
 @app.on_event("startup")
 def init_db():
     import logging
