@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, model_validator, Field
 
 
 # ---------- Auth ----------
@@ -187,6 +187,23 @@ class CajaUpdate(BaseModel):
 
 
 class CajaOut(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _null_to_default(cls, data):
+        if hasattr(data, "__dict__"):
+            data = data.__dict__
+        if isinstance(data, dict):
+            _num = [("multa_atraso",0.0),("dia_corte",0),("encaje_factor",0.0),
+                    ("credito_max",0.0),("credito_emergente_max",0.0),("credito_emergente_plazo",0)]
+            _str = [("logo",""),("logo_url",""),("color_primario","#1B3A6B"),("color_acento","#E8A838")]
+            _bool = [("transparencia_total",False),("permite_retiros",True),
+                     ("permite_eco_ahorro",False),("permite_mascotas",False),
+                     ("permite_inversiones",False),("permite_credito_educativo",False)]
+            for k,d in _num + _str + _bool:
+                if k in data and data[k] is None:
+                    data[k] = d
+        return data
+
     id: int
     nombre: str
     slug: str

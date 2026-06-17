@@ -177,6 +177,22 @@ def init_db():
                             "garante2_estado": "VARCHAR(20) DEFAULT ''"})
         _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE", "pin_hash": "VARCHAR(128) DEFAULT ''"})
         _add_cols("cajas", {"permite_eco_ahorro": "BOOLEAN DEFAULT FALSE", "permite_mascotas": "BOOLEAN DEFAULT FALSE", "permite_inversiones": "BOOLEAN DEFAULT FALSE", "permite_credito_educativo": "BOOLEAN DEFAULT FALSE"})
+        # Normalizar NULLs en cajas (filas anteriores a la migración)
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE cajas SET
+                  multa_atraso = COALESCE(multa_atraso, 0),
+                  dia_corte = COALESCE(dia_corte, 0),
+                  encaje_factor = COALESCE(encaje_factor, 0),
+                  credito_max = COALESCE(credito_max, 0),
+                  credito_emergente_max = COALESCE(credito_emergente_max, 0),
+                  credito_emergente_plazo = COALESCE(credito_emergente_plazo, 0),
+                  logo_url = COALESCE(logo_url, ''),
+                  logo = COALESCE(logo, ''),
+                  color_primario = COALESCE(color_primario, '#1B3A6B'),
+                  color_acento = COALESCE(color_acento, '#E8A838')
+            """))
+            log.info("NULLs en cajas normalizados.")
 
         # Superadmin inicial desde variables de entorno
         # Chequeo de configuración de seguridad
