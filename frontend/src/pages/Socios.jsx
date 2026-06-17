@@ -82,6 +82,7 @@ function Expediente({ socioId, onCerrar }) {
   const [lib, setLib] = useState(null);
   const [error, setError] = useState("");
   const [editando, setEditando] = useState(false);
+  const [fichaAbierta, setFichaAbierta] = useState(false);
   const [sol, setSol] = useState(null);
   const soloLectura = (getSesion() || {}).rol === "directiva";
 
@@ -166,11 +167,15 @@ function Expediente({ socioId, onCerrar }) {
       })()}
 
       <div className="tarjeta no-print">
-        <div className="seccion-titulo" style={{ margin: "0 0 8px" }}>
-          <h3 style={{ margin: 0 }}>Ficha del socio</h3>
-          {!soloLectura && <button className="boton mini" onClick={() => setEditando(!editando)}>{editando ? "Cerrar" : "Editar ficha"}</button>}
+        <div className="seccion-titulo" style={{ margin: "0 0 8px", cursor: "pointer" }}
+          onClick={() => { if (!editando) setFichaAbierta(f => !f); }}>
+          <h3 style={{ margin: 0 }}>
+            <span style={{ marginRight: 6, fontSize: 12, opacity: 0.6 }}>{fichaAbierta ? "▾" : "▸"}</span>
+            Ficha del socio
+          </h3>
+          {!soloLectura && <button className="boton mini" onClick={(e) => { e.stopPropagation(); setEditando(!editando); setFichaAbierta(true); }}>{editando ? "Cerrar" : "Editar ficha"}</button>}
         </div>
-        {editando ? (
+        {(fichaAbierta || editando) && (editando ? (
           <EditarFicha socio={socio} onListo={(g) => { setEditando(false); if (g) cargar(); }} />
         ) : (
           <>
@@ -190,7 +195,7 @@ function Expediente({ socioId, onCerrar }) {
             {!soloLectura && socio.activo &&
               <button className="boton-baja" onClick={anonimizar}>Dar de baja y anonimizar (derecho al olvido)</button>}
           </>
-        )}
+        ))}
       </div>
 
       {!soloLectura && socio.activo && (
@@ -229,10 +234,13 @@ function Expediente({ socioId, onCerrar }) {
                 {c.cuotas.map((q) => (
                   <div className="fila" key={q.id}>
                     <div><div className="principal" style={{ fontSize: 14 }}>Cuota {q.numero}</div>
-                      <div className="detalle">vence {fechaCorta(q.fecha_vencimiento)}</div></div>
+                      <div className="detalle">capital {usd(q.capital)} + int. {usd(q.interes)} · vence {fechaCorta(q.fecha_vencimiento)}</div>
+                      {!q.pagada && q.abonado > 0 && <div className="detalle" style={{ color: "var(--sara)" }}>Abonado: {usd(q.abonado)} · pendiente: {usd(Math.max(0, q.total - (q.abonado||0)))}</div>}
+                    </div>
                     <div style={{ textAlign: "right" }}>
                       <div className="cifra">{usd(q.total)}</div>
                       {q.pagada ? <span className="pill ok">pagada {fechaCorta(q.fecha_pago)}</span>
+                        : q.abonado > 0 ? <span className="pill sara">abono parcial</span>
                         : new Date(q.fecha_vencimiento) < new Date() ? <span className="pill mora">vencida</span>
                           : <span className="pill neutro">pendiente</span>}</div>
                   </div>
