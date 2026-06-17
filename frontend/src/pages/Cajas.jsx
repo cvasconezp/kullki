@@ -76,23 +76,36 @@ function EditarCaja({ caja, onListo }) {
     } catch (err) { setError(err.message); }
   };
 
-  const guardar = async () => {
+  const guardar = async (intento = 1) => {
     setError(""); setGuardando(true);
+    const body = {
+      nombre: f.nombre, comunidad: f.comunidad,
+      tasa_interes_mensual: +f.tasa_interes_mensual,
+      aporte_ordinario: +f.aporte_ordinario, multa_mora: +f.multa_mora,
+      credito_max: +f.credito_max, encaje_factor: +f.encaje_factor,
+      credito_emergente_max: +f.credito_emergente_max, credito_emergente_plazo: +f.credito_emergente_plazo,
+      permite_retiros: f.permite_retiros, dia_corte: +f.dia_corte, multa_atraso: +f.multa_atraso,
+      color_primario: f.color_primario, color_acento: f.color_acento,
+      logo: f.logo, transparencia_total: f.transparencia_total, activa: f.activa,
+      permite_eco_ahorro: f.permite_eco_ahorro, permite_mascotas: f.permite_mascotas,
+      permite_inversiones: f.permite_inversiones, permite_credito_educativo: f.permite_credito_educativo,
+    };
     try {
-      await api(`/cajas/${caja.id}`, { method: "PATCH", body: {
-        nombre: f.nombre, comunidad: f.comunidad,
-        tasa_interes_mensual: +f.tasa_interes_mensual,
-        aporte_ordinario: +f.aporte_ordinario, multa_mora: +f.multa_mora,
-        credito_max: +f.credito_max, encaje_factor: +f.encaje_factor,
-        credito_emergente_max: +f.credito_emergente_max, credito_emergente_plazo: +f.credito_emergente_plazo,
-        permite_retiros: f.permite_retiros, dia_corte: +f.dia_corte, multa_atraso: +f.multa_atraso,
-        color_primario: f.color_primario, color_acento: f.color_acento,
-        logo: f.logo, transparencia_total: f.transparencia_total, activa: f.activa,
-        permite_eco_ahorro: f.permite_eco_ahorro, permite_mascotas: f.permite_mascotas,
-        permite_inversiones: f.permite_inversiones, permite_credito_educativo: f.permite_credito_educativo,
-      }});
+      await api(`/cajas/${caja.id}`, { method: "PATCH", body });
       onListo(true);
-    } catch (e) { setError(e.message); setGuardando(false); }
+    } catch (e) {
+      const esRed = e.message === "Failed to fetch" || e.message.includes("NetworkError");
+      if (esRed && intento < 3) {
+        // Reintento automático (backend arrancando en Railway)
+        setError(`Conectando con el servidor… (intento ${intento}/3)`);
+        await new Promise(r => setTimeout(r, 4000));
+        return guardar(intento + 1);
+      }
+      setError(esRed
+        ? "No se pudo conectar con el servidor. Espera unos segundos y vuelve a intentarlo."
+        : e.message);
+      setGuardando(false);
+    }
   };
 
   return (
