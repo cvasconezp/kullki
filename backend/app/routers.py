@@ -2223,7 +2223,7 @@ def analitica(caja_id: int | None = None, db: Session = Depends(get_db),
         if not f: return None
         return hoy_d.year - f.year - ((hoy_d.month, hoy_d.day) < (f.month, f.day))
     from datetime import date as _date
-    hoy_d = _hoy_ec()
+    hoy_d = hoy_ec()
     genero, instr, civil, ocup = {}, {}, {}, {}
     rangos = {"18-29": 0, "30-44": 0, "45-59": 0, "60+": 0, "Sin dato": 0}
     edades = []
