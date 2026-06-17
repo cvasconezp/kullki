@@ -251,22 +251,44 @@ function Expediente({ socioId, onCerrar }) {
         </div>
       )}
 
+      {/* ── Sección 1: Ahorros ── */}
       {(() => {
-        // Historial unificado: aportes + retiros + multas + pagos de crédito
-        const hist = [
-          ...aportes.map((a) => ({
+        const movAhorro = [
+          ...aportes.filter((a) => a.tipo !== "multa").map((a) => ({
             key: `a${a.id}`, fecha: a.fecha,
-            label: a.tipo === "ordinario" ? "Aporte mensual" : a.tipo === "multa" ? "Multa" : "Aporte extraordinario",
-            sub: a.nota || "",
-            monto: a.monto,
-            clase: a.tipo === "multa" ? "neg" : "pos",
-            signo: a.tipo === "multa" ? "−" : "+",
+            label: a.tipo === "ordinario" ? "Aporte mensual" : "Aporte extraordinario",
+            sub: a.nota || "", monto: a.monto, clase: "pos", signo: "+",
           })),
           ...(lib.retiros || []).map((r) => ({
             key: `r${r.id}`, fecha: r.fecha,
-            label: "Retiro de ahorro",
-            sub: r.nota || "",
+            label: "Retiro", sub: r.nota || "",
             monto: r.monto, clase: "neg", signo: "−",
+          })),
+        ].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+        return (
+          <div className="tarjeta">
+            <h3>Ahorros ({movAhorro.length})</h3>
+            {movAhorro.length === 0 && <div className="vacio">Sin movimientos de ahorro.</div>}
+            {movAhorro.map((m) => (
+              <div className="fila" key={m.key}>
+                <div>
+                  <div className="principal">{m.label}</div>
+                  <div className="detalle">{fechaCorta(m.fecha)}{m.sub ? ` · ${m.sub}` : ""}</div>
+                </div>
+                <div className={`cifra ${m.clase}`}>{m.signo}{usd(m.monto)}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* ── Sección 2: Créditos y obligaciones ── */}
+      {(() => {
+        const movDeuda = [
+          ...aportes.filter((a) => a.tipo === "multa").map((a) => ({
+            key: `m${a.id}`, fecha: a.fecha,
+            label: "Multa", sub: a.nota || "",
+            monto: a.monto, clase: "neg", signo: "−",
           })),
           ...creditos.flatMap((c) =>
             c.cuotas
@@ -274,18 +296,17 @@ function Expediente({ socioId, onCerrar }) {
               .map((q) => ({
                 key: `q${q.id}`,
                 fecha: q.fecha_pago || q.fecha_vencimiento,
-                label: `Pago crédito${c.destino ? " · " + c.destino : ""} — cuota ${q.numero}/${c.plazo_meses}`,
-                sub: `Capital ${usd(q.capital)} + interés ${usd(q.interes)}${q.pagada && q.abonado < q.total ? " (abono parcial)" : ""}`,
-                monto: q.abonado || q.total,
-                clase: "credit-pay", signo: "↓",
+                label: `Pago cuota ${q.numero}/${c.plazo_meses}${c.destino ? " · " + c.destino : ""}`,
+                sub: `Capital ${usd(q.capital)} + interés ${usd(q.interes)}${!q.pagada ? " · abono parcial" : ""}`,
+                monto: q.abonado || q.total, clase: "credit-pay", signo: "↓",
               }))
           ),
         ].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+        if (movDeuda.length === 0) return null;
         return (
           <div className="tarjeta">
-            <h3>Historial de movimientos ({hist.length})</h3>
-            {hist.length === 0 && <div className="vacio">Sin movimientos registrados.</div>}
-            {hist.map((m) => (
+            <h3>Créditos y multas ({movDeuda.length})</h3>
+            {movDeuda.map((m) => (
               <div className="fila" key={m.key}>
                 <div>
                   <div className="principal">{m.label}</div>
