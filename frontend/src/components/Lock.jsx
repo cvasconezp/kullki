@@ -5,7 +5,7 @@ export default function Lock({ sesion, onUnlock, onLogout }) {
   const [pw, setPw] = useState(""); const [err, setErr] = useState(""); const [cargando, setCargando] = useState(false);
   const reanudar = async () => {
     setErr(""); setCargando(true);
-    try { await api("/auth/verificar", { method: "POST", body: { password: pw } }); onUnlock(); }
+    try { await api("/auth/verificar-pin", { method: "POST", body: { pin: pw } }); onUnlock(); }
     catch (e) { setErr(e.message); setCargando(false); setPw(""); }
   };
   return (

@@ -51,6 +51,8 @@ export function descargarEstadoCSV(lib, periodo) {
   URL.revokeObjectURL(a.href);
 }
 
+const maskCedula = (c) => c ? String(c).replace(/-/g,'').slice(0, 2) + "······" + String(c).replace(/-/g,'').slice(-2) : "";
+
 export function imprimirEstadoCuenta(lib, periodo) {
   const ses = getSesion() || {};
   const color = ses.color_primario || "#1B3A6B";
@@ -121,7 +123,7 @@ export function imprimirEstadoCuenta(lib, periodo) {
     </div>
     <div class="meta">
       <span><b>Socio:</b> ${s.nombres}</span>
-      <span><b>Cédula:</b> ${s.cedula}</span>
+      <span><b>Cédula:</b> ${maskCedula(s.cedula)}</span>
       <span><b>Periodo:</b> ${nombrePeriodo(lib, periodo)}</span>
     </div>
     <div class="resumen">
@@ -146,8 +148,6 @@ export function imprimirEstadoCuenta(lib, periodo) {
 // Imprime un recibo pequeño al registrar un aporte, retiro o pago de cuota.
 // Nuevos campos opcionales: transaccionId, hora (HH:MM), socioId, cuentaId
 export function imprimirBoucher({ tipo, monto, fecha, hora, socio, nota, registradoPor, cajaInfo, extra, transaccionId, socioId }) {
-  // Enmascara la cédula: muestra primero 3 y últimos 3 dígitos → 167····242
-  const maskCedula = (c) => c ? String(c).slice(0, 2) + "······" + String(c).slice(-2) : null;
   const ses = getSesion() || {};
   const color = cajaInfo?.color_primario || ses.color_primario || "#1B3A6B";
   const acento = cajaInfo?.color_acento || ses.color_acento || "#E8A838";
@@ -346,7 +346,7 @@ export function imprimirInformeAsamblea(informe, cierre) {
   const hoy = new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" });
   const fila = (l, v, cls = "") => `<tr><td>${l}</td><td class="num ${cls}">${v}</td></tr>`;
   const socios = informe.filas.map((f) => `<tr>
-      <td>${f.socio}${f.en_mora ? ' <span class="mora">mora</span>' : ""}<div class="nota">CI ${f.cedula}${f.multas > 0 ? " · multas " + usd(f.multas) : ""}</div></td>
+      <td>${f.socio}${f.en_mora ? ' <span class="mora">mora</span>' : ""}<div class="nota">CI ${maskCedula(f.cedula)}${f.multas > 0 ? " · multas " + usd(f.multas) : ""}</div></td>
       <td class="num pos">${usd(f.ahorro_neto)}</td>
       <td class="num ${f.saldo_credito > 0 ? "neg" : ""}">${f.saldo_credito > 0 ? usd(f.saldo_credito) : "—"}</td>
     </tr>`).join("");
@@ -428,7 +428,7 @@ export function imprimirSolicitudCredito(lib, sol) {
      <div class="doc"><div class="t">Solicitud de crédito</div><div class="d">${hoy}</div></div></div>
    <div class="lugar">${lib.caja_nombre || "____________"}, ${hoy}</div>
    <p class="cuerpo">Yo, <strong>${s.nombres}</strong>, ${art} de la <strong>${lib.caja_nombre || "caja de ahorros"}</strong>,
-   con número de cédula <strong>${s.cedula}</strong> y número de cuenta <strong>${cuenta}</strong>, por medio del presente
+   con número de cédula <strong>${maskCedula(s.cedula)}</strong> y número de cuenta <strong>${cuenta}</strong>, por medio del presente
    solicito de manera formal un <strong>crédito ${tipoCred}</strong> de acuerdo con el detalle que se presenta a continuación:</p>
    <table>${fila("Monto solicitado", usd(m))}${fila("Plazo", n + " meses")}${fila("Tasa", tasa + "% mensual")}
    ${fila("Cuota estimada", usd(cuota) + " / mes")}${fila("Total estimado a pagar", usd(cuota * n))}
@@ -439,7 +439,7 @@ export function imprimirSolicitudCredito(lib, sol) {
    reglamento interno de la caja de ahorros. Agradezco de antemano la atención a la presente.</p>
    <p class="cuerpo">Atentamente,</p>
    <div class="firmas">
-     <div class="firma">${s.nombres}<br><span class="fci">C.I. ${s.cedula}</span><br>Solicitante</div>
+     <div class="firma">${s.nombres}<br><span class="fci">C.I. ${maskCedula(s.cedula)}</span><br>Solicitante</div>
      <div class="firma">${sol.garante || ""}<br><span class="fci">Garante</span></div>
      ${sol.garante2 ? '<div class="firma">' + sol.garante2 + '<br><span class="fci">Segundo garante</span></div>' : ""}
    </div>

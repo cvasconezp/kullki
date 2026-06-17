@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, usd, fechaCorta, mascaraCedula, getSesion } from "../lib/api.js";
 import ExportarEstado from "../components/ExportarEstado.jsx";
+import ImportarSocios from "../components/ImportarSocios.jsx";
 
 const GENEROS = [["", "—"], ["F", "Femenino"], ["M", "Masculino"], ["Otro", "Otro"], ["NS", "Prefiere no decir"]];
 const CIVIL = ["", "Soltero/a", "Casado/a", "Unión libre", "Divorciado/a", "Viudo/a"];
@@ -359,9 +360,12 @@ export default function Socios() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [verExtra, setVerExtra] = useState(false);
   const [abierto, setAbierto] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [pagina, setPagina] = useState(0);
   const soloLectura = (getSesion() || {}).rol === "directiva";
 
   const cargar = () => api("/socios").then(setSocios).catch((e) => setError(e.message));
+  const buscar = (v) => { setBusqueda(v); setPagina(0); };
   useEffect(() => { cargar(); }, []);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -463,22 +467,50 @@ export default function Socios() {
         </div>
       )}
 
+      {!soloLectura && <ImportarSocios onImportado={cargar} />}
+
       <div className="tarjeta">
+        <div style={{ padding: "8px 0 10px" }}>
+          <input
+            type="search" value={busqueda} onChange={(e) => buscar(e.target.value)}
+            placeholder="Buscar por nombre o cédula…"
+            style={{ width: "100%", padding: "7px 12px", borderRadius: 8, border: "1px solid var(--regla)", fontSize: 14, boxSizing: "border-box" }}
+          />
+        </div>
         <div className="fila encabezado"><span>Socio · toca para ver su expediente</span><span>Aportes / Debe</span></div>
-        {socios.length === 0 && <div className="vacio">Aún no hay socios. Registra el primero.</div>}
-        {socios.map((s) => (
-          <div className="fila tocable" key={s.id} role="button" tabIndex={0}
-            onClick={() => setAbierto(s.id)} onKeyDown={(e) => e.key === "Enter" && setAbierto(s.id)}>
-            <div><div className="principal">{s.nombres} {!s.activo && <span className="pill neutro">inactivo</span>}</div>
-              <div className="detalle">CI {mascaraCedula(s.cedula)}{s.whatsapp ? ` · ${s.whatsapp}` : s.telefono ? ` · ${s.telefono}` : ""}</div></div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <div style={{ textAlign: "right" }}>
-                <div className="cifra pos">{usd(s.total_aportes)}</div>
-                {s.saldo_credito > 0 && <div className="cifra neg" style={{ fontSize: 13 }}>debe {usd(s.saldo_credito)}</div>}</div>
-              <span className="chevron" aria-hidden="true">›</span>
-            </div>
-          </div>
-        ))}
+        {(() => {
+          const POR_PAG = 15;
+          const q = busqueda.trim().toLowerCase();
+          const filtrados = q
+            ? socios.filter(s => s.nombres.toLowerCase().includes(q) || s.cedula.includes(q))
+            : socios;
+          const totalPags = Math.ceil(filtrados.length / POR_PAG);
+          const pag = Math.min(pagina, Math.max(0, totalPags - 1));
+          const visibles = filtrados.slice(pag * POR_PAG, (pag + 1) * POR_PAG);
+          return (<>
+            {filtrados.length === 0 && <div className="vacio">{busqueda ? "Sin resultados para esa búsqueda." : "Aún no hay socios. Registra el primero."}</div>}
+            {visibles.map((s) => (
+              <div className="fila tocable" key={s.id} role="button" tabIndex={0}
+                onClick={() => setAbierto(s.id)} onKeyDown={(e) => e.key === "Enter" && setAbierto(s.id)}>
+                <div><div className="principal">{s.nombres} {!s.activo && <span className="pill neutro">inactivo</span>}</div>
+                  <div className="detalle">CI {mascaraCedula(s.cedula)}{s.whatsapp ? ` · ${s.whatsapp}` : s.telefono ? ` · ${s.telefono}` : ""}</div></div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="cifra pos">{usd(s.total_aportes)}</div>
+                    {s.saldo_credito > 0 && <div className="cifra neg" style={{ fontSize: 13 }}>debe {usd(s.saldo_credito)}</div>}</div>
+                  <span className="chevron" aria-hidden="true">›</span>
+                </div>
+              </div>
+            ))}
+            {totalPags > 1 && (
+              <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "10px 0 4px", flexWrap: "wrap" }}>
+                <button className="boton mini secundario" disabled={pag === 0} onClick={() => setPagina(pag - 1)}>‹ Anterior</button>
+                <span className="detalle" style={{ alignSelf: "center" }}>{pag + 1} / {totalPags} · {filtrados.length} socio(s)</span>
+                <button className="boton mini secundario" disabled={pag >= totalPags - 1} onClick={() => setPagina(pag + 1)}>Siguiente ›</button>
+              </div>
+            )}
+          </>);
+        })()}
       </div>
     </>
   );

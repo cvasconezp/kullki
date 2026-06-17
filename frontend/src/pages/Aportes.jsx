@@ -147,6 +147,7 @@ export default function Aportes() {
   const [form, setForm] = useState({ socio_id: "", monto: "", tipo: "ordinario", nota: "", cantidad_kg: "" });
   const [guardando, setGuardando] = useState(false);
   const [multando, setMultando] = useState(false);
+  const [notificando, setNotificando] = useState(false);
   const [permiteRetiros, setPermiteRetiros] = useState(true);
   const [cajaFlags, setCajaFlags] = useState({});
   const [editId, setEditId] = useState(null);   // `${_t}${id}`
@@ -284,6 +285,25 @@ export default function Aportes() {
           </button>
         </div>
       )}
+
+      <div className="tarjeta no-print">
+        <h3>Recordatorios por correo</h3>
+        <div className="detalle" style={{ marginBottom: 10 }}>
+          Envía un email a todos los socios activos que aún no han aportado este mes y tienen correo registrado.
+        </div>
+        <button className="boton secundario" disabled={notificando}
+          onClick={async () => {
+            if (!window.confirm("¿Enviar recordatorios de aporte a los socios que no han pagado este mes?")) return;
+            setNotificando(true);
+            try {
+              const r = await api("/notificaciones/enviar-cuotas", { method: "POST" });
+              setOk(`✉ ${r.enviados} recordatorio(s) enviado(s).${r.errores?.length ? ` ${r.errores.length} error(es).` : ""}`);
+            } catch (e) { setError(e.message); }
+            finally { setNotificando(false); }
+          }}>
+          {notificando ? "Enviando…" : "✉ Enviar recordatorios"}
+        </button>
+      </div>
 
       <div className="tarjeta">
         <h3>Movimientos recientes</h3>

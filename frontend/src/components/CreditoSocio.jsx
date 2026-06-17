@@ -11,6 +11,8 @@ export default function CreditoSocio({ lib }) {
   const techo = lib.credito_techo || 0;           // 0 = sin tope configurado
   const ahorro = lib.socio?.total_aportes || 0;
   const encaje = lib.caja_encaje_factor || 0;
+  const emergente_max = lib.caja_credito_emergente_max || 0;
+  const emergente_plazo = lib.caja_credito_emergente_plazo || 0;
 
   const [paso, setPaso] = useState("simular");     // "simular" | "solicitar"
   const [tipo, setTipo] = useState("ordinario");
@@ -31,8 +33,10 @@ export default function CreditoSocio({ lib }) {
 
   const m = +monto, n = +plazo, i = tasa / 100;
   const cuota = (m > 0 && n > 0) ? (i > 0 ? m * (i * (1 + i) ** n) / ((1 + i) ** n - 1) : m / n) : null;
-  const excede = techo > 0 && m > techo + 0.005;
-  const puedeContinuar = m > 0 && n > 0 && !excede;
+  const techo_activo = tipo === "emergente" && emergente_max > 0 ? emergente_max : techo;
+  const excede = techo_activo > 0 && m > techo_activo + 0.005;
+  const excede_plazo = tipo === "emergente" && emergente_plazo > 0 && n > emergente_plazo;
+  const puedeContinuar = m > 0 && n > 0 && !excede && !excede_plazo;
   const destinoFinal = destino === "Otro" ? destinoOtro.trim() : destino;
   const completo = m > 0 && n > 0 && destinoFinal && garante && docB64;
 
@@ -50,7 +54,8 @@ export default function CreditoSocio({ lib }) {
   const enviar = async () => {
     setError(""); setOk("");
     if (!completo) { setError("Completa todos los campos: monto, plazo, destino, garante y documento."); return; }
-    if (excede) { setError(`El monto supera tu máximo estimado (${usd(techo)}).`); return; }
+    if (excede) { setError(`El monto supera tu máximo estimado (${usd(techo_activo)}).`); return; }
+    if (excede_plazo) { setError(`El plazo máximo para créditos emergentes es ${emergente_plazo} meses.`); return; }
     if (garante2 && garante2 === garante) { setError("Los dos garantes deben ser personas distintas."); return; }
     setEnviando(true);
     try {
@@ -111,11 +116,11 @@ export default function CreditoSocio({ lib }) {
         </p>
 
         <div className="simu-techo">
-          <div className="l">Tu monto máximo estimado</div>
-          <div className="v">{techo > 0 ? usd(techo) : "Sin tope fijo"}</div>
+          <div className="l">Tu monto máximo estimado{tipo === "emergente" ? " (emergente)" : ""}</div>
+          <div className="v">{techo_activo > 0 ? usd(techo_activo) : "Sin tope fijo"}</div>
           <div className="d">
-            {techo > 0
-              ? <>según tu ahorro de {usd(ahorro)}{encaje ? ` × ${encaje} (regla de encaje)` : ""}.</>
+            {techo_activo > 0
+              ? <>según tu ahorro de {usd(ahorro)}{encaje && tipo !== "emergente" ? ` × ${encaje} (regla de encaje)` : ""}.{tipo === "emergente" && emergente_plazo > 0 ? ` Plazo máximo: ${emergente_plazo} meses.` : ""}</>
               : <>la caja no fijó un tope automático; lo define la directiva.</>}
           </div>
         </div>
@@ -137,7 +142,7 @@ export default function CreditoSocio({ lib }) {
         {cuota && (
           <div className={"simu-result" + (excede ? " excede" : "")}>
             {excede ? (
-              <div className="alerta-techo">⚠ El monto supera tu máximo estimado de {usd(techo)}. Baja el monto para continuar.</div>
+              <div className="alerta-techo">{excede ? `⚠ El monto supera tu máximo estimado de ${usd(techo_activo)}.` : `⚠ El plazo máximo para crédito emergente es ${emergente_plazo} meses.`}</div>
             ) : (
               <>
                 <div className="fila"><span>Cuota mensual estimada</span><strong className="cifra">{usd(cuota)}</strong></div>

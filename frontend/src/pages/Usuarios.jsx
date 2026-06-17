@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, fechaCorta } from "../lib/api.js";
+import { api, mascaraCedula, fechaCorta } from "../lib/api.js";
 
 const ROLES = [
   { v: "", t: "Todos los roles" },
@@ -82,7 +82,7 @@ export default function Usuarios() {
                     {!f.activo && <span className="pill mora" style={{ marginLeft: 4 }}>inactivo</span>}
                   </div>
                   <div className="detalle">
-                    CI {f.cedula} · {f.caja_nombre}
+                    CI {mascaraCedula(f.cedula)} · {f.caja_nombre}
                     {f.ultimo_acceso ? ` · último acceso ${fechaCorta(f.ultimo_acceso)}` : " · nunca ingresó"}
                     {f.debe_cambiar_password ? " · debe cambiar clave" : ""}
                   </div>

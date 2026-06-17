@@ -12,6 +12,13 @@ _HDR_FONT = Font(bold=True, color="FFFFFF", size=11)
 _HDR_FILL = PatternFill("solid", fgColor="1B3A6B")
 _HDR_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
+def _mask_cedula(cedula: str) -> str:
+    """Enmascara la cédula: 17••••••01 (muestra primeros 2 y últimos 2 dígitos)."""
+    c = (cedula or "").replace("-", "").replace(" ", "")
+    if len(c) < 5:
+        return c
+    return c[:2] + "••••••" + c[-2:]
+
 
 def _header(ws, cols, widths=None):
     ws.append(cols)
@@ -74,7 +81,7 @@ def excel_balance(db: Session, caja_id: int) -> bytes:
     socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == caja_id)
                         .order_by(models.Socio.nombres)).all()
     for i, s in enumerate(socios, 1):
-        ws.append([i, s.nombres, s.cedula, _d(s.fecha_ingreso),
+        ws.append([i, s.nombres, _mask_cedula(s.cedula), _d(s.fecha_ingreso),
                    _ahorro(db, s.id), round(_multas(db, s.id), 2),
                    round(_saldo_cred(db, s.id), 2), "Activo" if s.activo else "Inactivo"])
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
@@ -90,7 +97,7 @@ def excel_cartera(db: Session, caja_id: int) -> bytes:
     creditos = db.scalars(select(models.Credito).where(models.Credito.caja_id == caja_id)
                           .order_by(models.Credito.estado, models.Credito.fecha_desembolso.desc())).all()
     for i, c in enumerate(creditos, 1):
-        ws.append([i, c.socio.nombres, c.socio.cedula, round(c.monto, 2),
+        ws.append([i, c.socio.nombres, _mask_cedula(c.socio.cedula), round(c.monto, 2),
                    c.tasa_mensual, c.plazo_meses, _d(c.fecha_desembolso),
                    round(_saldo_cuotas(db, c.id), 2),
                    f"{_cuotas_pagadas(db, c.id)}/{c.plazo_meses}", c.estado])
@@ -123,7 +130,7 @@ def excel_completo(db: Session, caja_id: int) -> bytes:
     socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == caja_id)
                         .order_by(models.Socio.nombres)).all()
     for s in socios:
-        ws1.append([s.id, s.nombres, s.cedula, s.telefono, s.correo, s.whatsapp,
+        ws1.append([s.id, s.nombres, _mask_cedula(s.cedula), s.telefono, s.correo, s.whatsapp,
                     _d(s.fecha_ingreso), _ahorro(db, s.id),
                     round(_saldo_cred(db, s.id), 2), "SÍ" if s.activo else "NO"])
 

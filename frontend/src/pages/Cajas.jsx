@@ -3,7 +3,7 @@ import { api, mascaraCedula } from "../lib/api.js";
 
 const FORM_INICIAL = {
   nombre: "", slug: "", comunidad: "",
-  tasa_interes_mensual: "1.5", aporte_ordinario: "10", multa_mora: "0", credito_max: "0", encaje_factor: "0",
+  tasa_interes_mensual: "1.5", aporte_ordinario: "10", multa_mora: "0", credito_max: "0", encaje_factor: "0", credito_emergente_max: "0", credito_emergente_plazo: "0",
   permite_retiros: true, dia_corte: "0", multa_atraso: "0",
   permite_eco_ahorro: false, permite_mascotas: false, permite_inversiones: false, permite_credito_educativo: false,
   color_primario: "#1B3A6B", color_acento: "#E8A838", logo: "", transparencia_total: false,
@@ -30,6 +30,7 @@ function EditarCaja({ caja, onListo }) {
     aporte_ordinario: String(caja.aporte_ordinario),
     multa_mora: String(caja.multa_mora ?? 0),
     credito_max: String(caja.credito_max ?? 0), encaje_factor: String(caja.encaje_factor ?? 0),
+    credito_emergente_max: String(caja.credito_emergente_max ?? 0), credito_emergente_plazo: String(caja.credito_emergente_plazo ?? 0),
     permite_retiros: caja.permite_retiros !== false, dia_corte: String(caja.dia_corte ?? 0), multa_atraso: String(caja.multa_atraso ?? 0),
     color_primario: caja.color_primario || "#1B3A6B",
     color_acento: caja.color_acento || "#E8A838",
@@ -38,7 +39,42 @@ function EditarCaja({ caja, onListo }) {
     permite_inversiones: !!caja.permite_inversiones, permite_credito_educativo: !!caja.permite_credito_educativo,
   });
   const [error, setError] = useState(""); const [guardando, setGuardando] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(caja.logo_url || "");
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const logoRef = useRef(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+
+  const subirLogo = async (e) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setSubiendoLogo(true);
+    const base = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    const token = JSON.parse(sessionStorage.getItem("kullki_sesion"))?.access_token
+      || JSON.parse(sessionStorage.getItem("kullki_admin"))?.access_token;
+    const form = new FormData();
+    form.append("archivo", archivo);
+    try {
+      const res = await fetch(`${base}/cajas/${caja.id}/logo`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+      // Reload logo preview from the caja endpoint
+      const updated = await api(`/cajas`);
+      const c = updated.find(x => x.id === caja.id);
+      if (c) setLogoUrl(c.logo_url || "");
+    } catch (err) { setError(err.message); }
+    finally { setSubiendoLogo(false); if (logoRef.current) logoRef.current.value = ""; }
+  };
+
+  const borrarLogo = async () => {
+    try {
+      await api(`/cajas/${caja.id}/logo`, { method: "DELETE" });
+      setLogoUrl("");
+    } catch (err) { setError(err.message); }
+  };
 
   const guardar = async () => {
     setError(""); setGuardando(true);
@@ -48,6 +84,7 @@ function EditarCaja({ caja, onListo }) {
         tasa_interes_mensual: +f.tasa_interes_mensual,
         aporte_ordinario: +f.aporte_ordinario, multa_mora: +f.multa_mora,
         credito_max: +f.credito_max, encaje_factor: +f.encaje_factor,
+        credito_emergente_max: +f.credito_emergente_max, credito_emergente_plazo: +f.credito_emergente_plazo,
         permite_retiros: f.permite_retiros, dia_corte: +f.dia_corte, multa_atraso: +f.multa_atraso,
         color_primario: f.color_primario, color_acento: f.color_acento,
         logo: f.logo, transparencia_total: f.transparencia_total, activa: f.activa,
@@ -75,9 +112,28 @@ function EditarCaja({ caja, onListo }) {
         <div className="campo"><label>Logo (emoji o letra)</label>
           <input maxLength={4} value={f.logo} onChange={set("logo")} placeholder="🌾" /></div>
       </div>
+      <div className="campo">
+        <label>Imagen del logo (PNG / JPG / WEBP / SVG · máx 512 KB)</label>
+        {logoUrl && (
+          <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+            <img src={logoUrl} alt="Logo" style={{ height: 56, borderRadius: 8, border: "1px solid var(--regla)", objectFit: "contain" }} />
+            <button className="boton mini secundario" style={{ color: "var(--cochinilla)" }} onClick={borrarLogo}>Quitar imagen</button>
+          </div>
+        )}
+        <label className="boton mini" style={{ display: "inline-block", cursor: "pointer", opacity: subiendoLogo ? 0.6 : 1 }}>
+          {subiendoLogo ? "Subiendo…" : "📂 Subir imagen"}
+          <input ref={logoRef} type="file" accept=".png,.jpg,.jpeg,.webp,.svg" style={{ display: "none" }} disabled={subiendoLogo} onChange={subirLogo} />
+        </label>
+      </div>
       <div className="dos-col">
-        <div className="campo"><label>Crédito máximo (0 = sin límite)</label>
+        <div className="campo"><label>Crédito ordinario máximo (USD, 0 = sin límite)</label>
           <input inputMode="decimal" value={f.credito_max} onChange={set("credito_max")} /></div>
+        <div className="dos-col">
+          <div className="campo"><label>Crédito emergente máximo (USD, 0 = usa el ordinario)</label>
+            <input inputMode="decimal" value={f.credito_emergente_max} onChange={set("credito_emergente_max")} placeholder="ej. 500" /></div>
+          <div className="campo"><label>Plazo máx. emergente (meses, 0 = sin límite)</label>
+            <input inputMode="numeric" value={f.credito_emergente_plazo} onChange={set("credito_emergente_plazo")} placeholder="ej. 3" /></div>
+        </div>
         <div className="campo"><label>Encaje (crédito ≤ ahorro × factor)</label>
           <input inputMode="decimal" value={f.encaje_factor} onChange={set("encaje_factor")} /></div>
       </div>
@@ -216,6 +272,7 @@ export default function Cajas({ onAsumir }) {
         tasa_interes_mensual: +form.tasa_interes_mensual,
         aporte_ordinario: +form.aporte_ordinario, multa_mora: +form.multa_mora,
         credito_max: +form.credito_max, encaje_factor: +form.encaje_factor,
+        credito_emergente_max: +form.credito_emergente_max, credito_emergente_plazo: +form.credito_emergente_plazo,
         permite_retiros: form.permite_retiros, dia_corte: +form.dia_corte, multa_atraso: +form.multa_atraso,
         permite_eco_ahorro: form.permite_eco_ahorro, permite_mascotas: form.permite_mascotas,
         permite_inversiones: form.permite_inversiones, permite_credito_educativo: form.permite_credito_educativo,
@@ -271,8 +328,14 @@ export default function Cajas({ onAsumir }) {
               <input inputMode="decimal" value={form.aporte_ordinario} onChange={set("aporte_ordinario")} /></div>
           </div>
           <div className="dos-col">
-            <div className="campo"><label>Crédito máximo (USD, 0 = sin límite)</label>
+            <div className="campo"><label>Crédito ordinario máximo (USD, 0 = sin límite)</label>
               <input inputMode="decimal" value={form.credito_max} onChange={set("credito_max")} /></div>
+            <div className="dos-col">
+              <div className="campo"><label>Crédito emergente máximo (USD)</label>
+                <input inputMode="decimal" value={form.credito_emergente_max} onChange={set("credito_emergente_max")} placeholder="ej. 500" /></div>
+              <div className="campo"><label>Plazo máx. emergente (meses)</label>
+                <input inputMode="numeric" value={form.credito_emergente_plazo} onChange={set("credito_emergente_plazo")} placeholder="ej. 3" /></div>
+            </div>
             <div className="campo"><label>Encaje (crédito ≤ ahorro × factor, 0 = sin regla)</label>
               <input inputMode="decimal" value={form.encaje_factor} onChange={set("encaje_factor")} placeholder="ej. 3" /></div>
           </div>
@@ -341,7 +404,7 @@ export default function Cajas({ onAsumir }) {
             <div className="fila">
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span className="caja-logo sm" style={{ background: c.color_primario, color: c.color_acento }}>
-                  {c.logo || c.nombre[0]?.toUpperCase()}
+                  {c.logo_url ? <img src={c.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 4 }} /> : (c.logo || c.nombre[0]?.toUpperCase())}
                 </span>
                 <div>
                   <div className="principal">{c.nombre}</div>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { api, usd, fechaCorta } from "../lib/api.js";
+import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
 import { imprimirInformeAsamblea } from "../lib/exportar.js";
 import Seguridad2FA from "../components/Seguridad2FA.jsx";
+import ConfigurarPIN from "../components/ConfigurarPIN.jsx";
 
 function GrupoDemo({ titulo, datos, total }) {
   const max = Math.max(1, ...datos.map((d) => d.valor));
@@ -127,7 +128,7 @@ export default function Informes() {
               <div className="principal" style={{ fontSize: 14.5 }}>
                 {f.socio} {f.en_mora && <span className="pill mora">mora</span>}
               </div>
-              <div className="detalle">CI {f.cedula}{f.multas > 0 ? ` · multas ${usd(f.multas)}` : ""}</div>
+              <div className="detalle">CI {mascaraCedula(f.cedula)}{f.multas > 0 ? ` · multas ${usd(f.multas)}` : ""}</div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div className="cifra pos">{usd(f.ahorro_neto)}</div>
@@ -176,6 +177,7 @@ export default function Informes() {
       )}
 
       <Seguridad2FA />
+      <ConfigurarPIN />
 
       <p className="no-print" style={{ color: "var(--tinta-suave)", fontSize: 12.5, textAlign: "center", marginTop: 14 }}>
         Usa "PDF con membrete" para llevar este informe a la asamblea.

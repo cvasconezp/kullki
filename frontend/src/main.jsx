@@ -1,3 +1,13 @@
+import * as Sentry from "@sentry/react";
+const _SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN || "";
+if (_SENTRY_DSN) {
+  Sentry.init({
+    dsn: _SENTRY_DSN,
+    tracesSampleRate: 0.2,
+    replaysOnErrorSampleRate: 0.5,
+  });
+}
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";

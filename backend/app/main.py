@@ -1,6 +1,10 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
 
 from .database import Base, engine, SessionLocal
@@ -8,6 +12,22 @@ from . import models
 from .auth import hash_password, verify_password
 from .routers import (auth_router, cajas_router, socios_router, aportes_router,
                       creditos_router, retiros_router, reportes_router)
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+
+# ── Sentry (opcional) ────────────────────────────────────────────────────────
+import os as _os
+_SENTRY_DSN = _os.getenv("SENTRY_DSN", "")
+if _SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        traces_sample_rate=0.2,
+        send_default_pii=False,
+    )
 
 app = FastAPI(title="Kullki API", version="0.1.0",
               description="Gestión transparente de cajas de ahorro comunitarias — Yachay Deep Labs")
@@ -17,8 +37,37 @@ origins = [o.strip() for o in os.getenv(
     "http://localhost:5173,https://kullki.yachaydeep.com"
 ).split(",") if o.strip()]
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
+
+
+@app.middleware("http")
+async def rate_limit_auth(request: Request, call_next):
+    """Límite estricto en endpoints de autenticación: 20 req/min por IP."""
+    import time
+    path = request.url.path
+    if path.startswith("/auth/"):
+        client_ip = request.client.host if request.client else "unknown"
+        key = f"rl:auth:{client_ip}"
+        # Simple in-memory counter — suficiente para Railway (single instance)
+        store = getattr(app.state, "_rl_store", {})
+        app.state._rl_store = store
+        now = time.time()
+        bucket = store.get(key, {"count": 0, "reset": now + 60})
+        if now > bucket["reset"]:
+            bucket = {"count": 0, "reset": now + 60}
+        bucket["count"] += 1
+        store[key] = bucket
+        if bucket["count"] > 20:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Demasiadas peticiones. Intenta en un minuto."},
+                headers={"Retry-After": "60"}
+            )
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -82,6 +131,7 @@ def init_db():
                 "color_primario": "VARCHAR(9) DEFAULT '#1B3A6B'",
                 "color_acento": "VARCHAR(9) DEFAULT '#E8A838'",
                 "logo": "VARCHAR(8) DEFAULT ''",
+                "logo_url": "TEXT DEFAULT ''",
             }
             with engine.begin() as conn:
                 for col, ddl in nuevas.items():
@@ -114,7 +164,7 @@ def init_db():
         _add_cols("auditoria", {"afecta_socio_id": "INTEGER"})
         _add_cols("socios", {"consentimiento_datos": "BOOLEAN DEFAULT FALSE",
                              "consentimiento_fecha": "DATE"})
-        _add_cols("cajas", {"credito_max": "FLOAT DEFAULT 0", "encaje_factor": "FLOAT DEFAULT 0"})
+        _add_cols("cajas", {"credito_max": "FLOAT DEFAULT 0", "credito_emergente_max": "FLOAT DEFAULT 0", "credito_emergente_plazo": "INTEGER DEFAULT 0", "encaje_factor": "FLOAT DEFAULT 0"})
         _add_cols("creditos", {"garante": "VARCHAR(160) DEFAULT ''"})
         _add_cols("cajas", {"permite_retiros": "BOOLEAN DEFAULT TRUE", "dia_corte": "INTEGER DEFAULT 0",
                             "multa_atraso": "FLOAT DEFAULT 0"})
@@ -125,7 +175,7 @@ def init_db():
                             "garante_id": "INTEGER", "garante2_id": "INTEGER",
                             "garante_estado": "VARCHAR(20) DEFAULT 'pendiente'",
                             "garante2_estado": "VARCHAR(20) DEFAULT ''"})
-        _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE"})
+        _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE", "pin_hash": "VARCHAR(128) DEFAULT ''"})
         _add_cols("cajas", {"permite_eco_ahorro": "BOOLEAN DEFAULT FALSE", "permite_mascotas": "BOOLEAN DEFAULT FALSE", "permite_inversiones": "BOOLEAN DEFAULT FALSE", "permite_credito_educativo": "BOOLEAN DEFAULT FALSE"})
 
         # Superadmin inicial desde variables de entorno

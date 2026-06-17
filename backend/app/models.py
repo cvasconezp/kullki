@@ -19,8 +19,11 @@ class Caja(Base):
     color_primario: Mapped[str] = mapped_column(String(9), default="#1B3A6B")  # navy Yachay Deep
     color_acento: Mapped[str] = mapped_column(String(9), default="#E8A838")    # dorado Yachay Deep
     logo: Mapped[str] = mapped_column(String(8), default="")  # emoji o 1-2 letras; vacío => inicial
+    logo_url: Mapped[str] = mapped_column(Text, default="")  # URL/base64 de imagen del logo de la caja
     transparencia_total: Mapped[bool] = mapped_column(Boolean, default=False)  # socios ven toda la bitácora
-    credito_max: Mapped[float] = mapped_column(Float, default=0.0)     # monto máx. de crédito (0 = sin límite)
+    credito_max: Mapped[float] = mapped_column(Float, default=0.0)     # monto máx. de crédito ordinario (0 = sin límite)
+    credito_emergente_max: Mapped[float] = mapped_column(Float, default=0.0)   # monto máx. crédito emergente (0 = usa credito_max)
+    credito_emergente_plazo: Mapped[int] = mapped_column(Integer, default=0)   # plazo máx. meses emergente (0 = sin límite)
     encaje_factor: Mapped[float] = mapped_column(Float, default=0.0)   # crédito máx = ahorro * factor (0 = sin regla)
     permite_retiros: Mapped[bool] = mapped_column(Boolean, default=True)  # la caja autoriza retiros
     dia_corte: Mapped[int] = mapped_column(Integer, default=0)         # día límite del mes para aportar (0 = sin corte)
@@ -51,6 +54,7 @@ class Usuario(Base):
     debe_cambiar_password: Mapped[bool] = mapped_column(Boolean, default=False)
     ultimo_acceso: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     totp_secret: Mapped[str] = mapped_column(String(64), default="")
+    pin_hash: Mapped[str] = mapped_column(String(128), default="")  # PIN corto cifrado para desbloqueo rápido
     totp_activo: Mapped[bool] = mapped_column(Boolean, default=False)
 
     membresias: Mapped[list["Membresia"]] = relationship(back_populates="usuario")

@@ -57,6 +57,12 @@ class SeleccionCaja(BaseModel):
 class VerificarIn(BaseModel):
     password: str
 
+class PinIn(BaseModel):
+    pin: str = Field(min_length=4, max_length=6, pattern=r'^\d{4,6}$')
+
+class PinVerificarIn(BaseModel):
+    pin: str
+
 
 class CedulaIn(BaseModel):
     cedula: str
@@ -131,8 +137,11 @@ class CajaIn(BaseModel):
     color_primario: str = "#1B3A6B"
     color_acento: str = "#E8A838"
     logo: str = ""
+    logo_url: str = ""
     transparencia_total: bool = False
     credito_max: float = 0.0
+    credito_emergente_max: float = 0.0
+    credito_emergente_plazo: int = 0
     encaje_factor: float = 0.0
     permite_retiros: bool = True
     dia_corte: int = 0
@@ -164,6 +173,8 @@ class CajaUpdate(BaseModel):
     logo: str | None = None
     transparencia_total: bool | None = None
     credito_max: float | None = None
+    credito_emergente_max: float | None = None
+    credito_emergente_plazo: int | None = None
     encaje_factor: float | None = None
     permite_retiros: bool | None = None
     dia_corte: int | None = None
@@ -186,8 +197,11 @@ class CajaOut(BaseModel):
     color_primario: str = "#1B3A6B"
     color_acento: str = "#E8A838"
     logo: str = ""
+    logo_url: str = ""
     transparencia_total: bool = False
     credito_max: float = 0.0
+    credito_emergente_max: float = 0.0
+    credito_emergente_plazo: int = 0
     encaje_factor: float = 0.0
     permite_retiros: bool = True
     dia_corte: int = 0
@@ -377,6 +391,8 @@ class LibretaOut(BaseModel):
     caja_tasa: float = 0
     permite_retiros: bool = True
     caja_credito_max: float = 0
+    caja_credito_emergente_max: float = 0
+    caja_credito_emergente_plazo: int = 0
     caja_encaje_factor: float = 0
     credito_techo: float = 0
     aportes: list[AporteOut]

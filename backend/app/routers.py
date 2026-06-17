@@ -1,7 +1,10 @@
 from datetime import date, datetime, timedelta
 from collections import defaultdict
 import io, json, time, os
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+_limiter = Limiter(key_func=get_remote_address)
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -340,6 +343,41 @@ def verificar(data: schemas.VerificarIn, actor: Actor = Depends(get_identidad)):
     return {"ok": True}
 
 
+@auth_router.post("/pin/configurar")
+def pin_configurar(data: schemas.PinIn, db: Session = Depends(get_db),
+                   actor: Actor = Depends(get_identidad)):
+    """Configura o actualiza el PIN de desbloqueo rápido (4-6 dígitos)."""
+    actor.usuario.pin_hash = hash_password(data.pin)
+    db.commit()
+    return {"ok": True, "mensaje": "PIN configurado correctamente."}
+
+
+@auth_router.delete("/pin")
+def pin_borrar(db: Session = Depends(get_db), actor: Actor = Depends(get_identidad)):
+    """Elimina el PIN de desbloqueo rápido."""
+    actor.usuario.pin_hash = ""
+    db.commit()
+    return {"ok": True}
+
+
+@auth_router.post("/verificar-pin")
+def verificar_pin(data: schemas.PinVerificarIn, actor: Actor = Depends(get_identidad)):
+    """Verifica el PIN de desbloqueo. Acepta PIN o contraseña (fallback)."""
+    u = actor.usuario
+    # Intenta PIN primero
+    if u.pin_hash and verify_password(data.pin, u.pin_hash):
+        return {"ok": True}
+    # Fallback: contraseña completa
+    if verify_password(data.pin, u.password_hash):
+        return {"ok": True}
+    raise HTTPException(401, "PIN o contraseña incorrectos")
+
+
+@auth_router.get("/pin/estado")
+def pin_estado(actor: Actor = Depends(get_identidad)):
+    return {"tiene_pin": bool(actor.usuario.pin_hash)}
+
+
 @auth_router.post("/cambiar-password")
 def cambiar_password(data: schemas.CambioPassword, db: Session = Depends(get_db),
                      actor: Actor = Depends(get_identidad)):
@@ -430,6 +468,52 @@ def editar_caja(caja_id: int, data: schemas.CajaUpdate, db: Session = Depends(ge
     return caja
 
 
+
+@cajas_router.post("/{caja_id}/logo")
+async def subir_logo_caja(
+    caja_id: int,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    actor: Actor = Depends(require_roles("superadmin")),
+):
+    """Guarda el logo de la caja como data-URL en base64 (máx. 512 KB, PNG/JPG/WEBP/SVG)."""
+    import base64
+    MAX_BYTES = 512 * 1024
+    MIME_PERMITIDOS = {"image/png", "image/jpeg", "image/webp", "image/svg+xml"}
+
+    caja = db.get(models.Caja, caja_id)
+    if not caja:
+        raise HTTPException(404, "Caja no encontrada")
+
+    mime = archivo.content_type or ""
+    if mime not in MIME_PERMITIDOS:
+        raise HTTPException(400, f"Tipo de archivo no permitido ({mime}). Usa PNG, JPG, WEBP o SVG.")
+
+    contenido = await archivo.read()
+    if len(contenido) > MAX_BYTES:
+        raise HTTPException(400, f"El archivo supera los 512 KB ({len(contenido)//1024} KB).")
+
+    data_url = f"data:{mime};base64,{base64.b64encode(contenido).decode()}"
+    caja.logo_url = data_url
+    log_audit(db, actor, "editar", "caja", caja.id, f"Logo actualizado para '{caja.nombre}'", caja_id=caja.id)
+    db.commit()
+    return {"ok": True, "logo_url": data_url[:80] + "…"}
+
+
+@cajas_router.delete("/{caja_id}/logo")
+def borrar_logo_caja(
+    caja_id: int,
+    db: Session = Depends(get_db),
+    actor: Actor = Depends(require_roles("superadmin")),
+):
+    caja = db.get(models.Caja, caja_id)
+    if not caja:
+        raise HTTPException(404, "Caja no encontrada")
+    caja.logo_url = ""
+    db.commit()
+    return {"ok": True}
+
+
 @cajas_router.post("/{caja_id}/directiva")
 def crear_directiva(caja_id: int, data: schemas.DirectivaIn, db: Session = Depends(get_db),
                     actor: Actor = Depends(require_roles("superadmin"))):
@@ -508,6 +592,148 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
     db.commit()
     return _socio_out(db, socio)
 
+
+
+
+# ─── Importar socios desde Excel ──────────────────────────────────────────────
+@socios_router.post("/importar-excel")
+async def importar_socios_excel(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    actor: Actor = Depends(require_roles("tesorero", "superadmin")),
+):
+    """
+    Importa socios desde un archivo Excel.
+    Columnas esperadas (cabecera en fila 1, insensible a mayúsculas/tildes):
+      nombres*, cedula*, telefono, correo, whatsapp, direccion, ocupacion,
+      genero, estado_civil, nivel_instruccion, num_cargas, contacto_emergencia,
+      fecha_ingreso (YYYY-MM-DD o DD/MM/YYYY), fecha_nacimiento (igual).
+    * obligatorios
+    """
+    import openpyxl, re
+    from io import BytesIO
+
+    cid = caja_scope(actor, None)
+
+    contenido = await archivo.read()
+    try:
+        wb = openpyxl.load_workbook(BytesIO(contenido), data_only=True)
+    except Exception:
+        raise HTTPException(400, "El archivo no es un Excel válido (.xlsx)")
+    ws = wb.active
+
+    # Leer cabecera
+    cabecera = [str(c.value or "").strip().lower() for c in ws[1]]
+
+    def _norm(s: str) -> str:
+        # quitar tildes, minúsculas, espacios
+        import unicodedata
+        s = unicodedata.normalize("NFD", s)
+        s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+        return s.lower().replace(" ", "_")
+
+    def _col(posibles):
+        for p in posibles:
+            for i, h in enumerate(cabecera):
+                if _norm(h) == _norm(p):
+                    return i
+        return None
+
+    def _cell(row, idx):
+        if idx is None:
+            return ""
+        v = row[idx].value if idx < len(row) else None
+        return str(v).strip() if v is not None else ""
+
+    def _fecha(raw: str):
+        if not raw:
+            return None
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                return date.fromisoformat(raw) if fmt == "%Y-%m-%d" else date(*reversed([int(x) for x in raw.replace("-","/").split("/")]))
+            except Exception:
+                pass
+        return None
+
+    CI = {
+        "nombres":              _col(["nombres", "nombre", "nombre_completo"]),
+        "cedula":               _col(["cedula", "cédula", "identificacion", "id"]),
+        "telefono":             _col(["telefono", "teléfono", "cel", "celular"]),
+        "correo":               _col(["correo", "email", "correo_electronico"]),
+        "whatsapp":             _col(["whatsapp", "wa"]),
+        "direccion":            _col(["direccion", "dirección"]),
+        "ocupacion":            _col(["ocupacion", "ocupación", "trabajo"]),
+        "genero":               _col(["genero", "género", "sexo"]),
+        "estado_civil":         _col(["estado_civil"]),
+        "nivel_instruccion":    _col(["nivel_instruccion", "instruccion"]),
+        "num_cargas":           _col(["num_cargas", "cargas", "cargas_familiares"]),
+        "contacto_emergencia":  _col(["contacto_emergencia", "emergencia"]),
+        "fecha_ingreso":        _col(["fecha_ingreso", "ingreso"]),
+        "fecha_nacimiento":     _col(["fecha_nacimiento", "nacimiento"]),
+    }
+
+    if CI["nombres"] is None or CI["cedula"] is None:
+        raise HTTPException(400, "El archivo debe tener columnas 'nombres' y 'cedula'")
+
+    importados, omitidos, errores = 0, 0, []
+
+    for nrow, row in enumerate(ws.iter_rows(min_row=2), start=2):
+        nombres = _cell(row, CI["nombres"])
+        cedula  = _cell(row, CI["cedula"]).replace("-", "").replace(" ", "")
+        if not nombres or not cedula:
+            continue  # fila vacía
+
+        # ¿Ya existe?
+        if db.scalar(select(models.Socio).where(
+            models.Socio.caja_id == cid, models.Socio.cedula == cedula)):
+            omitidos += 1
+            continue
+
+        try:
+            cargas_raw = _cell(row, CI["num_cargas"])
+            num_cargas = int(cargas_raw) if cargas_raw.isdigit() else 0
+            fi = _fecha(_cell(row, CI["fecha_ingreso"]))
+            fn = _fecha(_cell(row, CI["fecha_nacimiento"]))
+
+            socio = models.Socio(
+                caja_id=cid, nombres=nombres, cedula=cedula,
+                telefono=_cell(row, CI["telefono"]),
+                correo=_cell(row, CI["correo"]),
+                whatsapp=_cell(row, CI["whatsapp"]),
+                direccion=_cell(row, CI["direccion"]),
+                ocupacion=_cell(row, CI["ocupacion"]),
+                genero=_cell(row, CI["genero"]),
+                estado_civil=_cell(row, CI["estado_civil"]),
+                nivel_instruccion=_cell(row, CI["nivel_instruccion"]),
+                num_cargas=num_cargas,
+                contacto_emergencia=_cell(row, CI["contacto_emergencia"]),
+                fecha_ingreso=fi or date.today(),
+                fecha_nacimiento=fn,
+            )
+            db.add(socio)
+            db.flush()
+
+            usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula == cedula))
+            if not usuario:
+                usuario = models.Usuario(nombre=nombres, cedula=cedula,
+                                         password_hash=hash_password(cedula),
+                                         debe_cambiar_password=True)
+                db.add(usuario)
+                db.flush()
+            if not usuario.es_superadmin:
+                db.add(models.Membresia(usuario_id=usuario.id, caja_id=cid,
+                                        socio_id=socio.id, rol="socio"))
+            importados += 1
+
+        except Exception as exc:
+            errores.append(f"Fila {nrow}: {exc}")
+            db.rollback()  # no commiteamos esa fila
+            continue
+
+    db.commit()
+    log_audit(db, actor, "importar", "socio", 0,
+              f"Importación Excel: {importados} importados, {omitidos} omitidos", caja_id=cid)
+    return {"importados": importados, "omitidos": omitidos, "errores": errores}
 
 PERMITIDOS_SOCIO = {"telefono", "whatsapp", "correo", "direccion", "ocupacion",
                     "estado_civil", "nivel_instruccion", "num_cargas",
@@ -880,7 +1106,13 @@ def _otorgar_credito(db, actor, socio, monto, plazo, tasa_mensual, inicio, desti
     if not socio.activo:
         raise HTTPException(400, "El socio está inactivo")
     caja = db.get(models.Caja, socio.caja_id)
-    if caja.credito_max and monto > caja.credito_max + 0.005:
+    if tipo == "emergente":
+        tope_em = caja.credito_emergente_max or caja.credito_max or 0
+        if tope_em and monto > tope_em + 0.005:
+            raise HTTPException(400, f"Los créditos emergentes tienen un máximo de ${tope_em:.2f} en esta caja")
+        if plazo and caja.credito_emergente_plazo and plazo > caja.credito_emergente_plazo:
+            raise HTTPException(400, f"El plazo máximo para créditos emergentes es {caja.credito_emergente_plazo} meses")
+    elif caja.credito_max and monto > caja.credito_max + 0.005:
         raise HTTPException(400, f"El crédito supera el máximo permitido por la caja (${caja.credito_max:.2f})")
     if caja.encaje_factor:
         info = _socio_out(db, socio)
@@ -1502,6 +1734,8 @@ def mi_libreta(socio_id: int | None = None, db: Session = Depends(get_db),
         caja_nombre=caja.nombre,
         caja_tasa=caja.tasa_interes_mensual, permite_retiros=caja.permite_retiros,
         caja_credito_max=caja.credito_max or 0, caja_encaje_factor=caja.encaje_factor or 0,
+        caja_credito_emergente_max=caja.credito_emergente_max or 0,
+        caja_credito_emergente_plazo=caja.credito_emergente_plazo or 0,
         credito_techo=techo,
         aportes=[schemas.AporteOut.model_validate(a) for a in aportes],
         retiros=[schemas.RetiroOut.model_validate(x) for x in retiros],
@@ -2116,3 +2350,93 @@ def notificaciones(caja_id: int | None = None, db: Session = Depends(get_db),
     cred = db.scalar(select(func.count(models.SolicitudCredito.id)).where(
         models.SolicitudCredito.caja_id == cid, models.SolicitudCredito.estado == "pendiente")) or 0
     return {"solicitudes_datos": datos, "solicitudes_credito": cred, "total": datos + cred}
+
+
+# ─── Notificaciones email cuotas vencidas ──────────────────────────────────────
+@reportes_router.post("/notificaciones/enviar-cuotas")
+def enviar_recordatorios_cuotas(
+    db: Session = Depends(get_db),
+    actor: Actor = Depends(require_roles("tesorero", "superadmin")),
+):
+    """
+    Envía un email de recordatorio a todos los socios activos que NO han aportado
+    en el mes en curso y tienen correo registrado.
+    Requiere variables de entorno: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM.
+    """
+    import smtplib, os
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from calendar import monthrange
+
+    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER", "")
+    SMTP_PASS = os.getenv("SMTP_PASS", "")
+    EMAIL_FROM = os.getenv("EMAIL_FROM", SMTP_USER)
+
+    if not SMTP_HOST:
+        raise HTTPException(501, "Email no configurado. Agrega SMTP_HOST, SMTP_PORT, SMTP_USER y SMTP_PASS en las variables de entorno.")
+
+    cid = caja_scope(actor, None)
+    caja = db.get(models.Caja, cid)
+
+    hoy = date.today()
+    inicio_mes = hoy.replace(day=1)
+    fin_mes = hoy.replace(day=monthrange(hoy.year, hoy.month)[1])
+
+    # Socios activos con correo que no tienen aporte este mes
+    ids_con_aporte = set(db.scalars(
+        select(models.Aporte.socio_id).where(
+            models.Aporte.caja_id == cid,
+            models.Aporte.fecha >= inicio_mes,
+            models.Aporte.fecha <= fin_mes,
+            models.Aporte.tipo == "ordinario",
+        )
+    ).all())
+
+    socios_sin_aporte = db.scalars(
+        select(models.Socio).where(
+            models.Socio.caja_id == cid,
+            models.Socio.activo == True,
+            models.Socio.correo != "",
+        )
+    ).all()
+    socios_a_notificar = [s for s in socios_sin_aporte if s.id not in ids_con_aporte]
+
+    if not socios_a_notificar:
+        return {"enviados": 0, "mensaje": "Todos los socios activos con correo ya han aportado este mes."}
+
+    mes_nombre = ["enero","febrero","marzo","abril","mayo","junio",
+                  "julio","agosto","septiembre","octubre","noviembre","diciembre"][hoy.month - 1]
+
+    enviados, errores = 0, []
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as smtp:
+            smtp.starttls()
+            smtp.login(SMTP_USER, SMTP_PASS)
+            for socio in socios_a_notificar:
+                try:
+                    msg = MIMEMultipart("alternative")
+                    msg["Subject"] = f"Recordatorio de aporte · {caja.nombre} · {mes_nombre.capitalize()} {hoy.year}"
+                    msg["From"] = EMAIL_FROM
+                    msg["To"] = socio.correo
+                    nombre = socio.nombres.split()[0].capitalize()
+                    html = f"""
+<p>Hola, <strong>{nombre}</strong> 👋</p>
+<p>Este es un recordatorio amistoso de <strong>{caja.nombre}</strong>:</p>
+<p>Aún no registramos tu aporte ordinario de <strong>{mes_nombre} {hoy.year}</strong>.</p>
+<p>Si ya realizaste el pago, comunícate con el/la tesorero/a para que lo registre.</p>
+<p>Gracias por ser parte de nuestra caja de ahorro. 💚</p>
+<hr><p style="font-size:11px;color:#888">Este mensaje fue enviado automáticamente desde Kullki · Yachay Deep Labs</p>
+"""
+                    msg.attach(MIMEText(html, "html"))
+                    smtp.sendmail(EMAIL_FROM, socio.correo, msg.as_string())
+                    enviados += 1
+                except Exception as e:
+                    errores.append(f"{socio.nombres}: {e}")
+    except Exception as e:
+        raise HTTPException(502, f"No se pudo conectar al servidor de correo: {e}")
+
+    log_audit(db, actor, "notificar", "caja", cid,
+              f"Recordatorios enviados: {enviados} socios notificados", caja_id=cid)
+    return {"enviados": enviados, "omitidos": len(socios_a_notificar) - enviados, "errores": errores}
