@@ -44,6 +44,7 @@ button { font-family: var(--cuerpo); cursor: pointer; }
 .cifra { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cifra.pos { color: var(--kullki-oscuro); }
 .cifra.neg { color: var(--cochinilla); }
+.cifra.credit-pay { color: var(--sara); font-weight: 600; }
 
 /* ---------- cabecera ---------- */
 .topbar {

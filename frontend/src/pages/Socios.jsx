@@ -251,30 +251,52 @@ function Expediente({ socioId, onCerrar }) {
         </div>
       )}
 
-      {(lib.retiros && lib.retiros.length > 0) && (
-        <div className="tarjeta">
-          <h3>Retiros ({lib.retiros.length})</h3>
-          {lib.retiros.map((r) => (
-            <div className="fila" key={r.id}>
-              <div><div className="principal">Retiro</div>
-                <div className="detalle">{fechaCorta(r.fecha)}{r.nota ? ` · ${r.nota}` : ""}</div></div>
-              <div className="cifra neg">−{usd(r.monto)}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="tarjeta">
-        <h3>Aportes ({aportes.length})</h3>
-        {aportes.length === 0 && <div className="vacio">Sin aportes registrados.</div>}
-        {aportes.map((a) => (
-          <div className="fila" key={a.id}>
-            <div><div className="principal">{a.tipo === "ordinario" ? "Aporte mensual" : a.tipo === "multa" ? "Multa" : "Extraordinario"}</div>
-              <div className="detalle">{fechaCorta(a.fecha)}{a.nota ? ` · ${a.nota}` : ""}</div></div>
-            <div className="cifra pos">{usd(a.monto)}</div>
+      {(() => {
+        // Historial unificado: aportes + retiros + multas + pagos de crédito
+        const hist = [
+          ...aportes.map((a) => ({
+            key: `a${a.id}`, fecha: a.fecha,
+            label: a.tipo === "ordinario" ? "Aporte mensual" : a.tipo === "multa" ? "Multa" : "Aporte extraordinario",
+            sub: a.nota || "",
+            monto: a.monto,
+            clase: a.tipo === "multa" ? "neg" : "pos",
+            signo: a.tipo === "multa" ? "−" : "+",
+          })),
+          ...(lib.retiros || []).map((r) => ({
+            key: `r${r.id}`, fecha: r.fecha,
+            label: "Retiro de ahorro",
+            sub: r.nota || "",
+            monto: r.monto, clase: "neg", signo: "−",
+          })),
+          ...creditos.flatMap((c) =>
+            c.cuotas
+              .filter((q) => q.pagada || (q.abonado && q.abonado > 0))
+              .map((q) => ({
+                key: `q${q.id}`,
+                fecha: q.fecha_pago || q.fecha_vencimiento,
+                label: `Pago crédito${c.destino ? " · " + c.destino : ""} — cuota ${q.numero}/${c.plazo_meses}`,
+                sub: `Capital ${usd(q.capital)} + interés ${usd(q.interes)}${q.pagada && q.abonado < q.total ? " (abono parcial)" : ""}`,
+                monto: q.abonado || q.total,
+                clase: "credit-pay", signo: "↓",
+              }))
+          ),
+        ].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+        return (
+          <div className="tarjeta">
+            <h3>Historial de movimientos ({hist.length})</h3>
+            {hist.length === 0 && <div className="vacio">Sin movimientos registrados.</div>}
+            {hist.map((m) => (
+              <div className="fila" key={m.key}>
+                <div>
+                  <div className="principal">{m.label}</div>
+                  <div className="detalle">{fechaCorta(m.fecha)}{m.sub ? ` · ${m.sub}` : ""}</div>
+                </div>
+                <div className={`cifra ${m.clase}`}>{m.signo}{usd(m.monto)}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })()}
     </>
   );
 }
