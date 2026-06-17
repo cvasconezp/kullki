@@ -2181,9 +2181,9 @@ def analitica(caja_id: int | None = None, db: Session = Depends(get_db),
     dest = {}
     for c in creditos:
         k = (c.destino or "Sin especificar").strip().capitalize() or "Sin especificar"
-        d = dest.setdefault(k, {"etiqueta": k, "monto": 0.0, "count": 0})
-        d["monto"] += c.monto; d["count"] += 1
-    destinos = sorted(dest.values(), key=lambda x: -x["monto"])
+        d = dest.setdefault(k, {"etiqueta": k, "valor": 0.0, "count": 0})
+        d["valor"] += c.monto; d["count"] += 1
+    destinos = sorted(dest.values(), key=lambda x: -x["valor"])
 
     # distribución de montos
     buckets = [("< $100", 0, 100), ("$100–300", 100, 300), ("$300–600", 300, 600),
