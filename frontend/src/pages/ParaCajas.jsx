@@ -204,6 +204,53 @@ export default function ParaCajas() {
             proporcional al tamaño real de tu caja. Las cajas pequeñas pagan menos;
             las que crecen, pagan en proporción a lo que gestionan.
           </div>
+
+          {/* ── Beneficios cualitativos ── */}
+          <div className="lp-inc-tit">Incluido en tu precio</div>
+          <div className="lp-inc-grid">
+            <div className="lp-inc-item">
+              <span className="lp-inc-ico">💬</span>
+              <div>
+                <strong>Soporte directo</strong>
+                <p>Atención por WhatsApp y correo. Te ayudamos a configurar tu caja, resolver dudas y resolver problemas en el momento.</p>
+              </div>
+            </div>
+            <div className="lp-inc-item">
+              <span className="lp-inc-ico">🌐</span>
+              <div>
+                <strong>Dominio propio de tu caja</strong>
+                <p>Tu plataforma en línea accesible en <code>kullki.yachaydeep.com/tu-caja</code> — nada que instalar, disponible desde cualquier dispositivo.</p>
+              </div>
+            </div>
+            <div className="lp-inc-item">
+              <span className="lp-inc-ico">🗄️</span>
+              <div>
+                <strong>Base de datos y backups automáticos</strong>
+                <p>Tus datos se guardan en servidores seguros y con respaldo diario. Si algo falla, los recuperamos. Tú nunca pierdes un registro.</p>
+              </div>
+            </div>
+            <div className="lp-inc-item">
+              <span className="lp-inc-ico">🔒</span>
+              <div>
+                <strong>Seguridad integral</strong>
+                <p>Conexión cifrada HTTPS/SSL, autenticación en dos pasos para tesoreros, control de acceso por roles y protección contra intentos de acceso no autorizados.</p>
+              </div>
+            </div>
+            <div className="lp-inc-item">
+              <span className="lp-inc-ico">🚀</span>
+              <div>
+                <strong>Nuevas funcionalidades incluidas</strong>
+                <p>Seguimos desarrollando Kullki. Las mejoras y nuevas herramientas llegan automáticamente a tu caja, sin costos adicionales.</p>
+              </div>
+            </div>
+            <div className="lp-inc-item">
+              <span className="lp-inc-ico">⚙️</span>
+              <div>
+                <strong>Se adapta a tu caja</strong>
+                <p>Configuramos los parámetros según las reglas de tu organización: tipos de aporte, plazos de crédito, tasas y estructura de socios.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
