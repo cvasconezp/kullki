@@ -380,22 +380,35 @@ details[open] summary::before { content: "▾ "; }
 .lp-rol-t { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--kullki-oscuro); }
 .lp-rol p { font-size: 14px; color: var(--tinta-suave); margin: 6px 0 0; line-height: 1.5; }
 
-.lp-footer { background: #0e3d33; color: #b8d5cb; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.lp-footer {
+  background: linear-gradient(160deg, #0F3D33 0%, #1a5a47 100%);
+  color: #b8d5cb;
+  display: flex; flex-direction: column; padding: 0; overflow: hidden;
+  border-top: 3px solid var(--sara);
+}
 .lp-footer-in {
-  display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap;
-  padding: 40px 40px 28px; width: 100%; box-sizing: border-box;
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  display: flex; justify-content: space-between; align-items: flex-end;
+  gap: 24px; flex-wrap: wrap;
+  padding: 44px 40px 36px; width: 100%; box-sizing: border-box;
+  max-width: 1120px; margin: 0 auto;
 }
 /* Marca en footer */
 .lp-footer .lp-logo {
   font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 22px;
-  color: #fff; letter-spacing: -.01em; display: block; margin-bottom: 4px;
+  color: #fff; letter-spacing: -.01em; display: block; margin-bottom: 6px;
 }
 .lp-footer p { font-size: 13.5px; margin: 0; color: rgba(255,255,255,.6); line-height: 1.5; }
 .lp-footer a { color: var(--sara); text-underline-offset: 3px; }
 .lp-footer a:hover { color: #f7c555; }
 .lp-foot-meta { font-size: 12.5px; color: rgba(255,255,255,.45); text-align: right; line-height: 1.7; }
-.lp-footer-banner { width: 100%; height: auto; display: block; margin: 0; }
+.lp-footer-bottom {
+  background: rgba(0,0,0,.15);
+  text-align: center;
+  padding: 12px 20px;
+  font-size: 11.5px;
+  color: rgba(255,255,255,.3);
+  letter-spacing: .04em;
+}
 
 /* ============================================================
    Landing v2: historia, antes/después, cita de marca, login card
@@ -452,8 +465,7 @@ details[open] summary::before { content: "▾ "; }
 /* ---------- Landing v2: contenedores centrados + acciones de movimiento ---------- */
 .lp-roles { padding: 0; }
 .lp-roles-in { max-width: 1120px; margin: 0 auto; padding: 64px 22px; }
-.lp-footer { padding: 0; }
-.lp-footer-in { max-width: 1120px; margin: 0 auto; }
+/* footer rules consolidated above */
 
 .acciones-mov { display: flex; gap: 6px; justify-content: flex-end; margin-top: 5px; }
 .acciones-mov button { background: var(--papel); border: 1px solid var(--regla); border-radius: 99px;
@@ -737,9 +749,9 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
    ANÁLISIS DE ADQUISICIÓN
    ═══════════════════════════════════════════════════ */
 .lp-adquisicion {
-  background: var(--carta);
-  border-top: 1px solid var(--regla);
-  border-bottom: 1px solid var(--regla);
+  background: var(--kullki-tinte);
+  border-top: 1px solid #b5d9ce;
+  border-bottom: 1px solid #b5d9ce;
 }
 .lp-adq-in {
   max-width: 1120px;
@@ -771,8 +783,8 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
 }
 .lp-adq-card {
   background: #fff;
-  border: 1px solid var(--regla);
-  border-top: 3px solid var(--sara);
+  border: 1px solid #c4dfd7;
+  border-top: 4px solid var(--sara);
   border-radius: 18px;
   padding: 22px 20px;
   transition: transform .2s, box-shadow .2s;
@@ -785,7 +797,7 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
   font-family: var(--display);
   font-size: 40px;
   font-weight: 800;
-  color: var(--kullki-oscuro);
+  color: var(--kullki);
   line-height: 1;
 }
 .lp-adq-tit {
@@ -877,7 +889,8 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
    CONTACTO — /para-cajas
 ══════════════════════════════════════════════ */
 .lp-contacto {
-  background: var(--fondo, #f8f7f4);
+  background: linear-gradient(180deg, var(--kullki-tinte) 0%, var(--papel) 100%);
+  border-top: 1px solid #b5d9ce;
   padding: 80px 20px;
 }
 .lp-contacto-in {
@@ -998,9 +1011,18 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
    CALLOUT "Para tu caja" — en Landing principal
 ══════════════════════════════════════════════ */
 .lp-para-cajas {
-  background: var(--kullki-oscuro);
-  padding: 72px 20px;
+  background: linear-gradient(135deg, #0F3D33 0%, #1a5a47 50%, #2E7D6B 100%);
+  padding: 80px 20px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.lp-para-cajas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 60% at 80% 50%, rgba(242,179,54,.15), transparent 70%);
+  pointer-events: none;
 }
 .lp-para-cajas-in {
   max-width: 640px;

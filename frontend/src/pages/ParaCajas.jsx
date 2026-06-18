@@ -301,7 +301,6 @@ export default function ParaCajas() {
             </span>
           </div>
         </div>
-        <img src="/logo-kullki-footer.svg" alt="Kullki" className="lp-footer-banner" />
       </footer>
 
     </div>

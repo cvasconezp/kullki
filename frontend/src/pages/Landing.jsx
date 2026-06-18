@@ -173,7 +173,6 @@ export default function Landing({ sesion }) {
             </span>
           </div>
         </div>
-        <img src="/logo-kullki-footer.svg" alt="Kullki" className="lp-footer-banner" />
       </footer>
     </div>
   );
