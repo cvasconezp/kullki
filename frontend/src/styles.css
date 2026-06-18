@@ -1130,3 +1130,106 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
 
 /* Quitar el padding-left que tenía el lp-labs (ya no se usa) */
 .lp-marca { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+
+/* ══════════════════════════════════════════════
+   IMPORTAR DATOS
+══════════════════════════════════════════════ */
+.imp-wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+.imp-header { margin-bottom: 28px; }
+.imp-header h1 { font-size: 22px; margin: 0 0 6px; color: var(--kullki-oscuro); }
+.imp-sub { color: #555; margin: 0 0 20px; }
+
+.imp-pasos { display: flex; gap: 0; }
+.imp-paso { display: flex; align-items: center; gap: 8px; padding: 8px 18px 8px 12px;
+  background: #f0f0f0; color: #888; font-size: 13px; position: relative; flex: 1;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%); }
+.imp-paso:first-child { clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); padding-left: 16px; }
+.imp-paso.activo { background: var(--kullki); color: #fff; }
+.imp-paso.hecho  { background: var(--kullki-claro); color: #fff; }
+.imp-paso-n { font-weight: 700; font-size: 14px; }
+
+.imp-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 28px; margin-bottom: 20px; }
+.imp-card h2 { font-size: 17px; margin: 0 0 14px; color: var(--kullki-oscuro); }
+.imp-desc { font-size: 13.5px; color: #666; margin: -8px 0 18px; }
+.imp-error { background: #fff0f0; border: 1px solid #f5c6c6; border-radius: 8px;
+  padding: 12px 16px; color: #c0392b; margin-bottom: 16px; font-size: 14px; }
+
+/* entidades */
+.imp-entidades { display: flex; gap: 12px; margin-bottom: 4px; }
+.imp-ent { display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border: 2px solid #ddd; border-radius: 10px; padding: 16px 12px; cursor: pointer;
+  background: #fff; flex: 1; transition: all .15s; }
+.imp-ent:hover { border-color: var(--kullki-claro); }
+.imp-ent.sel   { border-color: var(--kullki); background: #f0faf6; }
+.imp-ent-ico   { font-size: 26px; }
+.imp-ent strong { font-size: 14px; color: var(--kullki-oscuro); }
+.imp-ent span  { font-size: 12px; color: #777; text-align: center; }
+
+/* drop zone */
+.imp-drop { border: 2px dashed #ccc; border-radius: 10px; padding: 32px 20px;
+  text-align: center; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; gap: 12px; color: #888; transition: all .15s; margin-bottom: 20px; }
+.imp-drop:hover { border-color: var(--kullki); color: var(--kullki); }
+.imp-drop.con-archivo { border-color: var(--kullki); background: #f0faf6; color: var(--kullki-oscuro); }
+.imp-drop-ico { font-size: 28px; }
+.imp-quitar { background: none; border: none; font-size: 18px; cursor: pointer;
+  color: #888; margin-left: 8px; padding: 0; }
+
+/* mapeo */
+.imp-mapeo-tabla { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+.imp-mapeo-head { display: grid; grid-template-columns: 200px 1fr 180px;
+  background: #f5f5f5; padding: 10px 14px; font-size: 12px; font-weight: 700;
+  color: #555; text-transform: uppercase; letter-spacing: .05em; }
+.imp-mapeo-fila { display: grid; grid-template-columns: 200px 1fr 180px;
+  align-items: center; padding: 9px 14px; border-top: 1px solid #f0f0f0; font-size: 13px; }
+.imp-mapeo-fila.obligatorio { background: #fffdf0; }
+.imp-req { color: #e74c3c; margin-right: 4px; font-weight: 700; }
+.imp-mapeo-fila select { border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px;
+  font-size: 13px; background: #fff; width: 100%; }
+.imp-muestra { color: #888; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; padding-left: 8px; }
+
+/* preview */
+.imp-preview-scroll { overflow-x: auto; max-height: 360px; overflow-y: auto;
+  border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 12px; }
+.imp-tabla { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.imp-tabla th { background: #f5f5f5; padding: 8px 10px; text-align: left;
+  font-weight: 700; color: #555; position: sticky; top: 0; white-space: nowrap; }
+.imp-tabla td { padding: 7px 10px; border-top: 1px solid #f0f0f0; }
+.imp-tabla tr.fila-err { background: #fff8f8; }
+.imp-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11.5px; }
+.imp-tag.ok  { background: #d4f0e4; color: #1a7d4c; }
+.imp-tag.err { background: #fde8e8; color: #c0392b; }
+.imp-nota { font-size: 12px; color: #888; margin: 4px 0; }
+
+/* resumen */
+.imp-resumen { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.imp-resumen.grande .imp-res-item { font-size: 18px; padding: 14px 22px; }
+.imp-res-item { padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+.imp-res-item.ok   { background: #d4f0e4; color: #1a7d4c; }
+.imp-res-item.err  { background: #fde8e8; color: #c0392b; }
+.imp-res-item.warn { background: #fef3cd; color: #856404; }
+
+/* resultado */
+.imp-resultado { text-align: center; }
+.imp-ok-ico { font-size: 56px; margin-bottom: 10px; }
+.imp-resultado h2 { margin-bottom: 20px; }
+.imp-resultado .imp-resumen { justify-content: center; }
+.imp-lote { font-size: 12.5px; color: #888; margin: 16px 0 24px; }
+.imp-errores-det { text-align: left; margin: 12px 0; background: #fff8f8;
+  border: 1px solid #f5c6c6; border-radius: 8px; padding: 12px 16px; }
+.imp-errores-det summary { cursor: pointer; font-size: 13px; color: #c0392b; font-weight: 600; }
+.imp-errores-det ul { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; color: #555; }
+
+/* botones */
+.imp-acciones { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; }
+.imp-btn-pri  { background: var(--kullki); color: #fff; border: none; border-radius: 8px;
+  padding: 11px 22px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.imp-btn-pri:hover:not(:disabled) { background: var(--kullki-oscuro); }
+.imp-btn-pri:disabled { opacity: .55; cursor: not-allowed; }
+.imp-btn-sec  { background: #f0f0f0; color: #444; border: none; border-radius: 8px;
+  padding: 11px 18px; font-size: 14px; cursor: pointer; }
+.imp-btn-sec:hover { background: #e0e0e0; }
+.imp-btn-danger { background: #fff; color: #c0392b; border: 1.5px solid #e8a0a0;
+  border-radius: 8px; padding: 11px 18px; font-size: 14px; cursor: pointer; }
+.imp-btn-danger:hover { background: #fff0f0; }

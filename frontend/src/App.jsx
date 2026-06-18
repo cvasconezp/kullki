@@ -15,6 +15,7 @@ import AprobacionCreditos from "./pages/AprobacionCreditos.jsx";
 import Notificaciones from "./pages/Notificaciones.jsx";
 import Libreta from "./pages/Libreta.jsx";
 import Bitacora from "./pages/Bitacora.jsx";
+import Importar from "./pages/Importar.jsx";
 import Informes from "./pages/Informes.jsx";
 import Cajas from "./pages/Cajas.jsx";
 import Estadisticas from "./pages/Estadisticas.jsx";
@@ -34,6 +35,7 @@ const NAV_TESORERO = [
   { id: "notif",     ruta: "notificaciones", label: "Notificaciones",  short: "Notif.",   ico: "🔔", c: "#DC2626" },
   { id: "informes",  ruta: "informe",        label: "Informe",         short: "Inf.",     ico: "📄", c: "#0891B2" },
   { id: "bitacora",  ruta: "bitacora",       label: "Bitácora",        short: "Bitác.",   ico: "📜", c: "#6B7280" },
+  { id: "importar",  ruta: "importar",       label: "Importar datos",  short: "Import.",  ico: "📂", c: "#0F3D33" },
 ];
 const NAV_SOCIO = [
   { id: "libreta",  ruta: "libreta",  label: "Mi libreta", short: "Libreta", ico: "📒", c: "#0E7A5C" },
@@ -206,6 +208,7 @@ export default function App() {
           {esSocio && activa === "credito" && <Libreta vista="credito" />}
           {esSocio && activa === "perfil" && <Libreta vista="perfil" />}
           {activa === "bitacora" && !esSuper && <Bitacora />}
+          {esTesorero && activa === "importar" && <Importar />}
         </main>
       </div>
     </div>

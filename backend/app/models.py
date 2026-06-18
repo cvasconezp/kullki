@@ -100,6 +100,7 @@ class Socio(Base):
     contacto_emergencia: Mapped[str] = mapped_column(String(160), default="")
     consentimiento_datos: Mapped[bool] = mapped_column(Boolean, default=False)  # LOPDP
     consentimiento_fecha: Mapped[date | None] = mapped_column(Date, nullable=True)
+    import_lote_id: Mapped[int | None] = mapped_column(ForeignKey("import_lotes.id"), nullable=True)
 
     caja: Mapped["Caja"] = relationship(back_populates="socios")
     aportes: Mapped[list["Aporte"]] = relationship(back_populates="socio")
@@ -118,6 +119,7 @@ class Aporte(Base):
     registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     anulado: Mapped[bool] = mapped_column(Boolean, default=False)
+    import_lote_id: Mapped[int | None] = mapped_column(ForeignKey("import_lotes.id"), nullable=True)
 
     socio: Mapped["Socio"] = relationship(back_populates="aportes")
 
@@ -137,6 +139,7 @@ class Credito(Base):
     estado: Mapped[str] = mapped_column(String(20), default="activo")  # activo | pagado
     registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    import_lote_id: Mapped[int | None] = mapped_column(ForeignKey("import_lotes.id"), nullable=True)
 
     socio: Mapped["Socio"] = relationship(back_populates="creditos")
     cuotas: Mapped[list["Cuota"]] = relationship(
@@ -268,3 +271,18 @@ class Egreso(Base):
     registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     anulado: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ImportLote(Base):
+    __tablename__ = "import_lotes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
+    entidad: Mapped[str] = mapped_column(String(20))   # socios | aportes | creditos
+    archivo: Mapped[str] = mapped_column(String(200), default="")
+    estado: Mapped[str] = mapped_column(String(20), default="procesando")  # procesando|completado|revertido
+    importados: Mapped[int] = mapped_column(Integer, default=0)
+    omitidos: Mapped[int] = mapped_column(Integer, default=0)
+    resumen: Mapped[str] = mapped_column(String(2000), default="")
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+

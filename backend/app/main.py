@@ -12,6 +12,7 @@ from . import models
 from .auth import hash_password, verify_password
 from .routers import (auth_router, cajas_router, socios_router, aportes_router,
                       creditos_router, retiros_router, reportes_router)
+from .importar import router as import_router
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
@@ -81,7 +82,7 @@ async def cabeceras_seguridad(request, call_next):
     return resp
 
 for r in (auth_router, cajas_router, socios_router, aportes_router,
-          creditos_router, retiros_router, reportes_router):
+          creditos_router, retiros_router, reportes_router, import_router):
     app.include_router(r)
 
 
@@ -244,6 +245,25 @@ def init_db():
         _add_cols("cajas", {"permite_retiros": "BOOLEAN DEFAULT TRUE", "dia_corte": "INTEGER DEFAULT 0",
                             "multa_atraso": "FLOAT DEFAULT 0"})
         _add_cols("creditos", {"tipo": "VARCHAR(20) DEFAULT 'ordinario'"})
+        # Importador de datos
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS import_lotes (
+                    id SERIAL PRIMARY KEY,
+                    caja_id INTEGER NOT NULL REFERENCES cajas(id),
+                    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+                    entidad VARCHAR(20) NOT NULL,
+                    archivo VARCHAR(200) DEFAULT '',
+                    estado VARCHAR(20) DEFAULT 'procesando',
+                    importados INTEGER DEFAULT 0,
+                    omitidos INTEGER DEFAULT 0,
+                    resumen VARCHAR(2000) DEFAULT '',
+                    creado_en TIMESTAMP DEFAULT NOW()
+                )
+            """))
+        _add_cols("socios",   {"import_lote_id": "INTEGER REFERENCES import_lotes(id)"})
+        _add_cols("aportes",  {"import_lote_id": "INTEGER REFERENCES import_lotes(id)"})
+        _add_cols("creditos", {"import_lote_id": "INTEGER REFERENCES import_lotes(id)"})
         _add_cols("solicitudes_credito", {"garante2": "VARCHAR(160) DEFAULT ''",
                             "tipo": "VARCHAR(20) DEFAULT 'ordinario'",
                             "documento_nombre": "VARCHAR(160) DEFAULT ''", "documento_b64": "TEXT",
