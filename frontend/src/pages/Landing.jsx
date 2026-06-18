@@ -316,7 +316,7 @@ export default function Landing({ sesion }) {
             las que crecen, pagan en proporción a lo que gestionan.
             <br />
             <button className="lp-cta" style={{ marginTop: "24px" }} onClick={() => navigate("/ingresar")}>
-              Empezar ahora — es gratis el primer mes →
+              Empezar ahora →
             </button>
           </div>
         </div>
