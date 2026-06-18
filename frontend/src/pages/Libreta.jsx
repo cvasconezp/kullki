@@ -3,6 +3,7 @@ import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
 import ExportarEstado from "../components/ExportarEstado.jsx";
 import MisDatos from "../components/MisDatos.jsx";
 import Seguridad2FA from "../components/Seguridad2FA.jsx";
+import ConfigurarPIN from "../components/ConfigurarPIN.jsx";
 import CreditoSocio from "../components/CreditoSocio.jsx";
 import GarantiasPendientes from "../components/GarantiasPendientes.jsx";
 import HistorialSolicitudes from "../components/HistorialSolicitudes.jsx";
@@ -82,6 +83,7 @@ export default function Libreta({ vista = "libreta" }) {
         <div className="seccion-titulo"><h2>Mi perfil</h2></div>
         <MisDatos socio={socio} onActualizado={cargar} />
         <Seguridad2FA />
+        <ConfigurarPIN />
       </>
     );
   }

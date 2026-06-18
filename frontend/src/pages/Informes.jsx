@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
 import { imprimirInformeAsamblea } from "../lib/exportar.js";
 import Seguridad2FA from "../components/Seguridad2FA.jsx";
-import ConfigurarPIN from "../components/ConfigurarPIN.jsx";
 
 function GrupoDemo({ titulo, datos, total }) {
   const max = Math.max(1, ...datos.map((d) => d.valor));
@@ -177,7 +176,6 @@ export default function Informes() {
       )}
 
       <Seguridad2FA />
-      <ConfigurarPIN />
 
       <p className="no-print" style={{ color: "var(--tinta-suave)", fontSize: 12.5, textAlign: "center", marginTop: 14 }}>
         Usa "PDF con membrete" para llevar este informe a la asamblea.
