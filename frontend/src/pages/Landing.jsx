@@ -19,6 +19,7 @@ const ROLES = [
 ];
 
 export default function Landing({ sesion }) {
+  const [menuAbierto, setMenu] = useState(false);
   const irApp = () => navigate(sesion ? `/${sesion.caja_slug || "admin"}` : "/ingresar");
 
   useEffect(() => {
