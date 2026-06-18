@@ -224,8 +224,8 @@ export default function Landing({ sesion }) {
                   <div className="lp-calc-klab">por socio al mes</div>
                 </div>
                 <div>
-                  <div className="lp-calc-kval">{pctCapital.toFixed(1)} %</div>
-                  <div className="lp-calc-klab">sobre el capital</div>
+                  <div className="lp-calc-kval">${(precioCalc / 12).toFixed(2)}</div>
+                  <div className="lp-calc-klab">por mes</div>
                 </div>
               </div>
 
