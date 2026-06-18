@@ -16,6 +16,10 @@ export default function ParaCajas() {
   const aportesAnuales = socios * aporteM * 12;
   const capitalXdolar  = Math.round(capital / precioCalc);
 
+  const [anosHistorial, setAnos] = useState(3);
+  const costoMigracion = 15 + (socios * 0.30) + (anosHistorial * 5);
+  const totalAno1 = precioCalc + costoMigracion;
+
   const fmt = (n) => n.toLocaleString("es-EC", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const usd = (n) => `$${n.toFixed(2)}`;
 
@@ -110,6 +114,16 @@ export default function ParaCajas() {
                   onChange={e => setAporteM(+e.target.value)} />
                 <div className="lp-calc-ticks"><span>$5</span><span>$100</span></div>
               </div>
+              <div className="lp-calc-row lp-calc-row-mig">
+                <div className="lp-calc-lbl">
+                  <span>Años de historial a migrar</span>
+                  <strong>{anosHistorial} año{anosHistorial !== 1 ? "s" : ""}</strong>
+                </div>
+                <input type="range" className="lp-calc-slider lp-slider-mig"
+                  min="0" max="15" step="1" value={anosHistorial}
+                  onChange={e => setAnos(+e.target.value)} />
+                <div className="lp-calc-ticks"><span>0 (solo datos actuales)</span><span>15 años</span></div>
+              </div>
               <p className="lp-calc-formula">
                 Precio = 1.5 % del capital + 1 % de aportes anuales · mínimo $120
               </p>
@@ -149,6 +163,30 @@ export default function ParaCajas() {
                 <div>
                   <div className="lp-calc-kval">${(precioCalc / 12).toFixed(2)}</div>
                   <div className="lp-calc-klab">por mes</div>
+                </div>
+              </div>
+              <div className="lp-calc-mig-box">
+                <div className="lp-calc-mig-header">
+                  <span className="lp-calc-mig-ico">📂</span>
+                  <span>Activación + migración de datos <em>(solo año 1)</em></span>
+                </div>
+                <div className="lp-calc-linea">
+                  <span>Configuración base</span><span>$15.00</span>
+                </div>
+                <div className="lp-calc-linea">
+                  <span>Migración · {socios} socios × $0.30</span>
+                  <span>${(socios * 0.30).toFixed(2)}</span>
+                </div>
+                <div className="lp-calc-linea">
+                  <span>Historial · {anosHistorial} año{anosHistorial !== 1 ? "s" : ""} × $5</span>
+                  <span>${(anosHistorial * 5).toFixed(2)}</span>
+                </div>
+                <div className="lp-calc-mig-total">
+                  <span>Total año 1</span>
+                  <span>${totalAno1.toFixed(2)}</span>
+                </div>
+                <div className="lp-calc-mig-rec">
+                  Año 2 en adelante: <strong>${fmt(precioCalc)} / año</strong>
                 </div>
               </div>
               <a className="lp-cta lp-calc-cta" href="#contacto">
