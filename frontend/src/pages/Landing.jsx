@@ -163,9 +163,9 @@ export default function Landing({ sesion }) {
                   <strong>${fmt(capital)}</strong>
                 </div>
                 <input type="range" className="lp-calc-slider"
-                  min="500" max="30000" step="500" value={capital}
+                  min="500" max="50000" step="500" value={capital}
                   onChange={e => setCapital(+e.target.value)} />
-                <div className="lp-calc-ticks"><span>$500</span><span>$30 000</span></div>
+                <div className="lp-calc-ticks"><span>$500</span><span>$50 000</span></div>
               </div>
 
               <div className="lp-calc-row">
