@@ -739,6 +739,18 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
   margin-top: 3px;
   line-height: 1.3;
 }
+.lp-calc-nudge {
+  display: block;
+  margin-top: 14px;
+  text-align: center;
+  font-size: 13.5px;
+  color: rgba(255,255,255,.6);
+  text-decoration: none;
+  letter-spacing: .01em;
+  transition: color .2s;
+}
+.lp-calc-nudge:hover { color: var(--sara); }
+
 .lp-calc-cta {
   width: 100%;
   text-align: center;

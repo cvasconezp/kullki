@@ -57,7 +57,7 @@ export default function ParaCajas() {
       <section className="lp-hero lp-hero-sm">
         <div className="lp-hero-glow" aria-hidden="true" />
         <div className="lp-hero-in">
-          <span className="lp-eyebrow">Para presidentes, tesoreros y directivos · Sin compromiso</span>
+          <span className="lp-eyebrow">Para presidentes, tesoreros y directivos</span>
           <h1>Kullki para tu caja<br /><span className="oro">a un precio proporcional</span></h1>
           <p className="lp-sub">
             Calcula exactamente cuánto cuesta para tu caja, entiende lo que obtienes
@@ -153,6 +153,9 @@ export default function ParaCajas() {
               </div>
               <a className="lp-cta lp-calc-cta" href="#contacto">
                 Solicitar demo →
+              </a>
+              <a href="#adquisicion" className="lp-calc-nudge">
+                ¿Qué obtiene tu caja por este precio? ↓
               </a>
             </div>
 
