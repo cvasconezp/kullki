@@ -47,11 +47,17 @@ export default function Landing({ sesion }) {
           <span className="lp-logo">Kullki</span>
           <span className="lp-labs">por Yachay Deep Labs</span>
         </div>
+        <nav className="lp-nav-links" aria-label="Secciones">
+          <a href="#historia">Por qué</a>
+          <a href="#beneficios">Beneficios</a>
+          <a href="#roles">Roles</a>
+          <a href="#precios">Precios</a>
+        </nav>
         <button className="lp-cta-mini" onClick={irApp}>{sesion ? "Ir a mi caja" : "Ingresar"}</button>
       </header>
 
       {/* HERO */}
-      <section className="lp-hero">
+      <section id="inicio" className="lp-hero">
         <div className="lp-hero-glow" aria-hidden="true" />
         <div className="lp-hero-in">
           <span className="lp-eyebrow">Cajas de ahorro comunitarias · Kichwa <em>kullki</em>: dinero</span>
@@ -73,7 +79,7 @@ export default function Landing({ sesion }) {
       </section>
 
       {/* HISTORIA / EL PROBLEMA */}
-      <section className="lp-historia">
+      <section id="historia" className="lp-historia">
         <div className="lp-historia-in">
           <span className="lp-eyebrow oscuro">Por qué existe Kullki</span>
           <h2>Tu caja nació de la confianza. Es hora de cuidarla.</h2>
@@ -108,7 +114,7 @@ export default function Landing({ sesion }) {
       </section>
 
       {/* BENEFICIOS */}
-      <section className="lp-seccion">
+      <section id="beneficios" className="lp-seccion">
         <span className="lp-eyebrow oscuro">Lo que cambia para tu comunidad</span>
         <h2>Confianza que se puede comprobar</h2>
         <div className="lp-grid">
@@ -128,7 +134,7 @@ export default function Landing({ sesion }) {
       </section>
 
       {/* ROLES */}
-      <section className="lp-roles">
+      <section id="roles" className="lp-roles">
         <div className="lp-roles-in">
           <span className="lp-eyebrow">Para cada persona de la caja</span>
           <h2>Todos miran la misma verdad</h2>
@@ -145,7 +151,7 @@ export default function Landing({ sesion }) {
       </section>
 
       {/* ── CALCULADORA DE PRECIOS ── */}
-      <section className="lp-calc">
+      <section id="precios" className="lp-calc">
         <div className="lp-calc-in">
           <span className="lp-eyebrow">Para cada caja, un precio proporcional</span>
           <h2>Calcula cuánto cuesta Kullki para tu caja</h2>
@@ -246,7 +252,7 @@ export default function Landing({ sesion }) {
       </section>
 
       {/* ── ANÁLISIS DE ADQUISICIÓN ── */}
-      <section className="lp-adquisicion">
+      <section id="adquisicion" className="lp-adquisicion">
         <div className="lp-adq-in">
           <span className="lp-eyebrow oscuro">Lo que obtienes a cambio</span>
           <h2>Kullki en perspectiva</h2>

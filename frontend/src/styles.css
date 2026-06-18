@@ -835,3 +835,20 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
   color: var(--sara);
   font-weight: 700;
 }
+
+/* Nav links landing */
+.lp-nav-links {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.lp-nav-links a {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--kullki-oscuro);
+  text-decoration: none;
+  opacity: .75;
+  transition: opacity .15s;
+}
+.lp-nav-links a:hover { opacity: 1; }
+@media (max-width: 600px) { .lp-nav-links { display: none; } }
