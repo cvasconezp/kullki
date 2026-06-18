@@ -3,6 +3,7 @@ import { getSesion, setSesion, getAdminSesion, setAdminSesion } from "./lib/api.
 import { applyTheme, resetTheme, logoDe } from "./lib/theme.js";
 import { useRuta, navigate } from "./lib/router.js";
 import Landing from "./pages/Landing.jsx";
+import ParaCajas from "./pages/ParaCajas.jsx";
 import Privacidad from "./pages/Privacidad.jsx";
 import Terminos from "./pages/Terminos.jsx";
 import Login from "./pages/Login.jsx";
@@ -71,7 +72,7 @@ export default function App() {
 
   useEffect(() => {
     // Rutas públicas siempre con la marca Kullki/YD, sin importar si hay sesión.
-    const rutaPublica = ruta === "/" || ruta === "/privacidad" || ruta === "/terminos" || ruta === "/ingresar";
+    const rutaPublica = ruta === "/" || ruta === "/privacidad" || ruta === "/terminos" || ruta === "/ingresar" || ruta === "/para-cajas";
     if (rutaPublica || !sesion || sesion.rol === "superadmin") resetTheme();
     else applyTheme(sesion);
   }, [sesion, ruta]);
@@ -107,6 +108,7 @@ export default function App() {
   if (ruta === "/") return <Landing sesion={sesion} />;
   if (ruta === "/privacidad") return <Privacidad />;
   if (ruta === "/terminos") return <Terminos />;
+  if (ruta === "/para-cajas") return <ParaCajas />;
   if (ruta === "/ingresar") {
     if (sesion) { navigate(rutaDe(sesion)); return null; }
     return <Login onLogin={entrar} />;

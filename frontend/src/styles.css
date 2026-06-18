@@ -852,3 +852,159 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
 }
 .lp-nav-links a:hover { opacity: 1; }
 @media (max-width: 600px) { .lp-nav-links { display: none; } }
+
+/* ══════════════════════════════════════════════
+   HERO COMPACTO (ParaCajas)
+══════════════════════════════════════════════ */
+.lp-hero.lp-hero-sm {
+  padding: 100px 20px 60px;
+  min-height: unset;
+}
+.lp-hero.lp-hero-sm .lp-hero-in {
+  max-width: 720px;
+}
+
+/* ══════════════════════════════════════════════
+   CONTACTO — /para-cajas
+══════════════════════════════════════════════ */
+.lp-contacto {
+  background: var(--fondo, #f8f7f4);
+  padding: 80px 20px;
+}
+.lp-contacto-in {
+  max-width: 960px;
+  margin: 0 auto;
+  text-align: center;
+}
+.lp-contacto-in h2 {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  color: var(--kullki-oscuro);
+  margin-bottom: 8px;
+}
+.lp-contacto-sub {
+  color: var(--tinta-suave);
+  margin-bottom: 48px;
+  font-size: 1.05rem;
+}
+.lp-contacto-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 32px;
+  text-align: left;
+}
+@media (max-width: 720px) {
+  .lp-contacto-grid { grid-template-columns: 1fr; }
+}
+
+/* Canales directos */
+.lp-contacto-canales {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.lp-canal {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1.5px solid var(--regla);
+  background: #fff;
+  text-decoration: none;
+  color: var(--kullki-oscuro);
+  transition: box-shadow .2s, border-color .2s;
+}
+.lp-canal:hover {
+  box-shadow: 0 4px 18px rgba(0,0,0,.08);
+  border-color: var(--sara);
+}
+.lp-canal-ico { font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+.lp-canal-tit { font-weight: 700; font-size: .82rem; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--tinta-suave); margin-bottom: 2px; }
+.lp-canal-val { font-weight: 700; font-size: 1.05rem; color: var(--kullki-oscuro); }
+.lp-canal-nota { font-size: .82rem; color: var(--tinta-suave); margin-top: 2px; }
+.lp-canal-wa .lp-canal-val { color: #128c7e; }
+.lp-canal-mail .lp-canal-val { color: var(--kullki-oscuro); }
+
+/* Formulario */
+.lp-contacto-form {
+  background: #fff;
+  border: 1.5px solid var(--regla);
+  border-radius: 16px;
+  padding: 28px 24px;
+}
+.lp-form-intro {
+  font-size: .9rem;
+  color: var(--tinta-suave);
+  margin-bottom: 16px;
+}
+.lp-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+@media (max-width: 480px) { .lp-form-row { grid-template-columns: 1fr; } }
+.lp-form-campo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.lp-form-campo label {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--kullki-oscuro);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.lp-form-campo label span { font-weight: 400; text-transform: none; color: var(--tinta-suave); }
+.lp-form-campo input,
+.lp-form-campo textarea {
+  border: 1.5px solid var(--regla);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: .95rem;
+  color: var(--kullki-oscuro);
+  background: #fafaf9;
+  transition: border-color .2s;
+  font-family: inherit;
+  resize: vertical;
+}
+.lp-form-campo input:focus,
+.lp-form-campo textarea:focus {
+  outline: none;
+  border-color: var(--sara);
+  background: #fff;
+}
+.lp-form-submit {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 1rem;
+}
+.lp-form-nota {
+  text-align: center;
+  font-size: .8rem;
+  color: var(--tinta-suave);
+  margin-top: 10px;
+}
+.lp-form-nota a { color: var(--kullki-oscuro); }
+
+/* ══════════════════════════════════════════════
+   CALLOUT "Para tu caja" — en Landing principal
+══════════════════════════════════════════════ */
+.lp-para-cajas {
+  background: var(--kullki-oscuro);
+  padding: 72px 20px;
+  text-align: center;
+}
+.lp-para-cajas-in {
+  max-width: 640px;
+  margin: 0 auto;
+}
+.lp-para-cajas .lp-eyebrow { color: var(--sara); opacity: 1; }
+.lp-para-cajas h2 {
+  color: #fff;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  margin: 10px 0 12px;
+}
+.lp-para-cajas p {
+  color: rgba(255,255,255,.75);
+  font-size: 1rem;
+  margin-bottom: 28px;
+}
