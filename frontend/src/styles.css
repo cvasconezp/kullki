@@ -811,3 +811,27 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
   .lp-calc-result { position: static; }
   .lp-antes-despues { grid-template-columns: 1fr; }
 }
+
+/* Incluye — lista en tarjeta calculadora */
+.lp-calc-incluye {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp-calc-incluye li {
+  font-size: 13px;
+  color: #c6d6f0;
+  padding-left: 18px;
+  position: relative;
+  line-height: 1.4;
+}
+.lp-calc-incluye li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--sara);
+  font-weight: 700;
+}

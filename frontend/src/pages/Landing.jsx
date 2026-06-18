@@ -216,6 +216,13 @@ export default function Landing({ sesion }) {
                 )}
               </div>
 
+              <ul className="lp-calc-incluye">
+                <li>Libreta digital para cada socio</li>
+                <li>Cierres y cálculos automáticos</li>
+                <li>Historial permanente de la caja</li>
+                <li>Acceso desde el celular, sin instalar nada</li>
+              </ul>
+
               <hr className="lp-calc-sep" />
 
               <div className="lp-calc-kpis">
