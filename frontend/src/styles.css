@@ -1,13 +1,14 @@
 :root {
-  --papel: #f4f6f2;
+  --papel: #F3F4F1;
   --carta: #ffffff;
-  --tinta: #17251f;
-  --tinta-suave: #5c6a63;
-  --regla: #d8ded7;
-  --kullki: #1B3A6B;          /* navy Yachay Deep (la caja sobreescribe en runtime) */
-  --kullki-oscuro: #0F2444;
-  --kullki-tinte: #D8EFF4;
-  --sara: #E8A838;            /* dorado Yachay Deep */
+  --tinta: #0F3D33;
+  --tinta-suave: #4a6b60;
+  --regla: #ccd8d3;
+  --kullki: #2E7D6B;          /* verde medio Kullki (la caja sobreescribe en runtime) */
+  --kullki-oscuro: #0F3D33;
+  --kullki-claro: #7DBCA6;    /* verde menta */
+  --kullki-tinte: #d4ede5;
+  --sara: #F2B336;            /* dorado Kullki */
   --cochinilla: #b3372b;
   --cochinilla-tinte: #f8e9e6;
   --borde: #d8ded7;
@@ -79,7 +80,7 @@ button { font-family: var(--cuerpo); cursor: pointer; }
   content: "";
   position: absolute; inset: 0 0 auto 0; height: 5px;
   background: repeating-linear-gradient(90deg,
-    var(--sara) 0 14px, #f2f8f5 14px 16px, var(--kullki) 16px 30px, #f2f8f5 30px 32px);
+    var(--sara) 0 14px, #eef4f1 14px 16px, var(--kullki) 16px 30px, #eef4f1 30px 32px);
   opacity: 0.9;
 }
 .libreta .eyebrow { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.75; }
@@ -339,9 +340,9 @@ details[open] summary::before { content: "▾ "; }
   padding: 9px 18px; font-weight: 600; font-size: 14px; }
 
 .lp-hero { position: relative; overflow: hidden; color: #eaf2ff;
-  background: linear-gradient(150deg, #1B3A6B 0%, #0F2444 55%, #1B3A6B 100%); }
+  background: linear-gradient(150deg, #2E7D6B 0%, #0F3D33 55%, #1a5a47 100%); }
 .lp-hero-glow { position: absolute; width: 520px; height: 520px; right: -120px; top: -160px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(232,168,56,.22), transparent 70%); filter: blur(20px); }
+  background: radial-gradient(circle, rgba(242,179,54,.22), transparent 70%); filter: blur(20px); }
 .lp-hero-in { position: relative; max-width: 1120px; margin: 0 auto; padding: 64px 22px 76px; }
 .lp-eyebrow { display: inline-block; font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--sara); font-weight: 600; }
@@ -354,7 +355,7 @@ details[open] summary::before { content: "▾ "; }
 .lp-acciones { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 30px; }
 .lp-cta { background: var(--sara); color: #2a1d00; border: none; border-radius: 12px;
   padding: 14px 26px; font-weight: 700; font-size: 16px; box-shadow: 0 8px 24px rgba(232,168,56,.28); }
-.lp-cta:hover { background: #F5C563; }
+.lp-cta:hover { background: #f7c555; }
 .lp-cta.claro { margin-top: 26px; }
 .lp-link { color: #eaf2ff; font-weight: 600; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,.4); padding-bottom: 2px; }
 .lp-chips { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 30px; font-size: 13.5px; color: #a8c0e6; }
@@ -378,7 +379,7 @@ details[open] summary::before { content: "▾ "; }
 .lp-rol-t { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--kullki-oscuro); }
 .lp-rol p { font-size: 14px; color: var(--tinta-suave); margin: 6px 0 0; line-height: 1.5; }
 
-.lp-footer { background: var(--kullki-oscuro); color: #c6d6f0; }
+.lp-footer { background: var(--kullki-oscuro); color: #c0d9cf; }
 .lp-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 30px 22px; }
 .lp-footer .lp-logo { color: #fff; }
@@ -411,7 +412,7 @@ details[open] summary::before { content: "▾ "; }
   max-width: 900px; margin: 0 auto; line-height: 1.2; }
 .lp-cita .oro { color: var(--sara); }
 
-.lp-footer-marca p { font-size: 13px; margin: 4px 0 0; color: #c6d6f0; }
+.lp-footer-marca p { font-size: 13px; margin: 4px 0 0; color: #c0d9cf; }
 .lp-footer-yd { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .lp-footer-yd img { opacity: .95; }
 .lp-footer-yd .lp-foot-meta { text-align: right; }
@@ -1008,3 +1009,28 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
   font-size: 1rem;
   margin-bottom: 28px;
 }
+
+/* ══════════════════════════════════════════════
+   LOGOS DE MARCA — imagotipo y footer
+══════════════════════════════════════════════ */
+
+/* Imagotipo horizontal en el nav (icon + "Kullki" texto como SVG) */
+.lp-logo-img {
+  height: 38px;
+  width: auto;
+  display: block;
+}
+
+/* Footer: logo Kullki banner */
+.lp-footer-logo-img {
+  height: 48px;
+  width: auto;
+  display: block;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  outline: 1.5px solid rgba(255,255,255,.12);
+  box-shadow: 0 2px 12px rgba(0,0,0,.25);
+}
+
+/* Quitar el padding-left que tenía el lp-labs (ya no se usa) */
+.lp-marca { display: flex; align-items: center; gap: 10px; text-decoration: none; }

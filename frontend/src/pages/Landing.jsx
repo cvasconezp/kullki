@@ -38,10 +38,9 @@ export default function Landing({ sesion }) {
     <div className="lp">
       <header className="lp-nav">
         <div className="lp-marca" onClick={() => navigate("/")} role="button" tabIndex={0}
-             onKeyDown={(e) => e.key === "Enter" && navigate("/")}>
-          <img src="/favicon.svg" alt="" width="34" height="34" />
-          <span className="lp-logo">Kullki</span>
-          <span className="lp-labs">por Yachay Deep Labs</span>
+             onKeyDown={(e) => e.key === "Enter" && navigate("/")}
+             title="Ir al inicio" style={{ cursor: "pointer" }}>
+          <img src="/logo-kullki-horizontal.svg" alt="Kullki" className="lp-logo-img" />
         </div>
         <nav className="lp-nav-links" aria-label="Secciones">
           <a href="#historia">Por qué</a>
@@ -166,9 +165,7 @@ export default function Landing({ sesion }) {
             <p>El dinero de tu comunidad, claro y a la vista.</p>
           </div>
           <div className="lp-footer-yd">
-            <a href="https://www.yachaydeep.com" target="_blank" rel="noreferrer">
-              <img src="/logo-hero-dark.svg" alt="Yachay Deep" height="34" />
-            </a>
+            <img src="/logo-kullki-footer.svg" alt="Kullki" className="lp-footer-logo-img" />
             <span className="lp-foot-meta">
               <a href="/privacidad" style={{ color: "inherit", textDecoration: "underline" }}>Privacidad</a>
               {" · "}

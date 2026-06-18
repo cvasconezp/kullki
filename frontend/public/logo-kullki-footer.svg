@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Capa_1" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 950.6 149.79">
+  <!-- Generator: Adobe Illustrator 29.5.0, SVG Export Plug-In . SVG Version: 2.1.0 Build 137)  -->
+  <defs>
+    <style>
+      .st0, .st1, .st2 {
+        fill: none;
+      }
+
+      .st1 {
+        stroke: #2d7d6b;
+        stroke-width: 10px;
+      }
+
+      .st1, .st2 {
+        stroke-miterlimit: 10;
+      }
+
+      .st2 {
+        stroke: #f2b334;
+        stroke-width: 15px;
+      }
+
+      .st3 {
+        fill: #0e3d33;
+      }
+
+      .st4 {
+        clip-path: url(#clippath);
+      }
+    </style>
+    <clipPath id="clippath">
+      <rect class="st0" x="232.13" width="718.47" height="149.79"/>
+    </clipPath>
+  </defs>
+  <rect class="st3" width="950.6" height="149.79"/>
+  <g class="st4">
+    <g>
+      <g>
+        <rect class="st3" x="908.33" y="32.51" width="84.77" height="84.77" transform="translate(225.5 694.19) rotate(-45)"/>
+        <rect class="st1" x="908.33" y="32.51" width="84.77" height="84.77" transform="translate(225.5 694.19) rotate(-45)"/>
+        <rect class="st2" x="929.64" y="53.82" width="42.14" height="42.14" transform="translate(225.5 694.19) rotate(-45)"/>
+      </g>
+      <g>
+        <rect class="st3" x="773.86" y="32.51" width="84.77" height="84.77" transform="translate(186.11 599.11) rotate(-45)"/>
+        <rect class="st1" x="773.86" y="32.51" width="84.77" height="84.77" transform="translate(186.11 599.11) rotate(-45)"/>
+        <rect class="st2" x="795.17" y="53.82" width="42.14" height="42.14" transform="translate(186.11 599.11) rotate(-45)"/>
+      </g>
+      <g>
+        <rect class="st3" x="706.62" y="-42.38" width="84.77" height="84.77" transform="translate(219.38 529.63) rotate(-45)"/>
+        <rect class="st1" x="706.62" y="-42.38" width="84.77" height="84.77" transform="translate(219.38 529.63) rotate(-45)"/>
+        <rect class="st2" x="727.94" y="-21.07" width="42.14" height="42.14" transform="translate(219.38 529.63) rotate(-45)"/>
+      </g>
+      <g>
+        <rect class="st3" x="841.09" y="-42.38" width="84.77" height="84.77" transform="translate(258.76 624.71) rotate(-45)"/>
+        <rect class="st1" x="841.09" y="-42.38" width="84.77" height="84.77" transform="translate(258.76 624.71) rotate(-45)"/>
+        <rect class="st2" x="862.4" y="-21.07" width="42.14" height="42.14" transform="translate(258.76 624.71) rotate(-45)"/>
+      </g>
+      <g>
+        <rect class="st3" x="841.09" y="107.4" width="84.77" height="84.77" transform="translate(152.85 668.58) rotate(-45)"/>
+        <rect class="st1" x="841.09" y="107.4" width="84.77" height="84.77" transform="translate(152.85 668.58) rotate(-45)"/>
+        <rect class="st2" x="862.4" y="128.72" width="42.14" height="42.14" transform="translate(152.85 668.58) rotate(-45)"/>
+      </g>
+      <g>
+        <rect class="st3" x="706.62" y="107.4" width="84.77" height="84.77" transform="translate(113.46 573.5) rotate(-45)"/>
+        <rect class="st1" x="706.62" y="107.4" width="84.77" height="84.77" transform="translate(113.46 573.5) rotate(-45)"/>
+        <rect class="st2" x="727.94" y="128.72" width="42.14" height="42.14" transform="translate(113.46 573.5) rotate(-45)"/>
+      </g>
+    </g>
+  </g>
+</svg>
