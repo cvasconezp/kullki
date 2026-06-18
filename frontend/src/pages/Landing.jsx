@@ -55,7 +55,7 @@ export default function Landing({ sesion }) {
       <section id="inicio" className="lp-hero">
         <div className="lp-hero-glow" aria-hidden="true" />
         <div className="lp-hero-in">
-          <span className="lp-eyebrow">Cajas de ahorro comunitarias · Kichwa <em>kullki</em>: dinero</span>
+          <span className="lp-eyebrow">Cajas de ahorro comunitarias</span>
           <h1>El dinero de tu comunidad,<br /><span className="oro">claro y a la vista de todos</span></h1>
           <p className="lp-sub">
             Kullki es el sistema inteligente para administrar tus recursos y los de tus
@@ -165,7 +165,6 @@ export default function Landing({ sesion }) {
             <p>El dinero de tu comunidad, claro y a la vista.</p>
           </div>
           <div className="lp-footer-yd">
-            <img src="/logo-kullki-footer.svg" alt="Kullki" className="lp-footer-logo-img" />
             <span className="lp-foot-meta">
               <a href="/privacidad" style={{ color: "inherit", textDecoration: "underline" }}>Privacidad</a>
               {" · "}
@@ -174,6 +173,7 @@ export default function Landing({ sesion }) {
             </span>
           </div>
         </div>
+        <img src="/logo-kullki-footer.svg" alt="Kullki" className="lp-footer-banner" />
       </footer>
     </div>
   );

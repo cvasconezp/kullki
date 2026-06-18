@@ -293,7 +293,6 @@ export default function ParaCajas() {
             <p>El dinero de tu comunidad, claro y a la vista.</p>
           </div>
           <div className="lp-footer-yd">
-            <img src="/logo-kullki-footer.svg" alt="Kullki" className="lp-footer-logo-img" />
             <span className="lp-foot-meta">
               <a href="/privacidad" style={{ color: "inherit", textDecoration: "underline" }}>Privacidad</a>
               {" · "}
@@ -302,6 +301,7 @@ export default function ParaCajas() {
             </span>
           </div>
         </div>
+        <img src="/logo-kullki-footer.svg" alt="Kullki" className="lp-footer-banner" />
       </footer>
 
     </div>
