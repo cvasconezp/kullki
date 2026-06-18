@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { navigate } from "../lib/router.js";
 
 const BENEFICIOS = [
@@ -20,6 +20,19 @@ const ROLES = [
 
 export default function Landing({ sesion }) {
   const irApp = () => navigate(sesion ? `/${sesion.caja_slug || "admin"}` : "/ingresar");
+
+  useEffect(() => {
+    const ids = ["inicio","historia","beneficios","roles","precios","adquisicion"];
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.find(e => e.isIntersecting);
+        if (visible) history.replaceState(null, "", "#" + visible.target.id);
+      },
+      { rootMargin: "-40% 0px -55% 0px", threshold: 0 }
+    );
+    ids.forEach(id => { const el = document.getElementById(id); if (el) obs.observe(el); });
+    return () => obs.disconnect();
+  }, []);
 
   /* ── Calculadora ── */
   const [capital, setCapital]   = useState(5000);
