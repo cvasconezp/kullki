@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { navigate } from "../lib/router.js";
 
 const BENEFICIOS = [
@@ -19,6 +20,24 @@ const ROLES = [
 
 export default function Landing({ sesion }) {
   const irApp = () => navigate(sesion ? `/${sesion.caja_slug || "admin"}` : "/ingresar");
+
+  /* ── Calculadora ── */
+  const [capital, setCapital]   = useState(5000);
+  const [socios, setSocios]     = useState(20);
+  const [aporteM, setAporteM]   = useState(20);
+
+  const compCapital     = capital * 0.025;
+  const compSocios      = socios * aporteM * 12 * 0.005;
+  const precioCalc      = Math.max(75, compCapital + compSocios);
+  const enPiso          = precioCalc === 75;
+  const porSocioMes     = precioCalc / 12 / socios;
+  const pctCapital      = (precioCalc / capital) * 100;
+  const aportesAnuales  = socios * aporteM * 12;
+  const capitalXdolar   = Math.round(capital / precioCalc);
+
+  const fmt = (n) => n.toLocaleString("es-EC", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const usd = (n) => `$${n.toFixed(2)}`;
+
   return (
     <div className="lp">
       <header className="lp-nav">
@@ -70,7 +89,7 @@ export default function Landing({ sesion }) {
               <span className="lp-ad-tag">Antes</span>
               <ul>
                 <li>El cuaderno o el Excel del tesorero</li>
-                <li>“Confía en mí” como única garantía</li>
+                <li>"Confía en mí" como única garantía</li>
                 <li>Cuentas a mano, errores y discusiones</li>
                 <li>Si cambia el tesorero, se pierde todo</li>
               </ul>
@@ -105,7 +124,7 @@ export default function Landing({ sesion }) {
 
       {/* CITA DE MARCA */}
       <section className="lp-cita">
-        <p>“El dinero de la comunidad, <span className="oro">a la vista de todos.</span>”</p>
+        <p>"El dinero de la comunidad, <span className="oro">a la vista de todos.</span>"</p>
       </section>
 
       {/* ROLES */}
@@ -122,6 +141,158 @@ export default function Landing({ sesion }) {
             ))}
           </div>
           <button className="lp-cta claro" onClick={() => navigate("/ingresar")}>Comenzar ahora →</button>
+        </div>
+      </section>
+
+      {/* ── CALCULADORA DE PRECIOS ── */}
+      <section className="lp-calc">
+        <div className="lp-calc-in">
+          <span className="lp-eyebrow">Para cada caja, un precio proporcional</span>
+          <h2>Calcula cuánto cuesta Kullki para tu caja</h2>
+          <p className="lp-calc-sub">
+            Mueve los controles y ve el precio en tiempo real. Sin letra chica.
+          </p>
+          <div className="lp-calc-grid">
+
+            {/* ─ Sliders ─ */}
+            <div className="lp-calc-sliders">
+
+              <div className="lp-calc-row">
+                <div className="lp-calc-lbl">
+                  <span>Capital de la caja</span>
+                  <strong>${fmt(capital)}</strong>
+                </div>
+                <input type="range" className="lp-calc-slider"
+                  min="500" max="30000" step="500" value={capital}
+                  onChange={e => setCapital(+e.target.value)} />
+                <div className="lp-calc-ticks"><span>$500</span><span>$30 000</span></div>
+              </div>
+
+              <div className="lp-calc-row">
+                <div className="lp-calc-lbl">
+                  <span>Número de socios</span>
+                  <strong>{socios} socios</strong>
+                </div>
+                <input type="range" className="lp-calc-slider"
+                  min="5" max="150" step="1" value={socios}
+                  onChange={e => setSocios(+e.target.value)} />
+                <div className="lp-calc-ticks"><span>5</span><span>150</span></div>
+              </div>
+
+              <div className="lp-calc-row">
+                <div className="lp-calc-lbl">
+                  <span>Aporte ordinario mensual</span>
+                  <strong>${aporteM} / mes</strong>
+                </div>
+                <input type="range" className="lp-calc-slider"
+                  min="5" max="100" step="5" value={aporteM}
+                  onChange={e => setAporteM(+e.target.value)} />
+                <div className="lp-calc-ticks"><span>$5</span><span>$100</span></div>
+              </div>
+
+              <p className="lp-calc-formula">
+                Precio = 2.5 % del capital + 0.5 % de aportes anuales · mínimo $75
+              </p>
+            </div>
+
+            {/* ─ Resultado ─ */}
+            <div className="lp-calc-result">
+              <span className="lp-calc-etiq">Tu precio estimado</span>
+              <div className="lp-calc-precio">
+                ${fmt(precioCalc)}<span> / año</span>
+              </div>
+
+              <div className="lp-calc-desglose">
+                <div className="lp-calc-linea">
+                  <span>2.5 % del capital (${fmt(capital)})</span>
+                  <span>${fmt(compCapital)}</span>
+                </div>
+                <div className="lp-calc-linea">
+                  <span>0.5 % aportes anuales · {socios} socios</span>
+                  <span>${fmt(compSocios)}</span>
+                </div>
+                {enPiso && (
+                  <div className="lp-calc-piso">⚡ Precio mínimo aplicado ($75)</div>
+                )}
+              </div>
+
+              <hr className="lp-calc-sep" />
+
+              <div className="lp-calc-kpis">
+                <div>
+                  <div className="lp-calc-kval">{usd(porSocioMes)}</div>
+                  <div className="lp-calc-klab">por socio al mes</div>
+                </div>
+                <div>
+                  <div className="lp-calc-kval">{pctCapital.toFixed(1)} %</div>
+                  <div className="lp-calc-klab">sobre el capital</div>
+                </div>
+              </div>
+
+              <button className="lp-cta lp-calc-cta" onClick={() => navigate("/ingresar")}>
+                Empezar con mi caja →
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── ANÁLISIS DE ADQUISICIÓN ── */}
+      <section className="lp-adquisicion">
+        <div className="lp-adq-in">
+          <span className="lp-eyebrow oscuro">Lo que obtienes a cambio</span>
+          <h2>Kullki en perspectiva</h2>
+          <p className="lp-adq-intro">
+            Para la caja que configuraste arriba — {socios} socios, capital de ${fmt(capital)},
+            aportes de ${aporteM}/mes — Kullki cuesta <strong>${fmt(precioCalc)} al año</strong>.
+            Esto es lo que significa ese número.
+          </p>
+
+          <div className="lp-adq-grid">
+            <div className="lp-adq-card">
+              <div className="lp-adq-val">{usd(porSocioMes)}</div>
+              <div className="lp-adq-tit">por socio al mes</div>
+              <p>
+                Cada persona de la caja paga menos que un mensaje de texto al mes.
+                A cambio: su libreta digital, historial completo y acceso desde el celular.
+              </p>
+            </div>
+            <div className="lp-adq-card">
+              <div className="lp-adq-val">{capitalXdolar}×</div>
+              <div className="lp-adq-tit">capital respaldado por cada $1</div>
+              <p>
+                Por cada dólar invertido en Kullki, ${capitalXdolar} de capital comunitario
+                quedan registrados, visibles y protegidos ante cualquier cambio de tesorero.
+              </p>
+            </div>
+            <div className="lp-adq-card">
+              <div className="lp-adq-val">${fmt(aportesAnuales)}</div>
+              <div className="lp-adq-tit">en aportes gestionados al año</div>
+              <p>
+                Kullki administra todos los movimientos — aportes, créditos, intereses,
+                multas y cierres — sin hojas de cálculo ni riesgo de error humano.
+              </p>
+            </div>
+            <div className="lp-adq-card">
+              <div className="lp-adq-val">{pctCapital.toFixed(1)} %</div>
+              <div className="lp-adq-tit">del capital, por un año completo</div>
+              <p>
+                Una fracción pequeña del capital cubre transparencia total, registros
+                permanentes, informes automáticos y la tranquilidad de la comunidad.
+              </p>
+            </div>
+          </div>
+
+          <div className="lp-adq-nota">
+            <strong>Sin costos ocultos.</strong> El precio se calcula una sola vez al año,
+            proporcional al tamaño real de tu caja. Las cajas pequeñas pagan menos;
+            las que crecen, pagan en proporción a lo que gestionan.
+            <br />
+            <button className="lp-cta" style={{ marginTop: "24px" }} onClick={() => navigate("/ingresar")}>
+              Empezar ahora — es gratis el primer mes →
+            </button>
+          </div>
         </div>
       </section>
 
