@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { navigate } from "../lib/router.js";
 
 const BENEFICIOS = [
@@ -48,7 +48,21 @@ export default function Landing({ sesion }) {
           <a href="#roles">Roles</a>
           <a onClick={() => navigate("/para-cajas")} style={{ cursor: "pointer" }}>Para tu caja</a>
         </nav>
-        <button className="lp-cta-mini" onClick={irApp}>{sesion ? "Ir a mi caja" : "Ingresar"}</button>
+        <div className="lp-nav-derecha">
+          <button className="lp-cta-mini" onClick={irApp}>{sesion ? "Ir a mi caja" : "Ingresar"}</button>
+          <button className="lp-hamburger" aria-label="Menú" onClick={() => setMenu(m => !m)}>
+            {menuAbierto ? "✕" : "☰"}
+          </button>
+        </div>
+        {menuAbierto && (
+          <div className="lp-menu-movil" onClick={() => setMenu(false)}>
+            <a href="#historia">Por qué Kullki</a>
+            <a href="#beneficios">Beneficios</a>
+            <a href="#roles">Roles</a>
+            <a onClick={() => navigate("/para-cajas")}>Para tu caja</a>
+            <button className="lp-cta-mini lp-cta-movil" onClick={irApp}>{sesion ? "Ir a mi caja" : "Ingresar"}</button>
+          </div>
+        )}
       </header>
 
       {/* HERO */}
@@ -141,7 +155,7 @@ export default function Landing({ sesion }) {
               </div>
             ))}
           </div>
-          <button className="lp-cta claro" onClick={() => navigate("/ingresar")}>Comenzar ahora →</button>
+          <button className="lp-cta claro" onClick={() => navigate("/para-cajas")}>Ver precios y solicitar demo →</button>
         </div>
       </section>
 

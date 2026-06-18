@@ -333,7 +333,7 @@ details[open] summary::before { content: "▾ "; }
    ============================================================ */
 .lp { width: 100%; color: var(--tinta); }
 .lp-nav { display: flex; align-items: center; justify-content: space-between;
-  max-width: 1120px; margin: 0 auto; padding: 16px 22px; }
+  max-width: 1120px; margin: 0 auto; padding: 16px 22px; position: relative; }
 .lp-marca { display: flex; align-items: center; gap: 9px; }
 .lp-logo { font-family: var(--display); font-weight: 800; font-size: 21px; color: var(--kullki-oscuro); }
 .lp-labs { font-size: 10.5px; color: var(--tinta-suave); letter-spacing: .07em; text-transform: uppercase; }
@@ -888,6 +888,39 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
 }
 .lp-nav-links a:hover { opacity: 1; }
 @media (max-width: 600px) { .lp-nav-links { display: none; } }
+
+/* Hamburguesa móvil */
+.lp-nav-derecha { display: flex; align-items: center; gap: 10px; }
+.lp-hamburger {
+  display: none;
+  background: none; border: none; font-size: 22px;
+  cursor: pointer; color: var(--kullki-oscuro); padding: 4px 8px;
+  line-height: 1;
+}
+@media (max-width: 600px) {
+  .lp-hamburger { display: block; }
+  .lp-cta-mini { display: none; }
+}
+.lp-menu-movil {
+  position: absolute; top: 100%; left: 0; right: 0;
+  background: #fff; border-top: 2px solid var(--kullki-claro);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  display: flex; flex-direction: column; gap: 0;
+  z-index: 200;
+}
+.lp-menu-movil a, .lp-menu-movil button {
+  display: block; padding: 16px 24px;
+  font-size: 15px; font-weight: 600; color: var(--kullki-oscuro);
+  text-decoration: none; border-bottom: 1px solid #f0f0f0;
+  text-align: left; background: none; border-right: none; border-left: none; border-top: none;
+  cursor: pointer;
+}
+.lp-menu-movil a:hover, .lp-menu-movil button:hover { background: #f5faf8; }
+.lp-cta-movil {
+  background: var(--kullki) !important; color: #fff !important;
+  border-radius: 0 !important; margin: 0 !important;
+  border-bottom: none !important;
+}
 
 /* ══════════════════════════════════════════════
    HERO COMPACTO (ParaCajas)
