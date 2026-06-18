@@ -250,6 +250,13 @@ export default function ParaCajas() {
                 <p>Configuramos los parámetros según las reglas de tu organización: tipos de aporte, plazos de crédito, tasas y estructura de socios.</p>
               </div>
             </div>
+            <div className="lp-inc-item">
+              <span className="lp-inc-ico">📂</span>
+              <div>
+                <strong>Migración de datos incluida</strong>
+                <p>Si tu caja lleva años en Excel, te ayudamos a importar el historial completo: socios, aportes y créditos. Empiezas en Kullki con todo al día.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
