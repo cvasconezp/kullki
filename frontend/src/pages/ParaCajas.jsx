@@ -292,8 +292,11 @@ export default function ParaCajas() {
       <footer className="lp-footer">
         <div className="lp-footer-in">
           <div className="lp-footer-marca">
-            <span className="lp-logo">Kullki</span>
-            <p>El dinero de tu comunidad, claro y a la vista.</p>
+            <img src="/favicon.svg" alt="Kullki" className="lp-footer-isotipo" />
+            <div>
+              <span className="lp-logo">Kullki</span>
+              <p>El dinero de tu comunidad, claro y a la vista.</p>
+            </div>
           </div>
           <div className="lp-footer-yd">
             <span className="lp-foot-meta">
