@@ -1,6 +1,6 @@
 // Acopla el interfaz a la identidad de cada caja: colores + meta theme-color.
 // Si no hay caja activa (landing, login, admin) usa la marca Yachay Deep.
-const YD = { primario: "#1B3A6B", acento: "#E8A838" };
+const YD = { primario: "#2E7D6B", acento: "#F2B336" };
 
 function hexToRgb(hex) {
   const h = (hex || "").replace("#", "");
