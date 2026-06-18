@@ -46,6 +46,7 @@ export default function ParaCajas() {
           <span className="lp-labs">por Yachay Deep Labs</span>
         </div>
         <nav className="lp-nav-links" aria-label="Secciones">
+          <a onClick={() => navigate("/")} style={{ cursor: "pointer" }}>← Inicio</a>
           <a href="#precios">Precios</a>
           <a href="#adquisicion">Por qué vale</a>
           <a href="#contacto">Contacto</a>
