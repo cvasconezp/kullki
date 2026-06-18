@@ -168,6 +168,7 @@ export default function Landing({ sesion }) {
             </div>
           </div>
           <div className="lp-footer-yd">
+            <span className="lp-foot-attrib">Kullki por <a href="https://www.yachaydeep.com" target="_blank" rel="noreferrer">Yachay Deep Labs</a></span>
             <span className="lp-foot-meta">
               <a href="/privacidad" style={{ color: "inherit", textDecoration: "underline" }}>Privacidad</a>
               {" · "}

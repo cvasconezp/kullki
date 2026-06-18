@@ -400,6 +400,9 @@ details[open] summary::before { content: "▾ "; }
 .lp-footer p { font-size: 13.5px; margin: 0; color: rgba(255,255,255,.6); line-height: 1.5; }
 .lp-footer a { color: var(--sara); text-underline-offset: 3px; }
 .lp-footer a:hover { color: #f7c555; }
+.lp-foot-attrib { display: block; font-size: 12px; color: rgba(255,255,255,.5); margin-bottom: 4px; text-align: right; }
+.lp-foot-attrib a { color: rgba(255,255,255,.65); text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.2); }
+.lp-foot-attrib a:hover { color: var(--sara); border-color: var(--sara); }
 .lp-foot-meta { font-size: 12.5px; color: rgba(255,255,255,.45); text-align: right; line-height: 1.7; }
 .lp-footer-bottom {
   background: rgba(0,0,0,.15);
