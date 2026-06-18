@@ -161,11 +161,8 @@ export default function Landing({ sesion }) {
       <footer className="lp-footer">
         <div className="lp-footer-in">
           <div className="lp-footer-marca">
-            <img src="/favicon.svg" alt="Kullki" className="lp-footer-isotipo" />
-            <div>
-              <span className="lp-logo">Kullki</span>
-              <p>El dinero de tu comunidad, claro y a la vista.</p>
-            </div>
+            <img src="/logo-kullki-negativo.svg" alt="Kullki" className="lp-footer-negativo" />
+            <p>El dinero de tu comunidad, claro y a la vista.</p>
           </div>
           <div className="lp-footer-yd">
             <span className="lp-foot-attrib">Kullki por <a href="https://www.yachaydeep.com" target="_blank" rel="noreferrer">Yachay Deep Labs</a></span>
