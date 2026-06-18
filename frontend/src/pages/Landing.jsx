@@ -28,7 +28,7 @@ export default function Landing({ sesion }) {
 
   const compCapital     = capital * 0.015;
   const compSocios      = socios * aporteM * 12 * 0.005;
-  const precioCalc      = Math.max(75, compCapital + compSocios);
+  const precioCalc      = Math.max(120, compCapital + compSocios);
   const enPiso          = precioCalc === 75;
   const porSocioMes     = precioCalc / 12 / socios;
   const pctCapital      = (precioCalc / capital) * 100;
@@ -191,7 +191,7 @@ export default function Landing({ sesion }) {
               </div>
 
               <p className="lp-calc-formula">
-                Precio = 1.5 % del capital + 0.5 % de aportes anuales · mínimo $75
+                Precio = 1.5 % del capital + 0.5 % de aportes anuales · mínimo $120
               </p>
             </div>
 
@@ -212,7 +212,7 @@ export default function Landing({ sesion }) {
                   <span>${fmt(compSocios)}</span>
                 </div>
                 {enPiso && (
-                  <div className="lp-calc-piso">⚡ Precio mínimo aplicado ($75)</div>
+                  <div className="lp-calc-piso">⚡ Precio mínimo aplicado ($120)</div>
                 )}
               </div>
 
