@@ -987,6 +987,69 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
   font-family: monospace;
 }
 
+
+/* ══════════════════════════════════════════════
+   BIENVENIDA — wizard onboarding caja nueva
+══════════════════════════════════════════════ */
+.bienvenida {
+  min-height: 100vh; background: var(--fondo);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 16px 80px; position: relative; overflow: hidden;
+}
+.bienvenida-glow {
+  position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 400px; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(46,125,107,.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.bienvenida-in { max-width: 620px; width: 100%; position: relative; z-index: 1; }
+.bienvenida-hero { text-align: center; margin-bottom: 40px; }
+.bienvenida-ico { font-size: 48px; display: block; margin-bottom: 12px; }
+.bienvenida-hero h1 { font-size: 26px; font-weight: 800; color: var(--kullki-oscuro); margin-bottom: 8px; }
+.bienvenida-hero p  { color: #5a7a72; font-size: 15px; }
+
+.bienvenida-pasos { display: flex; flex-direction: column; gap: 0; }
+
+.bienvenida-paso {
+  display: flex; gap: 18px; align-items: flex-start;
+  background: #fff; border: 1.5px solid #e0ede8;
+  border-radius: 14px; padding: 20px 22px; margin-bottom: 12px;
+  transition: box-shadow .2s;
+}
+.bienvenida-paso:hover { box-shadow: 0 4px 16px rgba(46,125,107,.1); }
+.bienvenida-paso.hecho { background: #f0faf6; border-color: var(--kullki); opacity: .85; }
+
+.bienvenida-num {
+  min-width: 36px; height: 36px; border-radius: 50%;
+  background: var(--kullki); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 15px; flex-shrink: 0;
+}
+.bienvenida-paso.hecho .bienvenida-num { background: #7dbca6; }
+
+.bienvenida-paso-body strong { display: block; font-size: 15px; font-weight: 700; color: var(--kullki-oscuro); margin-bottom: 4px; }
+.bienvenida-paso-body p { font-size: 13.5px; color: #5a7a72; margin: 0 0 12px; }
+
+.bienvenida-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+.bienvenida-btn {
+  background: var(--kullki); color: #fff; border: none;
+  border-radius: 8px; padding: 8px 18px; font-weight: 700;
+  font-size: 13px; cursor: pointer; transition: background .15s;
+}
+.bienvenida-btn:hover { background: var(--kullki-oscuro); }
+.bienvenida-btn-sec {
+  background: transparent; color: var(--kullki);
+  border: 1.5px solid var(--kullki); border-radius: 8px;
+  padding: 7px 16px; font-weight: 600; font-size: 13px;
+  cursor: pointer; transition: background .15s;
+}
+.bienvenida-btn-sec:hover { background: #e8f5f0; }
+
+.bienvenida-ayuda {
+  margin-top: 28px; text-align: center; font-size: 14px; color: #5a7a72;
+}
+.bienvenida-ayuda a { color: var(--kullki); font-weight: 600; margin-left: 8px; }
+
 /* ══════════════════════════════════════════════
    TIERS — selector de plan
 ══════════════════════════════════════════════ */
@@ -1058,6 +1121,25 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
 }
 .lp-calc-mig-rec { font-size: 12px; color: #a07030; margin-top: 8px; text-align: right; }
 .lp-calc-mig-rec strong { color: var(--kullki-oscuro); }
+
+/* ══════════════════════════════════════════════
+   PAGO — /para-cajas
+══════════════════════════════════════════════ */
+.lp-pago { background: var(--fondo); padding: 72px 20px; }
+.lp-pago-in { max-width: 900px; margin: 0 auto; text-align: center; }
+.lp-pago-in h2 { font-size: clamp(22px, 3vw, 30px); font-weight: 800; color: var(--kullki-oscuro); margin-bottom: 32px; }
+.lp-pago-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px; margin-bottom: 24px;
+}
+.lp-pago-card {
+  background: #fff; border: 1.5px solid #e0ede8; border-radius: 14px;
+  padding: 24px 20px; text-align: center;
+}
+.lp-pago-ico { font-size: 32px; display: block; margin-bottom: 10px; }
+.lp-pago-card strong { display: block; font-size: 15px; font-weight: 700; color: var(--kullki-oscuro); margin-bottom: 8px; }
+.lp-pago-card p { font-size: 13.5px; color: #5a7a72; margin: 0; line-height: 1.5; }
+.lp-pago-nota { font-size: 13px; color: #7a9a90; max-width: 600px; margin: 0 auto; }
 
 /* ══════════════════════════════════════════════
    CONTACTO — /para-cajas

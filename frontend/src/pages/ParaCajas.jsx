@@ -2,6 +2,8 @@ import { useState } from "react";
 import { navigate } from "../lib/router.js";
 
 export default function ParaCajas() {
+  const [menuAbierto, setMenu] = useState(false);
+
   /* ── Calculadora ── */
   const [capital, setCapital]   = useState(5000);
   const [socios, setSocios]     = useState(20);
@@ -58,7 +60,21 @@ export default function ParaCajas() {
           <a href="#adquisicion">Por qué vale</a>
           <a href="#contacto">Contacto</a>
         </nav>
-        <button className="lp-cta-mini" onClick={() => navigate("/ingresar")}>Ingresar</button>
+        <div className="lp-nav-derecha">
+          <button className="lp-cta-mini" onClick={() => navigate("/ingresar")}>Ingresar</button>
+          <button className="lp-hamburger" aria-label="Menú" onClick={() => setMenu(m => !m)}>
+            {menuAbierto ? "✕" : "☰"}
+          </button>
+        </div>
+        {menuAbierto && (
+          <div className="lp-menu-movil" onClick={() => setMenu(false)}>
+            <a onClick={() => navigate("/")}>← Inicio</a>
+            <a href="#precios">Precios</a>
+            <a href="#adquisicion">Por qué vale</a>
+            <a href="#contacto">Contacto</a>
+            <button className="lp-cta-mini lp-cta-movil" onClick={() => navigate("/ingresar")}>Ingresar</button>
+          </div>
+        )}
       </header>
 
       {/* ── HERO ── */}
@@ -314,7 +330,35 @@ export default function ParaCajas() {
         </div>
       </section>
 
-      {/* ── CONTACTO ── */}
+      {/* ── CÓMO PAGAR ── */}
+      <section className="lp-pago">
+        <div className="lp-pago-in">
+          <span className="lp-eyebrow oscuro">Sin sorpresas al momento de pagar</span>
+          <h2>¿Cómo se realiza el pago?</h2>
+          <div className="lp-pago-grid">
+            <div className="lp-pago-card">
+              <span className="lp-pago-ico">💵</span>
+              <strong>Efectivo</strong>
+              <p>Puedes pagar en efectivo directamente en Cayambe, coordinando la entrega por WhatsApp antes de activar tu caja.</p>
+            </div>
+            <div className="lp-pago-card">
+              <span className="lp-pago-ico">🏦</span>
+              <strong>Transferencia bancaria</strong>
+              <p>Realizas una transferencia a nuestra cuenta y nos envías el comprobante por WhatsApp. Activamos tu caja en el día.</p>
+            </div>
+            <div className="lp-pago-card">
+              <span className="lp-pago-ico">📅</span>
+              <strong>Renovación anual</strong>
+              <p>El cobro es una vez al año. Te avisamos con 15 días de anticipación para que coordines el pago sin interrupciones.</p>
+            </div>
+          </div>
+          <p className="lp-pago-nota">
+            No manejamos tarjetas ni pagos en línea. Todo se coordina directamente por WhatsApp — así mantenemos las cosas simples y sin comisiones adicionales.
+          </p>
+        </div>
+      </section>
+
+      {/* ── CONTACTO ── */}}
       <section id="contacto" className="lp-contacto">
         <div className="lp-contacto-in">
           <span className="lp-eyebrow">Sin compromiso · Respondemos en menos de 24 h</span>

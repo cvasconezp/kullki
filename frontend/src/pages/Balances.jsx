@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import Bienvenida from "./Bienvenida.jsx";
 import { api, usd } from "../lib/api.js";
 import Analitica from "./Analitica.jsx";
 
@@ -169,6 +170,9 @@ export default function Balances() {
   const [tab, setTab] = useState("resumen");
 
   useEffect(() => { api("/balances").then(setD).catch((e) => setError(e.message)); }, []);
+
+  // Caja nueva sin socios → mostrar wizard de onboarding
+  if (d && d.dashboard && d.dashboard.socios_activos === 0) return <Bienvenida />;
 
   const serie = useMemo(() => {
     if (!d) return [];
