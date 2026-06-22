@@ -19,6 +19,10 @@ export default function ParaCajas() {
   const [anosHistorial, setAnos] = useState(3);
   const costoMigracion = 15 + (socios * 0.30) + (anosHistorial * 5);
   const totalAno1 = precioCalc + costoMigracion;
+  const IVA = 0.15;
+  const precioIva   = precioCalc * (1 + IVA);
+  const totalAno1Iva = totalAno1 * (1 + IVA);
+  const porSocioMesIva = precioIva / 12 / socios;
 
   const fmt = (n) => n.toLocaleString("es-EC", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const usd = (n) => `$${n.toFixed(2)}`;
@@ -77,7 +81,7 @@ export default function ParaCajas() {
       {/* ── CALCULADORA ── */}
       <section id="precios" className="lp-calc">
         <div className="lp-calc-in">
-          <span className="lp-eyebrow">Para cada caja, un precio proporcional</span>
+          <span className="lp-eyebrow">Para cada caja, un precio proporcional · precios + IVA (15 %)</span>
           <h2>Calcula cuánto cuesta Kullki para tu caja</h2>
           <p className="lp-calc-sub">Mueve los controles y ve el precio en tiempo real. Sin letra chica.</p>
           <div className="lp-calc-grid">
@@ -133,7 +137,10 @@ export default function ParaCajas() {
             <div className="lp-calc-result">
               <span className="lp-calc-etiq">Tu precio estimado</span>
               <div className="lp-calc-precio">
-                ${fmt(precioCalc)}<span> / año</span>
+                ${fmt(Math.round(precioIva))}<span> / año</span>
+              </div>
+              <div className="lp-calc-iva-det">
+                Base: ${fmt(precioCalc)} + IVA 15 %: ${fmt(Math.round(precioCalc * IVA))}
               </div>
               <div className="lp-calc-desglose">
                 <div className="lp-calc-linea">
@@ -145,7 +152,7 @@ export default function ParaCajas() {
                   <span>${fmt(compSocios)}</span>
                 </div>
                 {enPiso && (
-                  <div className="lp-calc-piso">⚡ Precio mínimo aplicado ($120)</div>
+                  <div className="lp-calc-piso">⚡ Precio mínimo aplicado ($120 + IVA = $138)</div>
                 )}
               </div>
               <ul className="lp-calc-incluye">
@@ -157,11 +164,11 @@ export default function ParaCajas() {
               <hr className="lp-calc-sep" />
               <div className="lp-calc-kpis">
                 <div>
-                  <div className="lp-calc-kval">{usd(porSocioMes)}</div>
+                  <div className="lp-calc-kval">{usd(porSocioMesIva)}</div>
                   <div className="lp-calc-klab">por socio al mes</div>
                 </div>
                 <div>
-                  <div className="lp-calc-kval">${(precioCalc / 12).toFixed(2)}</div>
+                  <div className="lp-calc-kval">${(precioIva / 12).toFixed(2)}</div>
                   <div className="lp-calc-klab">por mes</div>
                 </div>
               </div>
@@ -181,12 +188,20 @@ export default function ParaCajas() {
                   <span>Historial · {anosHistorial} año{anosHistorial !== 1 ? "s" : ""} × $5</span>
                   <span>${(anosHistorial * 5).toFixed(2)}</span>
                 </div>
-                <div className="lp-calc-mig-total">
-                  <span>Total año 1</span>
+                <div className="lp-calc-linea">
+                  <span>Subtotal año 1</span>
                   <span>${totalAno1.toFixed(2)}</span>
                 </div>
+                <div className="lp-calc-linea">
+                  <span>IVA 15 %</span>
+                  <span>${(totalAno1 * IVA).toFixed(2)}</span>
+                </div>
+                <div className="lp-calc-mig-total">
+                  <span>Total año 1 (con IVA)</span>
+                  <span>${totalAno1Iva.toFixed(2)}</span>
+                </div>
                 <div className="lp-calc-mig-rec">
-                  Año 2 en adelante: precio recalculado en cada renovación según el tamaño de tu caja
+                  Año 2 en adelante: precio recalculado + IVA en cada renovación según el tamaño de tu caja
                 </div>
               </div>
               <a className="lp-cta lp-calc-cta" href="#contacto">
@@ -208,12 +223,12 @@ export default function ParaCajas() {
           <h2>Kullki en perspectiva</h2>
           <p className="lp-adq-intro">
             Para la caja que configuraste arriba — {socios} socios, capital de ${fmt(capital)},
-            aportes de ${aporteM}/mes — Kullki cuesta <strong>${fmt(precioCalc)} al año</strong>.
+            aportes de ${aporteM}/mes — Kullki cuesta <strong>${fmt(Math.round(precioIva))} al año (IVA incluido)</strong>.
             Esto es lo que significa ese número.
           </p>
           <div className="lp-adq-grid">
             <div className="lp-adq-card">
-              <div className="lp-adq-val">{usd(porSocioMes)}</div>
+              <div className="lp-adq-val">{usd(porSocioMesIva)}</div>
               <div className="lp-adq-tit">por socio al mes</div>
               <p>Cada persona de la caja paga menos que un mensaje de texto al mes.
                 A cambio: su libreta digital, historial completo y acceso desde el celular.</p>

@@ -1030,6 +1030,10 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
 /* ══════════════════════════════════════════════
    MIGRACIÓN en calculadora
 ══════════════════════════════════════════════ */
+.lp-calc-iva-det {
+  font-size: 12px; color: #7dbca6; text-align: center;
+  margin-top: -6px; margin-bottom: 8px;
+}
 .lp-calc-row-mig { margin-top: 8px; border-top: 1px dashed #d4ebe3; padding-top: 16px; }
 .lp-slider-mig::-webkit-slider-thumb { background: var(--sara) !important; }
 .lp-slider-mig::-moz-range-thumb { background: var(--sara) !important; }
