@@ -1,24 +1,23 @@
 import { useState } from "react";
 import { navigate } from "../lib/router.js";
 
+const TIERS = [
+  { nombre: "Pequeña",  max: 30,  precio: 89,  tag: null },
+  { nombre: "Mediana",  max: 80,  precio: 149, tag: "Más popular" },
+  { nombre: "Grande",   max: 200, precio: 229, tag: null },
+];
+
 export default function ParaCajas() {
   /* ── Calculadora ── */
-  const [capital, setCapital]   = useState(5000);
-  const [socios, setSocios]     = useState(20);
-  const [aporteM, setAporteM]   = useState(20);
-
-  const compCapital    = capital * 0.015;
-  const compSocios     = socios * aporteM * 12 * 0.010;
-  const precioCalc     = Math.max(120, compCapital + compSocios);
-  const enPiso         = precioCalc === 120;
-  const porSocioMes    = precioCalc / 12 / socios;
-  const pctCapital     = (precioCalc / capital) * 100;
-  const aportesAnuales = socios * aporteM * 12;
-  const capitalXdolar  = Math.round(capital / precioCalc);
-
+  const [tierIdx, setTier]       = useState(1);
+  const [socios, setSocios]      = useState(20);
   const [anosHistorial, setAnos] = useState(3);
+
+  const tier           = TIERS[tierIdx];
+  const porSocioMes    = tier.precio / 12 / socios;
+  const porDia         = tier.precio / 365;
   const costoMigracion = 15 + (socios * 0.30) + (anosHistorial * 5);
-  const totalAno1 = precioCalc + costoMigracion;
+  const totalAno1      = tier.precio + costoMigracion;
 
   const fmt = (n) => n.toLocaleString("es-EC", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const usd = (n) => `$${n.toFixed(2)}`;
@@ -62,14 +61,14 @@ export default function ParaCajas() {
         <div className="lp-hero-glow" aria-hidden="true" />
         <div className="lp-hero-in">
           <span className="lp-eyebrow">Para presidentes, tesoreros y directivos</span>
-          <h1>Kullki para tu caja<br /><span className="oro">a un precio proporcional</span></h1>
+          <h1>Kullki para tu caja<br /><span className="oro">precio fijo, sin sorpresas</span></h1>
           <p className="lp-sub">
-            Calcula exactamente cuánto cuesta para tu caja, entiende lo que obtienes
-            a cambio, y agenda una demostración cuando quieras.
+            Elige el plan según el tamaño de tu caja. El precio no cambia durante el año
+            y la renovación usa las mismas condiciones — a menos que tu caja crezca de tramo.
           </p>
           <div className="lp-acciones">
             <a className="lp-cta" href="#contacto">Solicitar demo →</a>
-            <a className="lp-link" href="#precios">Calcular precio</a>
+            <a className="lp-link" href="#precios">Ver precios</a>
           </div>
         </div>
       </section>
@@ -77,42 +76,40 @@ export default function ParaCajas() {
       {/* ── CALCULADORA ── */}
       <section id="precios" className="lp-calc">
         <div className="lp-calc-in">
-          <span className="lp-eyebrow">Para cada caja, un precio proporcional</span>
-          <h2>Calcula cuánto cuesta Kullki para tu caja</h2>
-          <p className="lp-calc-sub">Mueve los controles y ve el precio en tiempo real. Sin letra chica.</p>
-          <div className="lp-calc-grid">
+          <span className="lp-eyebrow">Planes anuales · precio fijo</span>
+          <h2>Elige el plan de tu caja</h2>
+          <p className="lp-calc-sub">El precio es fijo por el tramo de socios. Sin letra chica, sin recálculos sorpresa.</p>
 
-            {/* Sliders */}
+          {/* ── Tier cards ── */}
+          <div className="lp-tiers">
+            {TIERS.map((t, i) => (
+              <div key={i}
+                   className={`lp-tier${i === tierIdx ? " lp-tier-sel" : ""}${t.tag ? " lp-tier-pop" : ""}`}
+                   onClick={() => setTier(i)}
+                   role="button" tabIndex={0}
+                   onKeyDown={(e) => e.key === "Enter" && setTier(i)}>
+                {t.tag && <div className="lp-tier-tag">{t.tag}</div>}
+                <div className="lp-tier-nombre">{t.nombre}</div>
+                <div className="lp-tier-max">hasta {t.max} socios</div>
+                <div className="lp-tier-precio">${t.precio}<span>/año</span></div>
+                <div className="lp-tier-mes">${(t.precio / 12).toFixed(2)}/mes</div>
+              </div>
+            ))}
+          </div>
+          <p className="lp-tiers-nota">¿Más de 200 socios? <a href="#contacto">Escríbenos</a> para una propuesta personalizada.</p>
+
+          {/* ── Sliders migración ── */}
+          <div className="lp-calc-grid">
             <div className="lp-calc-sliders">
               <div className="lp-calc-row">
                 <div className="lp-calc-lbl">
-                  <span>Capital de la caja</span>
-                  <strong>${fmt(capital)}</strong>
-                </div>
-                <input type="range" className="lp-calc-slider"
-                  min="500" max="50000" step="500" value={capital}
-                  onChange={e => setCapital(+e.target.value)} />
-                <div className="lp-calc-ticks"><span>$500</span><span>$50 000</span></div>
-              </div>
-              <div className="lp-calc-row">
-                <div className="lp-calc-lbl">
-                  <span>Número de socios</span>
+                  <span>Número de socios actuales</span>
                   <strong>{socios} socios</strong>
                 </div>
                 <input type="range" className="lp-calc-slider"
-                  min="5" max="150" step="1" value={socios}
+                  min="5" max={tier.max} step="1" value={Math.min(socios, tier.max)}
                   onChange={e => setSocios(+e.target.value)} />
-                <div className="lp-calc-ticks"><span>5</span><span>150</span></div>
-              </div>
-              <div className="lp-calc-row">
-                <div className="lp-calc-lbl">
-                  <span>Aporte ordinario mensual</span>
-                  <strong>${aporteM} / mes</strong>
-                </div>
-                <input type="range" className="lp-calc-slider"
-                  min="5" max="100" step="5" value={aporteM}
-                  onChange={e => setAporteM(+e.target.value)} />
-                <div className="lp-calc-ticks"><span>$5</span><span>$100</span></div>
+                <div className="lp-calc-ticks"><span>5</span><span>{tier.max}</span></div>
               </div>
               <div className="lp-calc-row lp-calc-row-mig">
                 <div className="lp-calc-lbl">
@@ -125,7 +122,8 @@ export default function ParaCajas() {
                 <div className="lp-calc-ticks"><span>0 (solo datos actuales)</span><span>15 años</span></div>
               </div>
               <p className="lp-calc-formula">
-                Precio = 1.5 % del capital + 1 % de aportes anuales · mínimo $120
+                El precio no varía con el capital ni los aportes — solo con el tramo de socios.
+                Al renovar, si tu caja sigue en el mismo tramo, el precio es idéntico.
               </p>
             </div>
 
@@ -133,20 +131,17 @@ export default function ParaCajas() {
             <div className="lp-calc-result">
               <span className="lp-calc-etiq">Tu precio estimado</span>
               <div className="lp-calc-precio">
-                ${fmt(precioCalc)}<span> / año</span>
+                ${tier.precio}<span> / año</span>
               </div>
               <div className="lp-calc-desglose">
                 <div className="lp-calc-linea">
-                  <span>1.5 % del capital (${fmt(capital)})</span>
-                  <span>${fmt(compCapital)}</span>
+                  <span>Plan {tier.nombre} · hasta {tier.max} socios</span>
+                  <span>${tier.precio}</span>
                 </div>
                 <div className="lp-calc-linea">
-                  <span>1 % aportes anuales · {socios} socios</span>
-                  <span>${fmt(compSocios)}</span>
+                  <span>Precio mensual</span>
+                  <span>${(tier.precio / 12).toFixed(2)}</span>
                 </div>
-                {enPiso && (
-                  <div className="lp-calc-piso">⚡ Precio mínimo aplicado ($120)</div>
-                )}
               </div>
               <ul className="lp-calc-incluye">
                 <li>Libreta digital para cada socio</li>
@@ -161,8 +156,8 @@ export default function ParaCajas() {
                   <div className="lp-calc-klab">por socio al mes</div>
                 </div>
                 <div>
-                  <div className="lp-calc-kval">${(precioCalc / 12).toFixed(2)}</div>
-                  <div className="lp-calc-klab">por mes</div>
+                  <div className="lp-calc-kval">{usd(porDia)}</div>
+                  <div className="lp-calc-klab">por día</div>
                 </div>
               </div>
               <div className="lp-calc-mig-box">
@@ -186,7 +181,7 @@ export default function ParaCajas() {
                   <span>${totalAno1.toFixed(2)}</span>
                 </div>
                 <div className="lp-calc-mig-rec">
-                  Año 2 en adelante: <strong>${fmt(precioCalc)} / año</strong>
+                  Año 2 en adelante: <strong>${tier.precio} / año</strong> — mismo precio si tu caja no cambia de tramo
                 </div>
               </div>
               <a className="lp-cta lp-calc-cta" href="#contacto">
@@ -207,8 +202,7 @@ export default function ParaCajas() {
           <span className="lp-eyebrow oscuro">Lo que obtienes a cambio</span>
           <h2>Kullki en perspectiva</h2>
           <p className="lp-adq-intro">
-            Para la caja que configuraste arriba — {socios} socios, capital de ${fmt(capital)},
-            aportes de ${aporteM}/mes — Kullki cuesta <strong>${fmt(precioCalc)} al año</strong>.
+            Plan <strong>{tier.nombre}</strong> — {socios} socios, <strong>${tier.precio} al año</strong>.
             Esto es lo que significa ese número.
           </p>
           <div className="lp-adq-grid">
@@ -219,28 +213,27 @@ export default function ParaCajas() {
                 A cambio: su libreta digital, historial completo y acceso desde el celular.</p>
             </div>
             <div className="lp-adq-card">
-              <div className="lp-adq-val">{capitalXdolar}×</div>
-              <div className="lp-adq-tit">capital respaldado por cada $1</div>
-              <p>Por cada dólar invertido en Kullki, ${capitalXdolar} de capital comunitario
-                quedan registrados, visibles y protegidos ante cualquier cambio de tesorero.</p>
+              <div className="lp-adq-val">{usd(porDia)}</div>
+              <div className="lp-adq-tit">por día</div>
+              <p>Menos que una llamada al día. Kullki trabaja los 365 días del año —
+                registra, calcula, respalda y mantiene todo al día sin intervención.</p>
             </div>
             <div className="lp-adq-card">
-              <div className="lp-adq-val">${fmt(aportesAnuales)}</div>
-              <div className="lp-adq-tit">en aportes gestionados al año</div>
-              <p>Kullki administra todos los movimientos — aportes, créditos, intereses,
-                multas y cierres — sin hojas de cálculo ni riesgo de error humano.</p>
+              <div className="lp-adq-val">7</div>
+              <div className="lp-adq-tit">servicios incluidos</div>
+              <p>Soporte, dominio, backups, seguridad, nuevas funciones, adaptación a tu caja
+                y migración de datos — todo en un solo precio, sin módulos adicionales.</p>
             </div>
             <div className="lp-adq-card">
-              <div className="lp-adq-val">{pctCapital.toFixed(1)} %</div>
-              <div className="lp-adq-tit">del capital, por un año completo</div>
-              <p>Una fracción pequeña del capital cubre transparencia total, registros
-                permanentes, informes automáticos y la tranquilidad de la comunidad.</p>
+              <div className="lp-adq-val">= año 2</div>
+              <div className="lp-adq-tit">precio predecible</div>
+              <p>Si tu caja no sube de tramo, el precio de renovación es exactamente el mismo.
+                Sin recálculos, sin sorpresas — sabes de antemano lo que pagarás.</p>
             </div>
           </div>
           <div className="lp-adq-nota">
-            <strong>Sin costos ocultos.</strong> El precio se calcula una sola vez al año,
-            proporcional al tamaño real de tu caja. Las cajas pequeñas pagan menos;
-            las que crecen, pagan en proporción a lo que gestionan.
+            <strong>Sin costos ocultos.</strong> El precio se fija por tramo de socios y no varía durante el año.
+            Si tu caja crece y supera el límite del plan, migras al siguiente en la renovación — no antes.
           </div>
 
           {/* ── Beneficios cualitativos ── */}

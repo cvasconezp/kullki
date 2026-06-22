@@ -988,6 +988,46 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
 }
 
 /* ══════════════════════════════════════════════
+   TIERS — selector de plan
+══════════════════════════════════════════════ */
+.lp-tiers {
+  display: flex; gap: 14px; justify-content: center;
+  margin: 32px 0 8px; flex-wrap: wrap;
+}
+.lp-tier {
+  flex: 1; min-width: 150px; max-width: 220px;
+  background: #fff; border: 2px solid #d4ebe3;
+  border-radius: 14px; padding: 20px 16px 18px;
+  text-align: center; cursor: pointer;
+  transition: border-color .2s, box-shadow .2s, transform .15s;
+  position: relative;
+}
+.lp-tier:hover { border-color: var(--kullki); transform: translateY(-2px); }
+.lp-tier-sel {
+  border-color: var(--kullki) !important;
+  box-shadow: 0 0 0 3px rgba(46,125,107,.18);
+  background: #f0faf6;
+}
+.lp-tier-pop { border-color: var(--sara); }
+.lp-tier-pop.lp-tier-sel { border-color: var(--sara) !important; box-shadow: 0 0 0 3px rgba(242,179,54,.22); background: #fffdf0; }
+.lp-tier-tag {
+  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  background: var(--sara); color: #7a5200; font-size: 11px; font-weight: 700;
+  padding: 2px 12px; border-radius: 20px; white-space: nowrap;
+}
+.lp-tier-nombre { font-weight: 800; font-size: 16px; color: var(--kullki-oscuro); margin-bottom: 4px; }
+.lp-tier-max { font-size: 12px; color: #5a7a72; margin-bottom: 12px; }
+.lp-tier-precio { font-size: 28px; font-weight: 900; color: var(--kullki-oscuro); }
+.lp-tier-precio span { font-size: 14px; font-weight: 500; color: #5a7a72; }
+.lp-tier-mes { font-size: 12px; color: #5a7a72; margin-top: 4px; }
+.lp-tiers-nota { text-align: center; font-size: 13px; color: #5a7a72; margin-bottom: 28px; }
+.lp-tiers-nota a { color: var(--kullki); font-weight: 600; }
+@media (max-width: 480px) {
+  .lp-tier { min-width: 130px; padding: 18px 12px; }
+  .lp-tier-precio { font-size: 24px; }
+}
+
+/* ══════════════════════════════════════════════
    MIGRACIÓN en calculadora
 ══════════════════════════════════════════════ */
 .lp-calc-row-mig { margin-top: 8px; border-top: 1px dashed #d4ebe3; padding-top: 16px; }
