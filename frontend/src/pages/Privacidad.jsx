@@ -36,7 +36,7 @@ export default function Privacidad() {
         <p>Los datos se conservan mientras la persona sea socia de la caja y por el tiempo que la normativa contable exija. Tras la baja, los datos personales pueden anonimizarse conservando los registros financieros estrictamente necesarios.</p>
 
         <h2>8. Contacto</h2>
-        <p>Para ejercer tus derechos o consultas: a través de tu tesorero/a, o a Yachay Deep Labs en <a href="mailto:cvasconezp@gmail.com">cvasconezp@gmail.com</a>.</p>
+        <p>Para ejercer tus derechos o consultas: a través de tu tesorero/a, o a Yachay Deep Labs en <a href="mailto:kullki@yachaydeep.com">kullki@yachaydeep.com</a>.</p>
 
         <p className="doc-meta" style={{ marginTop: 24 }}>Este documento es una plantilla de referencia y no constituye asesoría legal. Cada caja debe revisarlo con su asesor.</p>
       </div>

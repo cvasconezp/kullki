@@ -382,12 +382,12 @@ export default function ParaCajas() {
                 </div>
               </a>
               <a className="lp-canal lp-canal-mail"
-                 href="mailto:yachaydeep@gmail.com?subject=Demo%20Kullki"
+                 href="mailto:kullki@yachaydeep.com?subject=Demo%20Kullki"
                  target="_blank" rel="noreferrer">
                 <span className="lp-canal-ico">✉️</span>
                 <div>
                   <div className="lp-canal-tit">Correo</div>
-                  <div className="lp-canal-val">yachaydeep@gmail.com</div>
+                  <div className="lp-canal-val">kullki@yachaydeep.com</div>
                   <div className="lp-canal-nota">Propuestas y temas formales</div>
                 </div>
               </a>

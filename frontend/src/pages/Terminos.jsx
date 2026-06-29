@@ -33,7 +33,7 @@ export default function Terminos() {
         <p>El tratamiento de datos se rige por nuestra <a href="/privacidad">Política de privacidad</a>, conforme a la LOPDP del Ecuador.</p>
 
         <h2>7. Contacto</h2>
-        <p>Yachay Deep Labs — <a href="mailto:cvasconezp@gmail.com">cvasconezp@gmail.com</a>.</p>
+        <p>Yachay Deep Labs — <a href="mailto:kullki@yachaydeep.com">kullki@yachaydeep.com</a>.</p>
         <p className="doc-meta" style={{ marginTop: 24 }}>Documento de referencia; cada caja puede adaptarlo a su reglamento interno.</p>
       </div>
       <footer className="lp-footer"><div className="lp-footer-in">
