@@ -29,8 +29,8 @@ export default function Terminos() {
         <h2>5. Limitación de responsabilidad</h2>
         <p>Kullki es una herramienta de apoyo. Las cifras mostradas dependen de lo que registra cada caja. Yachay Deep Labs no se responsabiliza por errores de registro, decisiones financieras o pérdidas derivadas del mal uso.</p>
 
-        <h2>6. Datos personales</h2>
-        <p>El tratamiento de datos se rige por nuestra <a href="/privacidad">Política de privacidad</a>, conforme a la LOPDP del Ecuador.</p>
+        <h2>6. Datos personales e investigación</h2>
+        <p>El tratamiento de datos se rige por nuestra <a href="/privacidad">Política de privacidad</a>, conforme a la LOPDP del Ecuador. Con tu <strong>consentimiento específico y revocable</strong>, Kullki puede usar datos <strong>seudonimizados</strong> (sin identificarte) con fines de investigación y estadística sobre el ahorro comunitario; puedes <strong>oponerte</strong> en cualquier momento sin afectar tu membresía.</p>
 
         <h2>7. Contacto</h2>
         <p>Yachay Deep Labs — <a href="mailto:kullki@yachaydeep.com">kullki@yachaydeep.com</a>.</p>
