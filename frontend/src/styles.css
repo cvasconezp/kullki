@@ -1122,6 +1122,13 @@ button.enlace{background:none;border:none;color:var(--kullki);font:inherit;curso
   font-weight: 700; font-size: 15px; color: #7a5200;
   border-top: 1px solid #f2b336; margin-top: 8px; padding-top: 8px;
 }
+.lp-calc-linea-suma {
+  margin-top: 6px; font-weight: 600;
+}
+.lp-calc-mig-total-grande {
+  font-size: 16.5px; color: #5a3a00;
+  border-top: 2px solid #f2b336; margin-top: 6px; padding-top: 10px;
+}
 .lp-calc-mig-rec { font-size: 12px; color: #a07030; margin-top: 8px; text-align: right; }
 .lp-calc-mig-rec strong { color: var(--kullki-oscuro); }
 
