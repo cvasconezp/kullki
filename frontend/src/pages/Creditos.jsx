@@ -3,7 +3,7 @@ import { api, usd, fechaCorta, getSesion } from "../lib/api.js";
 import { waLink, imprimirBoucher, imprimirTablaAmortizacion } from "../lib/exportar.js";
 import SolicitudesCredito from "../components/SolicitudesCredito.jsx";
 
-function TablaCuotas({ credito, onPagar, onAbonar, pagando, onImprimir }) {
+function TablaCuotas({ credito, onPagar, onAbonar, pagando, onImprimir, onComprobante }) {
   const [abonos, setAbonos] = useState({});
   const primeraPendiente = credito.cuotas.find((q) => !q.pagada)?.id;
   return (
@@ -28,7 +28,12 @@ function TablaCuotas({ credito, onPagar, onAbonar, pagando, onImprimir }) {
                 </div>
               </div>
               {c.pagada ? (
-                <span className="pill ok">pagada {fechaCorta(c.fecha_pago)}</span>
+                <div style={{ textAlign: "right" }}>
+                  <span className="pill ok">pagada {fechaCorta(c.fecha_pago)}</span>
+                  <div className="acciones-mov">
+                    <button onClick={() => onComprobante(c.id)}>🖨 Comprobante</button>
+                  </div>
+                </div>
               ) : c.id === primeraPendiente ? (
                 <button className="boton mini" disabled={pagando}
                   style={vencida ? { background: "var(--cochinilla)" } : {}}
@@ -262,6 +267,7 @@ export default function Creditos() {
                 ? <TablaCuotas credito={detalle[c.id]} pagando={trabajando}
                     onPagar={(cuotaId) => pagar(cuotaId, c.id)}
                     onAbonar={(cuotaId, monto) => abonar(cuotaId, monto, c.id)}
+                    onComprobante={(cuotaId) => _boucherPago(detalle[c.id], cuotaId, "pago_cuota")}
                     onImprimir={() => imprimirTablaAmortizacion(detalle[c.id])} />
                 : <div className="vacio">Cargando cuotas…</div>}
               {c.estado !== "pagado" && detalle[c.id] && (
