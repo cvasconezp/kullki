@@ -5,6 +5,9 @@ os.environ["SUPERADMIN_CEDULA"] = "admin"
 os.environ["SUPERADMIN_PASSWORD"] = "test-admin-123"
 os.environ["SEED_DEMO"] = "0"  # tests deterministas: sin auto-seed demo
 os.environ["BACKUP_ENABLED"] = "0"
+from cryptography.fernet import Fernet as _F
+os.environ["KULLKI_ENC_KEY"] = _F.generate_key().decode()
+os.environ["KULLKI_INDEX_KEY"] = "indexkey-solo-para-tests-0123456789abcdef"
 
 import pathlib
 for f in ("test_kullki.db",):

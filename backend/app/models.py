@@ -1,9 +1,10 @@
 from datetime import datetime, date
 from sqlalchemy import (
-    String, Integer, Float, Date, DateTime, ForeignKey, Boolean, Text, UniqueConstraint
+    String, Integer, Float, Date, DateTime, ForeignKey, Boolean, Text, UniqueConstraint, event
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
+from .crypto import EncryptedStr, blind_index
 
 
 class Caja(Base):
@@ -45,16 +46,17 @@ class Usuario(Base):
     El superadmin se distingue por el flag es_superadmin; el resto opera sobre sus
     membresías (ver Membresia). Una misma persona puede tener varias membresías."""
     __tablename__ = "usuarios"
-    __table_args__ = (UniqueConstraint("cedula", name="uq_usuario_cedula"),)
+    __table_args__ = (UniqueConstraint("cedula_bidx", name="uq_usuario_cedula_bidx"),)
     id: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(120))
-    cedula: Mapped[str] = mapped_column(String(20), index=True)
+    nombre: Mapped[str] = mapped_column(EncryptedStr)                       # cifrado
+    cedula: Mapped[str] = mapped_column(EncryptedStr)                       # cifrado
+    cedula_bidx: Mapped[str | None] = mapped_column(String(64), index=True) # HMAC para búsqueda/unicidad
     password_hash: Mapped[str] = mapped_column(String(256))
     es_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     debe_cambiar_password: Mapped[bool] = mapped_column(Boolean, default=False)
     ultimo_acceso: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    totp_secret: Mapped[str] = mapped_column(String(64), default="")
+    totp_secret: Mapped[str] = mapped_column(EncryptedStr, default="")  # cifrado
     pin_hash: Mapped[str] = mapped_column(String(128), default="")  # PIN corto cifrado para desbloqueo rápido
     totp_activo: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -79,25 +81,26 @@ class Membresia(Base):
 
 class Socio(Base):
     __tablename__ = "socios"
-    __table_args__ = (UniqueConstraint("caja_id", "cedula", name="uq_socio_caja_cedula"),)
+    __table_args__ = (UniqueConstraint("caja_id", "cedula_bidx", name="uq_socio_caja_cedula_bidx"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
-    nombres: Mapped[str] = mapped_column(String(120))
-    cedula: Mapped[str] = mapped_column(String(20))
-    telefono: Mapped[str] = mapped_column(String(20), default="")
+    nombres: Mapped[str] = mapped_column(EncryptedStr)                       # cifrado
+    cedula: Mapped[str] = mapped_column(EncryptedStr)                        # cifrado
+    cedula_bidx: Mapped[str | None] = mapped_column(String(64), index=True)  # HMAC búsqueda/unicidad
+    telefono: Mapped[str] = mapped_column(EncryptedStr, default="")          # cifrado
     fecha_ingreso: Mapped[date] = mapped_column(Date, default=date.today)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     # --- Ficha ampliada (para conocer al socio y hacer estudios) ---
     fecha_nacimiento: Mapped[date | None] = mapped_column(Date, nullable=True)
     genero: Mapped[str] = mapped_column(String(20), default="")        # F / M / Otro / NS
-    correo: Mapped[str] = mapped_column(String(120), default="")
-    whatsapp: Mapped[str] = mapped_column(String(20), default="")
-    direccion: Mapped[str] = mapped_column(String(200), default="")
+    correo: Mapped[str] = mapped_column(EncryptedStr, default="")            # cifrado
+    whatsapp: Mapped[str] = mapped_column(EncryptedStr, default="")          # cifrado
+    direccion: Mapped[str] = mapped_column(EncryptedStr, default="")         # cifrado
     ocupacion: Mapped[str] = mapped_column(String(120), default="")     # actividad / lugar de trabajo
     estado_civil: Mapped[str] = mapped_column(String(20), default="")
     nivel_instruccion: Mapped[str] = mapped_column(String(30), default="")
     num_cargas: Mapped[int] = mapped_column(Integer, default=0)          # cargas familiares
-    contacto_emergencia: Mapped[str] = mapped_column(String(160), default="")
+    contacto_emergencia: Mapped[str] = mapped_column(EncryptedStr, default="")  # cifrado
     consentimiento_datos: Mapped[bool] = mapped_column(Boolean, default=False)  # LOPDP
     consentimiento_fecha: Mapped[date | None] = mapped_column(Date, nullable=True)
     import_lote_id: Mapped[int | None] = mapped_column(ForeignKey("import_lotes.id"), nullable=True)
@@ -169,7 +172,7 @@ class Auditoria(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     caja_id: Mapped[int | None] = mapped_column(ForeignKey("cajas.id"), nullable=True, index=True)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
-    usuario_nombre: Mapped[str] = mapped_column(String(120))
+    usuario_nombre: Mapped[str] = mapped_column(EncryptedStr)   # cifrado
     accion: Mapped[str] = mapped_column(String(40))      # crear | pagar | editar | desactivar
     entidad: Mapped[str] = mapped_column(String(40))     # socio | aporte | credito | cuota | caja
     entidad_id: Mapped[int] = mapped_column(Integer)
@@ -188,7 +191,7 @@ class Cierre(Base):
     intereses: Mapped[float] = mapped_column(Float, default=0.0)
     total_ahorro: Mapped[float] = mapped_column(Float, default=0.0)
     num_socios: Mapped[int] = mapped_column(Integer, default=0)
-    creado_por: Mapped[str] = mapped_column(String(120), default="")
+    creado_por: Mapped[str] = mapped_column(EncryptedStr, default="")  # cifrado
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -198,7 +201,7 @@ class SolicitudCambio(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
     socio_id: Mapped[int] = mapped_column(ForeignKey("socios.id"), index=True)
-    socio_nombre: Mapped[str] = mapped_column(String(120))
+    socio_nombre: Mapped[str] = mapped_column(EncryptedStr)   # cifrado
     campos: Mapped[str] = mapped_column(Text, default="{}")   # JSON con los cambios propuestos
     estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # garantes|pendiente|en_aprobacion|correccion|aprobada|rechazada
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -212,7 +215,7 @@ class SolicitudCredito(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     caja_id: Mapped[int] = mapped_column(ForeignKey("cajas.id"), index=True)
     socio_id: Mapped[int] = mapped_column(ForeignKey("socios.id"), index=True)
-    socio_nombre: Mapped[str] = mapped_column(String(120))
+    socio_nombre: Mapped[str] = mapped_column(EncryptedStr)   # cifrado
     monto: Mapped[float] = mapped_column(Float)
     plazo_meses: Mapped[int] = mapped_column(Integer)
     destino: Mapped[str] = mapped_column(String(200), default="")
@@ -225,7 +228,7 @@ class SolicitudCredito(Base):
     tipo: Mapped[str] = mapped_column(String(20), default="ordinario")  # ordinario | emergente
     documentos: Mapped[str] = mapped_column(Text, default="")
     documento_nombre: Mapped[str] = mapped_column(String(160), default="")
-    documento_b64: Mapped[str] = mapped_column(Text, default="")
+    documento_b64: Mapped[str] = mapped_column(EncryptedStr, default="")  # cifrado
     estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # garantes|pendiente|en_aprobacion|correccion|aprobada|rechazada
     motivo: Mapped[str] = mapped_column(String(200), default="")
     credito_id: Mapped[int | None] = mapped_column(ForeignKey("creditos.id"), nullable=True)
@@ -239,7 +242,7 @@ class Acceso(Base):
     __tablename__ = "accesos"
     id: Mapped[int] = mapped_column(primary_key=True)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
-    usuario_nombre: Mapped[str] = mapped_column(String(120))
+    usuario_nombre: Mapped[str] = mapped_column(EncryptedStr)   # cifrado
     caja_id: Mapped[int | None] = mapped_column(ForeignKey("cajas.id"), nullable=True, index=True)
     rol: Mapped[str] = mapped_column(String(20), default="")
     fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
@@ -286,3 +289,11 @@ class ImportLote(Base):
     resumen: Mapped[str] = mapped_column(String(2000), default="")
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+
+# ── Blind index automático para la cédula (búsqueda por igualdad y unicidad) ──
+def _sync_cedula_bidx(mapper, connection, target):
+    target.cedula_bidx = blind_index(target.cedula)
+
+for _modelo in (Usuario, Socio):
+    event.listen(_modelo, "before_insert", _sync_cedula_bidx)
+    event.listen(_modelo, "before_update", _sync_cedula_bidx)

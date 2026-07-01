@@ -85,8 +85,8 @@ def excel_balance(db: Session, caja_id: int) -> bytes:
     _header(ws, ["N°", "Nombres", "Cédula", "F. ingreso",
                  "Ahorro neto", "Multas", "Saldo crédito", "Estado"],
             {"A": 5, "B": 30, "C": 14, "D": 13, "E": 14, "F": 12, "G": 14, "H": 10})
-    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == caja_id)
-                        .order_by(models.Socio.nombres)).all()
+    socios = sorted(db.scalars(select(models.Socio).where(models.Socio.caja_id == caja_id)).all(),
+                    key=lambda s: (s.nombres or "").lower())
     for i, s in enumerate(socios, 1):
         ws.append([i, s.nombres, _mask_cedula(s.cedula), _d(s.fecha_ingreso),
                    _ahorro(db, s.id), round(_multas(db, s.id), 2),
@@ -134,8 +134,8 @@ def excel_completo(db: Session, caja_id: int) -> bytes:
     _header(ws1, ["ID", "Nombres", "Cédula", "Teléfono", "Correo", "WhatsApp",
                   "F. ingreso", "Ahorro neto", "Saldo crédito", "Activo"],
             {"A": 6, "B": 30, "C": 14, "D": 14, "E": 24, "F": 14, "G": 13, "H": 13, "I": 13, "J": 8})
-    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == caja_id)
-                        .order_by(models.Socio.nombres)).all()
+    socios = sorted(db.scalars(select(models.Socio).where(models.Socio.caja_id == caja_id)).all(),
+                    key=lambda s: (s.nombres or "").lower())
     for s in socios:
         ws1.append([s.id, s.nombres, _mask_cedula(s.cedula), s.telefono, s.correo, s.whatsapp,
                     _d(s.fecha_ingreso), _ahorro(db, s.id),

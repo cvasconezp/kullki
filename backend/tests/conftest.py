@@ -11,6 +11,10 @@ os.environ.setdefault("SECRET_KEY", "clave-de-test-no-usar-en-produccion")
 os.environ.setdefault("SUPERADMIN_CEDULA",   "0000000000")
 os.environ.setdefault("SUPERADMIN_PASSWORD", "Admin1234!")
 os.environ.setdefault("BACKUP_ENABLED",      "0")
+# Llaves de cifrado en reposo para los tests (deterministas, solo test)
+from cryptography.fernet import Fernet as _F
+os.environ.setdefault("KULLKI_ENC_KEY",   _F.generate_key().decode())
+os.environ.setdefault("KULLKI_INDEX_KEY", "indexkey-solo-para-tests-0123456789abcdef")
 
 from datetime import date, timedelta
 from fastapi.testclient import TestClient

@@ -271,6 +271,9 @@ def init_db():
                             "garante_estado": "VARCHAR(20) DEFAULT 'pendiente'",
                             "garante2_estado": "VARCHAR(20) DEFAULT ''"})
         _add_cols("usuarios", {"totp_secret": "VARCHAR(64) DEFAULT ''", "totp_activo": "BOOLEAN DEFAULT FALSE", "pin_hash": "VARCHAR(128) DEFAULT ''"})
+        # Cifrado en reposo: columna de blind index para búsqueda/unicidad de cédula
+        _add_cols("usuarios", {"cedula_bidx": "VARCHAR(64)"})
+        _add_cols("socios", {"cedula_bidx": "VARCHAR(64)"})
         _add_cols("cajas", {"permite_eco_ahorro": "BOOLEAN DEFAULT FALSE", "permite_mascotas": "BOOLEAN DEFAULT FALSE", "permite_inversiones": "BOOLEAN DEFAULT FALSE", "permite_credito_educativo": "BOOLEAN DEFAULT FALSE"})
         _add_cols("cajas", {"tipo_caja": "VARCHAR(20) DEFAULT 'normal'"})
         # Crear tabla egresos si no existe

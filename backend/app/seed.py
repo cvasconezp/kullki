@@ -4,6 +4,7 @@ from datetime import date, timedelta
 import random
 from app.database import Base, engine, SessionLocal
 from app import models
+from .crypto import blind_index
 from app.auth import hash_password
 
 NOMBRES = ["María Quilumbaquí", "José Farinango", "Rosa Cabascango", "Luis Tuquerres",
@@ -28,7 +29,7 @@ def _add_months(d, n):
 def _usuario(db, nombre, cedula, password):
     """Reutiliza el usuario si la cédula ya existe (la cédula es única global);
     si no, lo crea. Evita choques al regenerar el demo cuando la cédula ya se usó."""
-    u = db.query(models.Usuario).filter_by(cedula=cedula).first()
+    u = db.query(models.Usuario).filter(models.Usuario.cedula_bidx == blind_index(cedula)).first()
     if not u:
         u = models.Usuario(nombre=nombre, cedula=cedula, password_hash=hash_password(password))
         db.add(u); db.flush()

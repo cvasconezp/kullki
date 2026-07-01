@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from . import models
+from .crypto import blind_index
 from .auth import require_roles, Actor, caja_scope, hash_password
 
 router = APIRouter(prefix="/importar", tags=["importar"])
@@ -532,7 +533,7 @@ def revertir(
 def _buscar_socio(db, cid, cedula, nombre) -> models.Socio | None:
     if cedula:
         s = db.scalar(select(models.Socio).where(
-            models.Socio.caja_id == cid, models.Socio.cedula == cedula))
+            models.Socio.caja_id == cid, models.Socio.cedula_bidx == blind_index(cedula)))
         if s:
             return s
     if nombre:
@@ -547,7 +548,7 @@ def _insertar_socio(db, actor, cid, datos, lote_id):
     cedula = datos["cedula"]
     # Ignorar duplicados
     existe = db.scalar(select(models.Socio).where(
-        models.Socio.caja_id == cid, models.Socio.cedula == cedula))
+        models.Socio.caja_id == cid, models.Socio.cedula_bidx == blind_index(cedula)))
     if existe:
         return False
 
@@ -569,7 +570,7 @@ def _insertar_socio(db, actor, cid, datos, lote_id):
     db.add(socio); db.flush()
 
     # Crear usuario si no existe
-    usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula == cedula))
+    usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula_bidx == blind_index(cedula)))
     if not usuario:
         usuario = models.Usuario(nombre=datos["nombres"], cedula=cedula,
                                   password_hash=hash_password(cedula),

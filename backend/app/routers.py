@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from . import models, schemas
+from .crypto import blind_index
 from .auth import (
     get_identidad,
     Actor, create_token, verify_password, hash_password, membresias_activas,
@@ -118,7 +119,7 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
     espera = _login_bloqueado(data.cedula)
     if espera:
         raise HTTPException(429, f"Demasiados intentos fallidos. Intenta de nuevo en {espera} minuto(s).")
-    user = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
+    user = db.scalar(select(models.Usuario).where(models.Usuario.cedula_bidx == blind_index(data.cedula)))
     if not user or not user.activo or not verify_password(data.password, user.password_hash):
         _registrar_fallo(data.cedula)
         raise HTTPException(401, "Cédula o contraseña incorrecta")
@@ -282,7 +283,7 @@ def totp_estado(actor: Actor = Depends(get_identidad)):
 def _usuario_administrable(db: Session, actor: Actor, cedula: str) -> models.Usuario:
     """Devuelve el usuario objetivo si el actor tiene permiso para gestionarlo.
     Superadmin: cualquiera. Tesorero: solo miembros (socios/directiva) de SU caja."""
-    objetivo = db.scalar(select(models.Usuario).where(models.Usuario.cedula == cedula))
+    objetivo = db.scalar(select(models.Usuario).where(models.Usuario.cedula_bidx == blind_index(cedula)))
     if not objetivo:
         raise HTTPException(404, "No existe un usuario con esa cédula")
     if actor.rol == "superadmin":
@@ -440,7 +441,7 @@ def crear_caja(data: schemas.CajaIn, db: Session = Depends(get_db),
 
     # Cuenta del tesorero: reutiliza si la cédula ya existe (persona en varias cajas)
     tesorero = db.scalar(select(models.Usuario)
-                         .where(models.Usuario.cedula == data.tesorero_cedula))
+                         .where(models.Usuario.cedula_bidx == blind_index(data.tesorero_cedula)))
     # Generar contraseña aleatoria si no se proporcionó
     import secrets, string as _string
     if not data.tesorero_password:
@@ -569,7 +570,7 @@ def crear_directiva(caja_id: int, data: schemas.DirectivaIn, db: Session = Depen
     caja = db.get(models.Caja, caja_id)
     if not caja:
         raise HTTPException(404, "Caja no encontrada")
-    u = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
+    u = db.scalar(select(models.Usuario).where(models.Usuario.cedula_bidx == blind_index(data.cedula)))
     if not u:
         u = models.Usuario(nombre=data.nombre, cedula=data.cedula,
                            password_hash=hash_password(data.password), debe_cambiar_password=True)
@@ -595,8 +596,8 @@ socios_router = APIRouter(prefix="/socios", tags=["socios"])
 def listar_socios(caja_id: int | None = None, db: Session = Depends(get_db),
                   user: models.Usuario = Depends(require_roles("tesorero", "superadmin", "directiva"))):
     cid = caja_scope(user, caja_id)
-    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid)
-                        .order_by(models.Socio.nombres)).all()
+    socios = sorted(db.scalars(select(models.Socio).where(models.Socio.caja_id == cid)).all(),
+                    key=lambda s: (s.nombres or "").lower())
     return [_socio_out(db, s) for s in socios]
 
 
@@ -605,7 +606,7 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
                 actor: Actor = Depends(require_roles("tesorero", "superadmin"))):
     cid = caja_scope(actor, data.caja_id)
     if db.scalar(select(models.Socio).where(models.Socio.caja_id == cid,
-                                            models.Socio.cedula == data.cedula)):
+                                            models.Socio.cedula_bidx == blind_index(data.cedula))):
         raise HTTPException(400, "Ya existe un socio con esa cédula en esta caja")
     socio = models.Socio(caja_id=cid, nombres=data.nombres, cedula=data.cedula,
                          telefono=data.telefono,
@@ -624,7 +625,7 @@ def crear_socio(data: schemas.SocioIn, db: Session = Depends(get_db),
 
     # Cuenta de acceso: una sola por persona (cédula). Si ya existe (porque es
     # socia/tesorera de otra caja), la REUTILIZAMOS y solo añadimos la membresía.
-    usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula == data.cedula))
+    usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula_bidx == blind_index(data.cedula)))
     if not usuario:
         usuario = models.Usuario(nombre=data.nombres, cedula=data.cedula,
                                  password_hash=hash_password(data.cedula),
@@ -733,7 +734,7 @@ async def importar_socios_excel(
 
         # ¿Ya existe?
         if db.scalar(select(models.Socio).where(
-            models.Socio.caja_id == cid, models.Socio.cedula == cedula)):
+            models.Socio.caja_id == cid, models.Socio.cedula_bidx == blind_index(cedula))):
             omitidos += 1
             continue
 
@@ -761,7 +762,7 @@ async def importar_socios_excel(
             db.add(socio)
             db.flush()
 
-            usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula == cedula))
+            usuario = db.scalar(select(models.Usuario).where(models.Usuario.cedula_bidx == blind_index(cedula)))
             if not usuario:
                 usuario = models.Usuario(nombre=nombres, cedula=cedula,
                                          password_hash=hash_password(cedula),
@@ -1409,8 +1410,8 @@ def listar_garantes(db: Session = Depends(get_db), actor: Actor = Depends(get_cu
     if not actor.caja_id and actor.rol != "superadmin":
         return []
     cid = actor.caja_id
-    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
-                        models.Socio.activo).order_by(models.Socio.nombres)).all()
+    socios = sorted(db.scalars(select(models.Socio).where(models.Socio.caja_id == cid,
+                        models.Socio.activo)).all(), key=lambda s: (s.nombres or "").lower())
     yo = actor.socio_id
     return [{"id": x.id, "nombre": x.nombres} for x in socios if x.id != yo]
 
@@ -1883,8 +1884,8 @@ def informe_asamblea(caja_id: int | None = None, db: Session = Depends(get_db),
     """Informe imprimible para la asamblea: estado de la caja y fila por socio."""
     cid = caja_scope(user, caja_id)
     dash = dashboard(caja_id=cid, db=db, user=user)
-    socios = db.scalars(select(models.Socio).where(models.Socio.caja_id == cid)
-                        .order_by(models.Socio.nombres)).all()
+    socios = sorted(db.scalars(select(models.Socio).where(models.Socio.caja_id == cid)).all(),
+                    key=lambda s: (s.nombres or "").lower())
     filas = []
     for s in socios:
         info = _socio_out(db, s)
