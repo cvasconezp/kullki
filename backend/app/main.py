@@ -175,27 +175,23 @@ def init_db():
         # Acordado: la base de producción solo tiene datos demo. Si la tabla
         # 'usuarios' aún tiene la columna 'rol' o NO existe 'membresias',
         # se borra y se crea el esquema nuevo. Controlado por RESET_SCHEMA != "0".
-        if os.getenv("RESET_SCHEMA", "1") != "0":
-            from sqlalchemy import inspect
-            insp = inspect(engine)
-            tablas = insp.get_table_names()
-            esquema_viejo = False
-            if "usuarios" in tablas:
-                cols = {c["name"] for c in insp.get_columns("usuarios")}
-                # "rol"/sin membresias = esquema pre-membresías; sin "cedula_bidx" =
-                # esquema previo al cifrado en reposo. En ambos casos hay que recrear.
-                if "rol" in cols or "membresias" not in tablas or "cedula_bidx" not in cols:
-                    esquema_viejo = True
-            if esquema_viejo:
-                from sqlalchemy import text
-                if engine.dialect.name == "postgresql":
-                    # drop_all falla por el orden de las FK; recrear el schema es atómico
-                    with engine.begin() as conn:
-                        conn.execute(text("DROP SCHEMA public CASCADE"))
-                        conn.execute(text("CREATE SCHEMA public"))
-                else:
-                    Base.metadata.drop_all(bind=engine)
-                log.warning("Esquema previo detectado (pre-membresías o pre-cifrado): base recreada.")
+        _reset = os.getenv("RESET_SCHEMA", "1") != "0"
+        _enc_ok = bool(os.getenv("KULLKI_ENC_KEY")) and bool(os.getenv("KULLKI_INDEX_KEY"))
+        print(f"[kullki-init] RESET_SCHEMA={os.getenv('RESET_SCHEMA')!r} -> reset={_reset} | "
+              f"KULLKI_ENC_KEY set={bool(os.getenv('KULLKI_ENC_KEY'))} | "
+              f"KULLKI_INDEX_KEY set={bool(os.getenv('KULLKI_INDEX_KEY'))}", flush=True)
+        if _reset:
+            # RESET_SCHEMA activo: recrear el esquema desde cero (borra datos).
+            # Producción usa RESET_SCHEMA=0, así que esto NUNCA corre ahí.
+            from sqlalchemy import text
+            if engine.dialect.name == "postgresql":
+                with engine.begin() as conn:
+                    conn.execute(text("DROP SCHEMA public CASCADE"))
+                    conn.execute(text("CREATE SCHEMA public"))
+            else:
+                Base.metadata.drop_all(bind=engine)
+            print("[kullki-init] RESET_SCHEMA activo: esquema recreado (datos borrados).", flush=True)
+            log.warning("RESET_SCHEMA activo: base recreada.")
 
         Base.metadata.create_all(bind=engine)
 
@@ -356,6 +352,14 @@ def init_db():
                     enriquecer_demo()
                 except Exception:
                     log.exception("Enriquecer demo falló (no crítico).")
+            # Diagnóstico de arranque (no crítico): confirma cifrado operativo
+            try:
+                _sa = db.scalar(select(models.Usuario).where(models.Usuario.es_superadmin))
+                _nu = db.query(models.Usuario).count()
+                print(f"[kullki-init] usuarios={_nu} | superadmin_existe={_sa is not None} | "
+                      f"superadmin_bidx_set={bool(_sa and _sa.cedula_bidx)}", flush=True)
+            except Exception as _e:
+                print(f"[kullki-init] diagnostico fallo: {_e!r}", flush=True)
         finally:
             db.close()
     except Exception:
