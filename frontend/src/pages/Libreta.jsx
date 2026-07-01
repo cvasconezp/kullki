@@ -38,6 +38,19 @@ export default function Libreta({ vista = "libreta" }) {
     cajaInfo: { nombre: caja_nombre, color_primario: _ses.color_primario, color_acento: _ses.color_acento, logo: _ses.logo },
   });
 
+  // Reimpresión del comprobante de un retiro del socio.
+  const comprobanteRetiro = (r) => imprimirBoucher({
+    tipo: "retiro",
+    monto: r.monto,
+    fecha: r.fecha,
+    hora: r.creado_en ? new Date(r.creado_en).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: false }) : undefined,
+    transaccionId: r.id,
+    socioId: socio.id,
+    socio: { nombres: socio.nombres, cedula: socio.cedula },
+    nota: r.nota,
+    cajaInfo: { nombre: caja_nombre, color_primario: _ses.color_primario, color_acento: _ses.color_acento, logo: _ses.logo },
+  });
+
   // ---------------- Crédito ----------------
   if (vista === "credito") {
     return (
@@ -113,6 +126,10 @@ export default function Libreta({ vista = "libreta" }) {
     t === "ordinario" ? "Aporte mensual"
       : t === "multa" ? "Multa"
       : t === "ingreso" ? "Cuota de ingreso"
+      : t === "eco_ahorro" ? "🌿 Eco ahorro"
+      : t === "mascotas" ? "🐾 Ahorro de mascotas"
+      : t === "inversion" ? "📈 Inversión"
+      : t === "credito_educativo" ? "🎓 Crédito educativo"
       : "Aporte extraordinario";
 
   return (
@@ -167,6 +184,26 @@ export default function Libreta({ vista = "libreta" }) {
           </div>
         ))}
       </div>
+
+      {(lib.retiros || []).length > 0 && (
+        <div className="tarjeta">
+          <h3>Tus retiros</h3>
+          {(lib.retiros || []).map((r) => (
+            <div className="fila" key={r.id}>
+              <div>
+                <div className="principal">Retiro de ahorro</div>
+                <div className="detalle">{fechaCorta(r.fecha)}{r.nota ? ` · ${r.nota}` : ""}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div className="cifra neg">−{usd(r.monto)}</div>
+                <div className="acciones-mov">
+                  <button onClick={() => comprobanteRetiro(r)}>🖨 Comprobante</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
