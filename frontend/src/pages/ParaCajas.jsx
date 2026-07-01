@@ -20,13 +20,14 @@ export default function ParaCajas() {
 
   const [anosHistorial, setAnos] = useState(3);
   const IVA = 0.15;
-  // Precio anual recurrente
-  const precioIva      = precioCalc * (1 + IVA);            // precio anual con IVA
-  // Activación + migración: pago único de año 1, base propia
-  const costoMigracion = 15 + (socios * 0.30) + (anosHistorial * 5); // activación sin IVA
-  const activacionIva  = costoMigracion * (1 + IVA);        // activación con IVA
-  // Total a pagar en el año 1 = precio anual (con IVA) + activación (con IVA)
-  const totalAno1Iva   = precioIva + activacionIva;
+  // Activación + migración: costo único del primer año (sin IVA)
+  const costoMigracion = 15 + (socios * 0.30) + (anosHistorial * 5);
+  // Un solo IVA sobre una sola base imponible del primer año
+  const baseAno1       = precioCalc + costoMigracion;       // base imponible total año 1
+  const ivaAno1        = baseAno1 * IVA;                     // IVA único (15 %)
+  const totalAno1Iva   = baseAno1 * (1 + IVA);              // total con IVA del primer año
+  // Precio recurrente (año 2 en adelante), con IVA incluido
+  const precioIva      = precioCalc * (1 + IVA);
   const porSocioMesIva = precioIva / 12 / socios;
 
   const fmt = (n) => n.toLocaleString("es-EC", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -159,7 +160,7 @@ export default function ParaCajas() {
                 ${fmt(Math.round(precioIva))}<span> / año</span>
               </div>
               <div className="lp-calc-iva-det">
-                Base: ${fmt(precioCalc)} + IVA 15 %: ${fmt(Math.round(precioCalc * IVA))}
+                precio anual · IVA 15 % incluido
               </div>
               <div className="lp-calc-desglose">
                 <div className="lp-calc-linea">
@@ -171,7 +172,7 @@ export default function ParaCajas() {
                   <span>${fmt(compSocios)}</span>
                 </div>
                 {enPiso && (
-                  <div className="lp-calc-piso">⚡ Precio mínimo aplicado ($120 + IVA = $138)</div>
+                  <div className="lp-calc-piso">⚡ Precio mínimo aplicado · $138 / año con IVA</div>
                 )}
               </div>
               <ul className="lp-calc-incluye">
@@ -194,10 +195,15 @@ export default function ParaCajas() {
               <div className="lp-calc-mig-box">
                 <div className="lp-calc-mig-header">
                   <span className="lp-calc-mig-ico">📂</span>
-                  <span>Activación + migración de datos <em>(solo año 1)</em></span>
+                  <span>Tu primer año · todo incluido</span>
                 </div>
                 <div className="lp-calc-linea">
-                  <span>Configuración base</span><span>$15.00</span>
+                  <span>Precio anual del servicio</span>
+                  <span>${precioCalc.toFixed(2)}</span>
+                </div>
+                <div className="lp-calc-linea">
+                  <span>Configuración base <em>(pago único)</em></span>
+                  <span>$15.00</span>
                 </div>
                 <div className="lp-calc-linea">
                   <span>Migración · {socios} socios × $0.30</span>
@@ -207,28 +213,20 @@ export default function ParaCajas() {
                   <span>Historial · {anosHistorial} año{anosHistorial !== 1 ? "s" : ""} × $5</span>
                   <span>${(anosHistorial * 5).toFixed(2)}</span>
                 </div>
-                <div className="lp-calc-linea">
-                  <span>Subtotal activación</span>
-                  <span>${costoMigracion.toFixed(2)}</span>
+                <div className="lp-calc-linea lp-calc-linea-suma">
+                  <span>Subtotal (base imponible)</span>
+                  <span>${baseAno1.toFixed(2)}</span>
                 </div>
                 <div className="lp-calc-linea">
                   <span>IVA 15 %</span>
-                  <span>${(costoMigracion * IVA).toFixed(2)}</span>
-                </div>
-                <div className="lp-calc-mig-total">
-                  <span>Activación con IVA <em>(pago único)</em></span>
-                  <span>${activacionIva.toFixed(2)}</span>
-                </div>
-                <div className="lp-calc-linea lp-calc-linea-suma">
-                  <span>+ Precio anual con IVA</span>
-                  <span>${precioIva.toFixed(2)}</span>
+                  <span>${ivaAno1.toFixed(2)}</span>
                 </div>
                 <div className="lp-calc-mig-total lp-calc-mig-total-grande">
-                  <span>Total a pagar año 1 (con IVA)</span>
+                  <span>Total primer año</span>
                   <span>${totalAno1Iva.toFixed(2)}</span>
                 </div>
                 <div className="lp-calc-mig-rec">
-                  Año 2 en adelante: precio recalculado + IVA en cada renovación según el tamaño de tu caja
+                  Desde el año 2 pagas solo el precio anual: <strong>${precioIva.toFixed(2)}</strong> con IVA, recalculado según el tamaño de tu caja.
                 </div>
               </div>
               <a className="lp-cta lp-calc-cta" href="#contacto">
