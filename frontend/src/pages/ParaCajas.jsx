@@ -19,11 +19,14 @@ export default function ParaCajas() {
   const capitalXdolar  = Math.round(capital / precioCalc);
 
   const [anosHistorial, setAnos] = useState(3);
-  const costoMigracion = 15 + (socios * 0.30) + (anosHistorial * 5);
-  const totalAno1 = precioCalc + costoMigracion;
   const IVA = 0.15;
-  const precioIva   = precioCalc * (1 + IVA);
-  const totalAno1Iva = totalAno1 * (1 + IVA);
+  // Precio anual recurrente
+  const precioIva      = precioCalc * (1 + IVA);            // precio anual con IVA
+  // Activación + migración: pago único de año 1, base propia
+  const costoMigracion = 15 + (socios * 0.30) + (anosHistorial * 5); // activación sin IVA
+  const activacionIva  = costoMigracion * (1 + IVA);        // activación con IVA
+  // Total a pagar en el año 1 = precio anual (con IVA) + activación (con IVA)
+  const totalAno1Iva   = precioIva + activacionIva;
   const porSocioMesIva = precioIva / 12 / socios;
 
   const fmt = (n) => n.toLocaleString("es-EC", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -205,15 +208,23 @@ export default function ParaCajas() {
                   <span>${(anosHistorial * 5).toFixed(2)}</span>
                 </div>
                 <div className="lp-calc-linea">
-                  <span>Subtotal año 1</span>
-                  <span>${totalAno1.toFixed(2)}</span>
+                  <span>Subtotal activación</span>
+                  <span>${costoMigracion.toFixed(2)}</span>
                 </div>
                 <div className="lp-calc-linea">
                   <span>IVA 15 %</span>
-                  <span>${(totalAno1 * IVA).toFixed(2)}</span>
+                  <span>${(costoMigracion * IVA).toFixed(2)}</span>
                 </div>
                 <div className="lp-calc-mig-total">
-                  <span>Total año 1 (con IVA)</span>
+                  <span>Activación con IVA <em>(pago único)</em></span>
+                  <span>${activacionIva.toFixed(2)}</span>
+                </div>
+                <div className="lp-calc-linea lp-calc-linea-suma">
+                  <span>+ Precio anual con IVA</span>
+                  <span>${precioIva.toFixed(2)}</span>
+                </div>
+                <div className="lp-calc-mig-total lp-calc-mig-total-grande">
+                  <span>Total a pagar año 1 (con IVA)</span>
                   <span>${totalAno1Iva.toFixed(2)}</span>
                 </div>
                 <div className="lp-calc-mig-rec">
@@ -358,7 +369,7 @@ export default function ParaCajas() {
         </div>
       </section>
 
-      {/* ── CONTACTO ── */}}
+      {/* ── CONTACTO ── */}
       <section id="contacto" className="lp-contacto">
         <div className="lp-contacto-in">
           <span className="lp-eyebrow">Sin compromiso · Respondemos en menos de 24 h</span>
