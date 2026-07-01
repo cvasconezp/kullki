@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, usd, fechaCorta, mascaraCedula } from "../lib/api.js";
+import { api, usd, fechaCorta, mascaraCedula, getSesion } from "../lib/api.js";
+import { imprimirBoucher } from "../lib/exportar.js";
 import ExportarEstado from "../components/ExportarEstado.jsx";
 import MisDatos from "../components/MisDatos.jsx";
 import Seguridad2FA from "../components/Seguridad2FA.jsx";
@@ -22,6 +23,20 @@ export default function Libreta({ vista = "libreta" }) {
 
   const { socio, caja_nombre, aportes, creditos } = lib;
   const activos = creditos.filter((c) => c.estado === "activo");
+
+  // Reimpresión del comprobante de un aporte del socio.
+  const _ses = getSesion() || {};
+  const comprobanteAporte = (a) => imprimirBoucher({
+    tipo: a.tipo,
+    monto: a.monto,
+    fecha: a.fecha,
+    hora: a.creado_en ? new Date(a.creado_en).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: false }) : undefined,
+    transaccionId: a.id,
+    socioId: socio.id,
+    socio: { nombres: socio.nombres, cedula: socio.cedula },
+    nota: a.nota,
+    cajaInfo: { nombre: caja_nombre, color_primario: _ses.color_primario, color_acento: _ses.color_acento, logo: _ses.logo },
+  });
 
   // ---------------- Crédito ----------------
   if (vista === "credito") {
@@ -143,7 +158,12 @@ export default function Libreta({ vista = "libreta" }) {
               <div className="detalle">{fechaCorta(a.fecha)}{a.nota ? ` · ${a.nota}` : ""}
                 {a.tipo === "ingreso" ? " · no cuenta como ahorro" : ""}</div>
             </div>
-            <div className="cifra pos">{usd(a.monto)}</div>
+            <div style={{ textAlign: "right" }}>
+              <div className="cifra pos">{usd(a.monto)}</div>
+              <div className="acciones-mov">
+                <button onClick={() => comprobanteAporte(a)}>🖨 Comprobante</button>
+              </div>
+            </div>
           </div>
         ))}
       </div>

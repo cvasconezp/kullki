@@ -204,6 +204,22 @@ export default function Aportes() {
     } catch (e) { setError(e.message); }
   };
 
+  // Reimprime el comprobante de un movimiento ya registrado (aporte o retiro).
+  const reimprimirComprobante = (m) => {
+    imprimirBoucher({
+      tipo: m.tipo,
+      monto: m.monto,
+      fecha: m.fecha,
+      hora: _hora(m.creado_en),
+      transaccionId: m.id,
+      socioId: m.socio_id,
+      socio: { nombres: m.socio_nombres, cedula: m.socio_cedula },
+      nota: m.nota,
+      registradoPor: ses.nombre,
+      cajaInfo: { nombre: ses.caja_nombre, color_primario: ses.color_primario, color_acento: ses.color_acento, logo: ses.logo },
+    });
+  };
+
   const movimientos = [
     ...(aportes || []).map((a) => ({ ...a, _t: "aporte" })),
     ...retiros.map((r) => ({ ...r, _t: "retiro", tipo: "retiro" })),
@@ -343,10 +359,15 @@ export default function Aportes() {
                 <div className={"cifra " + (m._t === "retiro" ? "neg" : "pos")} style={m.anulado ? { textDecoration: "line-through" } : {}}>
                   {m._t === "retiro" ? "−" : ""}{usd(m.monto)}
                 </div>
-                {editable(m) && editId !== id && (
+                {!m.anulado && editId !== id && (
                   <div className="acciones-mov">
-                    <button onClick={() => { setEditId(id); setEditMonto(String(m.monto)); }}>✎ Editar</button>
-                    <button onClick={() => anular(m)}>✕ Anular</button>
+                    <button onClick={() => reimprimirComprobante(m)}>🖨 Comprobante</button>
+                    {editable(m) && (
+                      <>
+                        <button onClick={() => { setEditId(id); setEditMonto(String(m.monto)); }}>✎ Editar</button>
+                        <button onClick={() => anular(m)}>✕ Anular</button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
