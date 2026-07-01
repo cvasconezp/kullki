@@ -182,7 +182,9 @@ def init_db():
             esquema_viejo = False
             if "usuarios" in tablas:
                 cols = {c["name"] for c in insp.get_columns("usuarios")}
-                if "rol" in cols or "membresias" not in tablas:
+                # "rol"/sin membresias = esquema pre-membresías; sin "cedula_bidx" =
+                # esquema previo al cifrado en reposo. En ambos casos hay que recrear.
+                if "rol" in cols or "membresias" not in tablas or "cedula_bidx" not in cols:
                     esquema_viejo = True
             if esquema_viejo:
                 from sqlalchemy import text
@@ -193,7 +195,7 @@ def init_db():
                         conn.execute(text("CREATE SCHEMA public"))
                 else:
                     Base.metadata.drop_all(bind=engine)
-                log.warning("Esquema viejo detectado: base recreada para multi-membresía.")
+                log.warning("Esquema previo detectado (pre-membresías o pre-cifrado): base recreada.")
 
         Base.metadata.create_all(bind=engine)
 
